@@ -38,9 +38,9 @@ class TokenFilter(logging.Filter):
         self.token = token
     
     def filter(self, record):
-        # Пропускаем getUpdates запросы (слишком шумные)
         if hasattr(record, 'msg') and isinstance(record.msg, str):
-            if '/getUpdates' in record.msg:
+            # Пропускаем getUpdates запросы только если статус 200
+            if '/getUpdates' in record.msg and '200 OK' in record.msg:
                 return False
             record.msg = record.msg.replace(self.token, '***')
         if hasattr(record, 'args') and record.args:
