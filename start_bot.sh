@@ -17,8 +17,23 @@ fi
 
 # Активируем виртуальное окружение и запускаем бота в фоне
 source venv/bin/activate
+
+# Очищаем старый лог
+> bot_output.log
+
 nohup python3 bot.py > bot_output.log 2>&1 &
 BOT_PID=$!
+
+# Ждём немного и проверяем, не упал ли бот сразу
+sleep 1
+
+# Проверяем, жив ли процесс
+if ! ps -p $BOT_PID > /dev/null; then
+    echo "❌ Ошибка при запуске бота!"
+    echo ""
+    cat bot_output.log
+    exit 1
+fi
 
 # Сохраняем PID в файл
 echo $BOT_PID > bot.pid

@@ -6,6 +6,7 @@
 import sqlite3
 import json
 import logging
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -21,16 +22,26 @@ class Database:
         self.db_path = db_path
         self.conn: Optional[sqlite3.Connection] = None
         self._connect()
-        self._create_tables()
 
     def _connect(self):
         """Подключение к базе данных"""
+        # Не создаём файл если он не существует
+        if not os.path.exists(self.db_path):
+            logger.info(f"База данных не существует: {self.db_path}")
+            return
+        
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         logger.info(f"Подключено к базе данных: {self.db_path}")
 
-    def _create_tables(self):
+    def create_tables(self):
         """Создание таблиц если они не существуют"""
+        # Если БД не существует, создаём её
+        if not self.conn:
+            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self.conn.row_factory = sqlite3.Row
+            logger.info(f"Создана база данных: {self.db_path}")
+        
         cursor = self.conn.cursor()
 
         # Таблица настроек бота
@@ -83,6 +94,8 @@ class Database:
 
     def get_setting(self, key: str, default: Any = None) -> Any:
         """Получение настройки по ключу"""
+        if not self.conn:
+            return default
         cursor = self.conn.cursor()
         cursor.execute('SELECT value FROM settings WHERE key = ?', (key,))
         row = cursor.fetchone()
@@ -95,6 +108,9 @@ class Database:
 
     def set_setting(self, key: str, value: Any):
         """Сохранение настройки"""
+        if not self.conn:
+            logger.error(f"Нельзя сохранить настройку {key}: база данных не подключена")
+            return
         cursor = self.conn.cursor()
         cursor.execute('''
             INSERT OR REPLACE INTO settings (key, value, updated_at)
@@ -151,6 +167,8 @@ class Database:
 
     def get_poll_schedules(self) -> List[Dict[str, Any]]:
         """Получение всех расписаний опросов"""
+        if not self.conn:
+            return []
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM poll_schedules ORDER BY created_at')
         rows = cursor.fetchall()
@@ -163,6 +181,9 @@ class Database:
 
     def add_poll_schedule(self, schedule: Dict[str, Any]):
         """Добавление расписания опроса"""
+        if not self.conn:
+            logger.error("Нельзя добавить расписание: база данных не подключена")
+            return
         cursor = self.conn.cursor()
         schedule_id = schedule.get('id', str(datetime.now().timestamp()))
         cursor.execute('''
@@ -183,6 +204,9 @@ class Database:
 
     def update_poll_schedule(self, schedule_id: str, updates: Dict[str, Any]):
         """Обновление расписания опроса"""
+        if not self.conn:
+            logger.error("Нельзя обновить расписание: база данных не подключена")
+            return
         cursor = self.conn.cursor()
         set_clause = ', '.join([f"{key} = ?" for key in updates.keys()])
         values = list(updates.values()) + [schedule_id]
@@ -195,12 +219,17 @@ class Database:
 
     def remove_poll_schedule(self, schedule_id: str):
         """Удаление расписания опроса"""
+        if not self.conn:
+            logger.error("Нельзя удалить расписание: база данных не подключена")
+            return
         cursor = self.conn.cursor()
         cursor.execute('DELETE FROM poll_schedules WHERE id = ?', (schedule_id,))
         self.conn.commit()
 
     def get_poll_schedule(self, schedule_id: str) -> Optional[Dict[str, Any]]:
         """Получение расписания по ID"""
+        if not self.conn:
+            return None
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM poll_schedules WHERE id = ?', (schedule_id,))
         row = cursor.fetchone()
@@ -212,10 +241,13 @@ class Database:
 
     # ==================== Методы для работы с активными опросами ====================
 
-    def add_active_poll(self, poll_id: str, chat_id: str, message_id: int, 
-                        message_thread_id: Optional[int] = None, 
+    def add_active_poll(self, poll_id: str, chat_id: str, message_id: int,
+                        message_thread_id: Optional[int] = None,
                         template_id: Optional[str] = None):
         """Добавление активного опроса"""
+        if not self.conn:
+            logger.error("Нельзя добавить активный опрос: база данных не подключена")
+            return
         cursor = self.conn.cursor()
         cursor.execute('''
             INSERT INTO active_polls (id, chat_id, message_id, message_thread_id, template_id)
@@ -225,6 +257,8 @@ class Database:
 
     def get_active_polls(self) -> List[Dict[str, Any]]:
         """Получение всех активных опросов"""
+        if not self.conn:
+            return []
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM active_polls ORDER BY created_at')
         rows = cursor.fetchall()
@@ -236,12 +270,17 @@ class Database:
 
     def remove_active_poll(self, poll_id: str):
         """Удаление активного опроса"""
+        if not self.conn:
+            logger.error("Нельзя удалить активный опрос: база данных не подключена")
+            return
         cursor = self.conn.cursor()
         cursor.execute('DELETE FROM active_polls WHERE id = ?', (poll_id,))
         self.conn.commit()
 
     def get_active_poll(self, poll_id: str) -> Optional[Dict[str, Any]]:
         """Получение активного опроса по ID"""
+        if not self.conn:
+            return None
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM active_polls WHERE id = ?', (poll_id,))
         row = cursor.fetchone()

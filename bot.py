@@ -396,22 +396,6 @@ class VolleyBot:
         return poll_message
 
 
-import signal
-import sys
-
-# Глобальная переменная для управления остановкой бота
-bot_should_stop = False
-
-def signal_handler(sig, frame):
-    """Обработчик сигнала остановки"""
-    global bot_should_stop
-    logger.info("Получен сигнал остановки. Завершаем работу бота...")
-    bot_should_stop = True
-
-# Регистрируем обработчик сигнала
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
 # Экземпляр бота
 volley_bot = VolleyBot(db_path="volleybot.db")
 
@@ -985,9 +969,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'step': 'schedule_changing_time',
             'schedule_id': schedule_id
         }
-        
+
         await query.edit_message_text(
-            text="Введите новое время тренировки в формате ЧЧ:ММ (например, 18:00):",
+            text="Введите новое время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data=f"edit_schedule:{schedule_id}")]])
         )
 
@@ -1216,7 +1200,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         creation_states[user_id] = {'step': 'changing_training_time'}
         await query.edit_message_text(
-            text="Введите время тренировки в формате ЧЧ:ММ (например, 18:00):",
+            text="Введите время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='edit_default_template')]])
         )
         
@@ -1310,9 +1294,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'training_day': state['training_day'],
                     'poll_day': selected_day
                 }
-                
+
                 await query.edit_message_text(
-                    text="Введите время тренировки в формате ЧЧ:ММ (например, 18:00):",
+                    text="Введите время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
                 )
             else:
@@ -1482,7 +1466,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 creation_states[user_id]['step'] = 'waiting_training_time_input'
 
                 await query.edit_message_text(
-                    text="Введите время тренировки в формате ЧЧ:ММ (например, 18:00):",
+                    text="Введите время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
                 )
             else:
@@ -1701,18 +1685,6 @@ async def schedule_poll_creation(context: ContextTypes.DEFAULT_TYPE):
     await volley_bot.create_polls_for_all_enabled_templates(context.bot)
 
 
-async def stop_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда для остановки бота (только для администраторов)"""
-    user_id = update.effective_user.id
-    if user_id not in volley_bot.admin_user_ids:
-        await update.message.reply_text('❌ У вас нет прав для остановки бота.')
-        return
-    
-    global bot_should_stop
-    bot_should_stop = True
-    await update.message.reply_text('🛑 Бот будет остановлен...')
-    
-
 def main():
     """Основная функция запуска бота"""
     # Создаем приложение
@@ -1733,7 +1705,6 @@ def main():
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("getid", get_user_id))
-    application.add_handler(CommandHandler("stop_bot", stop_bot_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
