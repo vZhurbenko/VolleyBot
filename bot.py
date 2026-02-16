@@ -514,29 +514,43 @@ async def create_once_poll(update, context, state):
 # Экземпляр бота
 volley_bot = VolleyBot(db_path="volleybot.db")
 
-# Настраиваем фильтрацию логов httpx
+# Маскируем токен в логах httpx на уровне всего логгера
 httpx_logger = logging.getLogger('httpx')
-token_filter = TokenFilter(volley_bot.bot_token)
-httpx_logger.addFilter(token_filter)
 httpx_logger.propagate = False
 
-# Создаём handler с маскировкой токена для httpx
-httpx_handler = logging.StreamHandler()
-httpx_handler.setLevel(logging.INFO)
-httpx_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-token_masking_handler = TokenMaskingHandler(volley_bot.bot_token, httpx_handler)
-httpx_logger.addHandler(token_masking_handler)
+# Создаём свой handler с полной маскировкой
+class MaskingStreamHandler(logging.StreamHandler):
+    def __init__(self, token):
+        super().__init__()
+        self.token = token
+        self.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    
+    def emit(self, record):
+        # Маскируем токен в сообщении
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            # Пропускаем getUpdates с 200 OK
+            msg = record.getMessage() if hasattr(record, 'getMessage') else str(record.msg)
+            if '/getUpdates' in msg and '200 OK' in msg:
+                return
+            record.msg = record.msg.replace(self.token, '***')
+        if hasattr(record, 'args') and record.args:
+            record.args = tuple(
+                arg.replace(self.token, '***') if isinstance(arg, str) else arg
+                for arg in record.args
+            )
+        super().emit(record)
 
-# Применяем TokenMaskingHandler ко всем handler'ам корневого логгера
+httpx_handler = MaskingStreamHandler(volley_bot.bot_token)
+httpx_handler.setLevel(logging.INFO)
+httpx_logger.addHandler(httpx_handler)
+
+# Также маскируем токен в корневом логгере (для telegram.ext и других)
 root_logger = logging.getLogger()
 for handler in root_logger.handlers:
-    if not isinstance(handler, TokenMaskingHandler):
-        # Добавляем TokenMaskingHandler для маскировки токена
-        wrapped = TokenMaskingHandler(volley_bot.bot_token, handler)
-        # Копируем настройки
+    if not isinstance(handler, MaskingStreamHandler):
+        wrapped = MaskingStreamHandler(volley_bot.bot_token)
         wrapped.setLevel(handler.level)
         wrapped.setFormatter(handler.formatter)
-        # Заменяем handler
         root_logger.addHandler(wrapped)
         root_logger.removeHandler(handler)
 
