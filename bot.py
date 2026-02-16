@@ -4,6 +4,19 @@ Volleyball Poll Bot - продвинутый Telegram-бот для управл
 """
 
 import logging
+
+# Настраиваем логирование httpx ДО импорта telegram
+# Это нужно чтобы перехватить логи до создания handler'ов
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
+# Очищаем handler'ы httpx до импорта telegram
+httpx_logger = logging.getLogger('httpx')
+httpx_logger.handlers = []
+httpx_logger.propagate = True  # Передаём в корневой логгер
+
 import asyncio
 import uuid
 from datetime import datetime, timedelta
@@ -24,65 +37,62 @@ from telegram.ext import (
 from database import Database
 
 
-# Настройка логирования
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
 logger = logging.getLogger(__name__)
 
-# Фильтр для скрытия токена бота и getUpdates в логах httpx
-class TokenFilter(logging.Filter):
-    def __init__(self, token):
-        super().__init__()
-        self.token = token
-
+# Фильтр для маскировки токена и фильтрации getUpdates
+class TokenMaskingFilter(logging.Filter):
+    """Фильтр для маскировки токена и фильтрации getUpdates"""
+    
+    # Токен будет установлен после загрузки
+    _token = None
+    
+    @classmethod
+    def set_token(cls, token):
+        cls._token = token
+    
     def filter(self, record):
-        # Получаем полное сообщение
+        if not self._token:
+            return True
+        
+        # Получаем сообщение
         msg = record.getMessage() if hasattr(record, 'getMessage') else str(record.msg)
         
-        # Пропускаем getUpdates запросы только если статус 200
+        # Пропускаем getUpdates с 200 OK
         if '/getUpdates' in msg and '200 OK' in msg:
             return False
         
-        # Маскируем токен во всех полях record
-        self._replace_token(record)
-        
         return True
-    
-    def _replace_token(self, record):
-        """Замена токена во всех строковых полях record"""
-        if hasattr(record, 'msg'):
-            if isinstance(record.msg, str):
-                record.msg = record.msg.replace(self.token, '***')
-        if hasattr(record, 'args') and record.args:
-            record.args = tuple(
-                arg.replace(self.token, '***') if isinstance(arg, str) else arg
-                for arg in record.args
-            )
 
 
-# Handler со скрытием токена
-class TokenMaskingHandler(logging.Handler):
-    def __init__(self, token, wrapped_handler):
-        super().__init__()
-        self.token = token
-        self.wrapped_handler = wrapped_handler
-        self.setLevel(wrapped_handler.level)
+# Formatter с маскировкой токена
+class TokenMaskingFormatter(logging.Formatter):
+    """Formatter который маскирует токен в отформатированном сообщении"""
     
-    def emit(self, record):
-        try:
-            # Маскируем токен во всех полях
-            if hasattr(record, 'msg') and isinstance(record.msg, str):
-                record.msg = record.msg.replace(self.token, '***')
-            if hasattr(record, 'args') and record.args:
-                record.args = tuple(
-                    arg.replace(self.token, '***') if isinstance(arg, str) else arg
-                    for arg in record.args
-                )
-            self.wrapped_handler.emit(record)
-        except Exception:
-            self.handleError(record)
+    _token = None
+    
+    @classmethod
+    def set_token(cls, token):
+        cls._token = token
+    
+    def __init__(self, fmt=None, datefmt=None, style='%', validate=True):
+        super().__init__(fmt, datefmt, style, validate)
+    
+    def format(self, record):
+        original = super().format(record)
+        if self._token:
+            return original.replace(self._token, '***')
+        return original
+
+
+# Применяем фильтр ко всем handler'ам
+token_filter = TokenMaskingFilter()
+for handler in logging.root.handlers[:]:
+    handler.addFilter(token_filter)
+    # Заменяем formatter на маскирующий
+    if handler.formatter:
+        old_fmt = handler.formatter._fmt
+        new_formatter = TokenMaskingFormatter(fmt=old_fmt)
+        handler.setFormatter(new_formatter)
 
 
 class VolleyBot:
@@ -514,45 +524,9 @@ async def create_once_poll(update, context, state):
 # Экземпляр бота
 volley_bot = VolleyBot(db_path="volleybot.db")
 
-# Маскируем токен в логах httpx на уровне всего логгера
-httpx_logger = logging.getLogger('httpx')
-httpx_logger.propagate = False
-
-# Создаём свой handler с полной маскировкой
-class MaskingStreamHandler(logging.StreamHandler):
-    def __init__(self, token):
-        super().__init__()
-        self.token = token
-        self.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    
-    def emit(self, record):
-        # Маскируем токен в сообщении
-        if hasattr(record, 'msg') and isinstance(record.msg, str):
-            # Пропускаем getUpdates с 200 OK
-            msg = record.getMessage() if hasattr(record, 'getMessage') else str(record.msg)
-            if '/getUpdates' in msg and '200 OK' in msg:
-                return
-            record.msg = record.msg.replace(self.token, '***')
-        if hasattr(record, 'args') and record.args:
-            record.args = tuple(
-                arg.replace(self.token, '***') if isinstance(arg, str) else arg
-                for arg in record.args
-            )
-        super().emit(record)
-
-httpx_handler = MaskingStreamHandler(volley_bot.bot_token)
-httpx_handler.setLevel(logging.INFO)
-httpx_logger.addHandler(httpx_handler)
-
-# Также маскируем токен в корневом логгере (для telegram.ext и других)
-root_logger = logging.getLogger()
-for handler in root_logger.handlers:
-    if not isinstance(handler, MaskingStreamHandler):
-        wrapped = MaskingStreamHandler(volley_bot.bot_token)
-        wrapped.setLevel(handler.level)
-        wrapped.setFormatter(handler.formatter)
-        root_logger.addHandler(wrapped)
-        root_logger.removeHandler(handler)
+# Устанавливаем токен в фильтр и formatter
+TokenMaskingFilter.set_token(volley_bot.bot_token)
+TokenMaskingFormatter.set_token(volley_bot.bot_token)
 
 
 # Словарь для хранения состояния создания шаблона для каждого пользователя
