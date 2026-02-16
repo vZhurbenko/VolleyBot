@@ -45,7 +45,21 @@ class TokenFilter(logging.Filter):
         if '/getUpdates' in msg and '200 OK' in msg:
             return False
         
+        # Маскируем токен во всех полях record
+        self._replace_token(record)
+        
         return True
+    
+    def _replace_token(self, record):
+        """Замена токена во всех строковых полях record"""
+        if hasattr(record, 'msg'):
+            if isinstance(record.msg, str):
+                record.msg = record.msg.replace(self.token, '***')
+        if hasattr(record, 'args') and record.args:
+            record.args = tuple(
+                arg.replace(self.token, '***') if isinstance(arg, str) else arg
+                for arg in record.args
+            )
 
 
 # Handler со скрытием токена
@@ -513,9 +527,18 @@ httpx_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelna
 token_masking_handler = TokenMaskingHandler(volley_bot.bot_token, httpx_handler)
 httpx_logger.addHandler(token_masking_handler)
 
+# Применяем TokenMaskingHandler ко всем handler'ам корневого логгера
 root_logger = logging.getLogger()
 for handler in root_logger.handlers:
-    handler.addFilter(token_filter)
+    if not isinstance(handler, TokenMaskingHandler):
+        # Добавляем TokenMaskingHandler для маскировки токена
+        wrapped = TokenMaskingHandler(volley_bot.bot_token, handler)
+        # Копируем настройки
+        wrapped.setLevel(handler.level)
+        wrapped.setFormatter(handler.formatter)
+        # Заменяем handler
+        root_logger.addHandler(wrapped)
+        root_logger.removeHandler(handler)
 
 
 # Словарь для хранения состояния создания шаблона для каждого пользователя
