@@ -1516,9 +1516,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Вычисляем дату тренировки на основе дня тренировки в шаблоне
         training_day = temp_template['training_day']
         training_time = temp_template['training_time']
-        
+
         # Получаем следующую дату для указанного дня недели
-        from datetime import datetime, timedelta
         days_map = {
             'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
             'friday': 4, 'saturday': 5, 'sunday': 6
