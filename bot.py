@@ -36,19 +36,41 @@ class TokenFilter(logging.Filter):
     def __init__(self, token):
         super().__init__()
         self.token = token
-    
+
     def filter(self, record):
-        if hasattr(record, 'msg') and isinstance(record.msg, str):
-            # Пропускаем getUpdates запросы только если статус 200
-            if '/getUpdates' in record.msg and '200 OK' in record.msg:
-                return False
-            record.msg = record.msg.replace(self.token, '***')
+        # Получаем полное сообщение
+        msg = record.getMessage() if hasattr(record, 'getMessage') else str(record.msg)
+        
+        # Пропускаем getUpdates запросы только если статус 200
+        if '/getUpdates' in msg and '200 OK' in msg:
+            return False
+        
+        # Скрываем токен во всех строковых полях
+        self._replace_token_in_record(record)
+        
+        return True
+    
+    def _replace_token_in_record(self, record):
+        """Рекурсивная замена токена во всех строковых полях record"""
+        if hasattr(record, 'msg'):
+            if isinstance(record.msg, str):
+                record.msg = record.msg.replace(self.token, '***')
         if hasattr(record, 'args') and record.args:
             record.args = tuple(
-                arg.replace(self.token, '***') if isinstance(arg, str) else arg
-                for arg in record.args
+                self._replace_token_in_obj(arg) for arg in record.args
             )
-        return True
+        if hasattr(record, 'exc_text') and record.exc_text:
+            record.exc_text = record.exc_text.replace(self.token, '***')
+    
+    def _replace_token_in_obj(self, obj):
+        """Замена токена в объекте любого типа"""
+        if isinstance(obj, str):
+            return obj.replace(self.token, '***')
+        elif isinstance(obj, (list, tuple)):
+            return type(obj)(self._replace_token_in_obj(item) for item in obj)
+        elif isinstance(obj, dict):
+            return {k: self._replace_token_in_obj(v) for k, v in obj.items()}
+        return obj
 
 
 class VolleyBot:
@@ -418,10 +440,15 @@ class VolleyBot:
 # Экземпляр бота
 volley_bot = VolleyBot(db_path="volleybot.db")
 
-# Применяем фильтр к httpx логгеру (скрываем токен, но оставляем логи)
+# Настраиваем фильтрацию логов httpx
 httpx_logger = logging.getLogger('httpx')
 token_filter = TokenFilter(volley_bot.bot_token)
 httpx_logger.addFilter(token_filter)
+
+# Также применяем фильтр ко всем handler'ам корневого логгера
+root_logger = logging.getLogger()
+for handler in root_logger.handlers:
+    handler.addFilter(token_filter)
 
 
 # Словарь для хранения состояния создания шаблона для каждого пользователя
