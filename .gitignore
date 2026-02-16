@@ -20,6 +20,7 @@ coverage.xml
 !.gitignore
 !.gitattributes
 !.gitmodules
+.qwen/
 *.swp
 *.swo
 *~
