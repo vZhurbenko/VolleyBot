@@ -45,32 +45,30 @@ class TokenFilter(logging.Filter):
         if '/getUpdates' in msg and '200 OK' in msg:
             return False
         
-        # Скрываем токен во всех строковых полях
-        self._replace_token_in_record(record)
-        
         return True
+
+
+# Handler со скрытием токена
+class TokenMaskingHandler(logging.Handler):
+    def __init__(self, token, wrapped_handler):
+        super().__init__()
+        self.token = token
+        self.wrapped_handler = wrapped_handler
+        self.setLevel(wrapped_handler.level)
     
-    def _replace_token_in_record(self, record):
-        """Рекурсивная замена токена во всех строковых полях record"""
-        if hasattr(record, 'msg'):
-            if isinstance(record.msg, str):
+    def emit(self, record):
+        try:
+            # Маскируем токен во всех полях
+            if hasattr(record, 'msg') and isinstance(record.msg, str):
                 record.msg = record.msg.replace(self.token, '***')
-        if hasattr(record, 'args') and record.args:
-            record.args = tuple(
-                self._replace_token_in_obj(arg) for arg in record.args
-            )
-        if hasattr(record, 'exc_text') and record.exc_text:
-            record.exc_text = record.exc_text.replace(self.token, '***')
-    
-    def _replace_token_in_obj(self, obj):
-        """Замена токена в объекте любого типа"""
-        if isinstance(obj, str):
-            return obj.replace(self.token, '***')
-        elif isinstance(obj, (list, tuple)):
-            return type(obj)(self._replace_token_in_obj(item) for item in obj)
-        elif isinstance(obj, dict):
-            return {k: self._replace_token_in_obj(v) for k, v in obj.items()}
-        return obj
+            if hasattr(record, 'args') and record.args:
+                record.args = tuple(
+                    arg.replace(self.token, '***') if isinstance(arg, str) else arg
+                    for arg in record.args
+                )
+            self.wrapped_handler.emit(record)
+        except Exception:
+            self.handleError(record)
 
 
 class VolleyBot:
@@ -444,8 +442,15 @@ volley_bot = VolleyBot(db_path="volleybot.db")
 httpx_logger = logging.getLogger('httpx')
 token_filter = TokenFilter(volley_bot.bot_token)
 httpx_logger.addFilter(token_filter)
+httpx_logger.propagate = False
 
-# Также применяем фильтр ко всем handler'ам корневого логгера
+# Создаём handler с маскировкой токена для httpx
+httpx_handler = logging.StreamHandler()
+httpx_handler.setLevel(logging.INFO)
+httpx_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+token_masking_handler = TokenMaskingHandler(volley_bot.bot_token, httpx_handler)
+httpx_logger.addHandler(token_masking_handler)
+
 root_logger = logging.getLogger()
 for handler in root_logger.handlers:
     handler.addFilter(token_filter)
