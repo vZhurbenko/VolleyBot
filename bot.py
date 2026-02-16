@@ -31,6 +31,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Отключаем избыточное логирование httpx (Telegram API запросы)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+
 
 class VolleyBot:
     """
