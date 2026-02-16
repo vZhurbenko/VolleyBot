@@ -31,8 +31,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Отключаем избыточное логирование httpx (Telegram API запросы)
-logging.getLogger('httpx').setLevel(logging.WARNING)
+# Фильтр для скрытия токена бота в логах httpx
+class TokenFilter(logging.Filter):
+    def __init__(self, token):
+        super().__init__()
+        self.token = token
+    
+    def filter(self, record):
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            record.msg = record.msg.replace(self.token, '***')
+        if hasattr(record, 'args') and record.args:
+            record.args = tuple(
+                arg.replace(self.token, '***') if isinstance(arg, str) else arg
+                for arg in record.args
+            )
+        return True
 
 
 class VolleyBot:
@@ -401,6 +414,11 @@ class VolleyBot:
 
 # Экземпляр бота
 volley_bot = VolleyBot(db_path="volleybot.db")
+
+# Применяем фильтр к httpx логгеру (скрываем токен, но оставляем логи)
+httpx_logger = logging.getLogger('httpx')
+token_filter = TokenFilter(volley_bot.bot_token)
+httpx_logger.addFilter(token_filter)
 
 
 # Словарь для хранения состояния создания шаблона для каждого пользователя
