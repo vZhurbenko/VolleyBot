@@ -1268,6 +1268,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if user_id in creation_states:
             state = creation_states[user_id]
+            
+            logger.info(f"create_schedule_no: state={state}")
+
+            # Проверяем наличие всех необходимых данных
+            required_fields = ['chat_id', 'training_day', 'poll_day', 'training_time']
+            missing_fields = [f for f in required_fields if f not in state]
+            
+            if missing_fields:
+                await query.edit_message_text(
+                    text=f"❌ Ошибка: отсутствуют данные: {', '.join(missing_fields)}\n\n"
+                         f"Начните создание опроса заново.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
+                )
+                del creation_states[user_id]
+                return
 
             # Получаем следующую дату для указанного дня тренировки
             days_map = {
@@ -1296,28 +1311,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             template = volley_bot.get_default_template()
             description = template['description'].replace('{date}', formatted_date).replace('{time}', state['training_time'])
 
-            # Создаем опрос
-            poll_message = await volley_bot.create_poll(
-                context.bot,
-                state['chat_id'],
-                description,
-                template['options'],
-                is_anonymous=False,  # Опросы не анонимные
-                message_thread_id=state['thread_id']
-            )
-
-            if poll_message:
-                # Закрепляем опрос
-                await volley_bot.pin_message(context.bot, state['chat_id'], poll_message.message_id)
-
-                await query.edit_message_text(
-                    text=f"✅ Опрос успешно создан и закреплен в чате {state['chat_id']}{f' (топик {state['thread_id']})' if state['thread_id'] else ''}!\n\n"
-                         f"Опрос создан единоразово, без автоматического повторения.",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
+            try:
+                # Создаем опрос
+                poll_message = await volley_bot.create_poll(
+                    context.bot,
+                    state['chat_id'],
+                    description,
+                    template['options'],
+                    is_anonymous=False,  # Опросы не анонимные
+                    message_thread_id=state['thread_id']
                 )
-            else:
+
+                if poll_message:
+                    # Закрепляем опрос
+                    await volley_bot.pin_message(context.bot, state['chat_id'], poll_message.message_id)
+
+                    await query.edit_message_text(
+                        text=f"✅ Опрос успешно создан и закреплен в чате {state['chat_id']}{f' (топик {state['thread_id']})' if state['thread_id'] else ''}!\n\n"
+                             f"Опрос создан единоразово, без автоматического повторения.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
+                    )
+                else:
+                    await query.edit_message_text(
+                        text=f"❌ Ошибка при создании опроса в чате {state['chat_id']}.",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
+                    )
+            except Exception as e:
+                logger.error(f"Ошибка при создании одноразового опроса: {e}")
                 await query.edit_message_text(
-                    text=f"❌ Ошибка при создании опроса в чате {state['chat_id']}.",
+                    text=f"❌ Ошибка при создании опроса: {e}",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
                 )
 
