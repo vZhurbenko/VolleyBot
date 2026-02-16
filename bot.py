@@ -95,6 +95,20 @@ for handler in logging.root.handlers[:]:
         handler.setFormatter(new_formatter)
 
 
+def get_weekday_russian(date: datetime) -> str:
+    """Получение дня недели на русском языке"""
+    weekdays = {
+        0: 'понедельник',
+        1: 'вторник',
+        2: 'среда',
+        3: 'четверг',
+        4: 'пятница',
+        5: 'суббота',
+        6: 'воскресенье'
+    }
+    return weekdays.get(date.weekday(), '')
+
+
 class VolleyBot:
     """
     Основной класс бота для управления опросами волейбольных тренировок
@@ -329,9 +343,11 @@ class VolleyBot:
         
         next_training_date = now + timedelta(days=days_ahead)
         formatted_date = next_training_date.strftime('%d.%m.%Y')
-        
+        weekday = get_weekday_russian(next_training_date)
+        formatted_date_with_weekday = f"{formatted_date} ({weekday})"
+
         # Подставляем дату и время в описание
-        description = template['description'].replace('{date}', formatted_date).replace('{time}', training_time)
+        description = template['description'].replace('{date}', formatted_date_with_weekday).replace('{time}', training_time)
         
         # Создаем опрос
         poll_message = await self.create_poll(
@@ -429,10 +445,12 @@ class VolleyBot:
         
         next_training_date = now + timedelta(days=days_ahead)
         formatted_date = next_training_date.strftime('%d.%m.%Y')
-        
+        weekday = get_weekday_russian(next_training_date)
+        formatted_date_with_weekday = f"{formatted_date} ({weekday})"
+
         # Получаем описание из шаблона и подставляем дату и время
         template = self.get_default_template()
-        description = template['description'].replace('{date}', formatted_date).replace('{time}', training_time)
+        description = template['description'].replace('{date}', formatted_date_with_weekday).replace('{time}', training_time)
         
         # Если в расписании есть свои варианты ответа, используем их
         if options:
@@ -483,10 +501,12 @@ async def create_once_poll(update, context, state):
 
         next_training_date = now + timedelta(days=days_ahead)
         formatted_date = next_training_date.strftime('%d.%m.%Y')
+        weekday = get_weekday_russian(next_training_date)
+        formatted_date_with_weekday = f"{formatted_date} ({weekday})"
 
         # Получаем описание из шаблона и подставляем дату и время
         template = volley_bot.get_default_template()
-        description = template['description'].replace('{date}', formatted_date).replace('{time}', state['training_time'])
+        description = template['description'].replace('{date}', formatted_date_with_weekday).replace('{time}', state['training_time'])
 
         # Создаем опрос
         poll_message = await volley_bot.create_poll(
@@ -1548,9 +1568,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         next_training_date = now + timedelta(days=days_ahead)
         formatted_date = next_training_date.strftime('%d.%m.%Y')
-        
+        weekday = get_weekday_russian(next_training_date)
+        formatted_date_with_weekday = f"{formatted_date} ({weekday})"
+
         # Подставляем дату и время в описание
-        description = temp_template['description'].replace('{date}', formatted_date).replace('{time}', training_time)
+        description = temp_template['description'].replace('{date}', formatted_date_with_weekday).replace('{time}', training_time)
         
         poll_message = await volley_bot.create_poll(
             context.bot,
