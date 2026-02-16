@@ -31,14 +31,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Фильтр для скрытия токена бота в логах httpx
+# Фильтр для скрытия токена бота и getUpdates в логах httpx
 class TokenFilter(logging.Filter):
     def __init__(self, token):
         super().__init__()
         self.token = token
     
     def filter(self, record):
+        # Пропускаем getUpdates запросы (слишком шумные)
         if hasattr(record, 'msg') and isinstance(record.msg, str):
+            if '/getUpdates' in record.msg:
+                return False
             record.msg = record.msg.replace(self.token, '***')
         if hasattr(record, 'args') and record.args:
             record.args = tuple(
