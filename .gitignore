@@ -31,3 +31,5 @@ bot.pid
 bot_output.log
 data.json
 .bot_token
+volleybot.db
+

@@ -3,7 +3,6 @@
 Volleyball Poll Bot - продвинутый Telegram-бот для управления опросами о посещении волейбольных тренировок
 """
 
-import json
 import logging
 import asyncio
 import uuid
@@ -22,6 +21,8 @@ from telegram.ext import (
     filters
 )
 
+from database import Database
+
 
 # Настройка логирования
 logging.basicConfig(
@@ -36,12 +37,30 @@ class VolleyBot:
     Основной класс бота для управления опросами волейбольных тренировок
     """
 
-    def __init__(self, config_file: str = "data.json", token_file: str = ".bot_token"):
-        self.config_file = config_file
-        self.config = self.load_config()
+    def __init__(self, token_file: str = ".bot_token", db_path: str = "volleybot.db"):
+        self.token_file = token_file
         self.bot_token = self.load_bot_token(token_file)
-        # Получаем список администраторов из конфига
-        self.admin_user_ids = self.config.get('admin', {}).get('user_ids', [123456789])
+
+        # Инициализация базы данных
+        self.db = Database(db_path)
+
+        # Проверка инициализации базы данных
+        if not self.db.is_initialized():
+            logger.error("=" * 60)
+            logger.error("База данных не инициализирована!")
+            logger.error("Для инициализации запустите: python3 init_db.py")
+            logger.error("=" * 60)
+            print("\n❌ База данных не инициализирована!")
+            print("📝 Для инициализации запустите: python3 init_db.py\n")
+            import sys
+            sys.exit(1)
+
+        # Получаем список администраторов из БД
+        self.admin_user_ids = self.db.get_admin_ids()
+
+        # Флаг для режима ожидания ID админа
+        self.waiting_for_admin_id = False
+        self.pending_user_id = None
 
     def load_bot_token(self, token_file: str) -> str:
         """Загрузка токена бота из отдельного файла"""
@@ -58,31 +77,13 @@ class VolleyBot:
             logger.error(f"Ошибка при чтении токена: {e}")
             raise
 
-    def load_config(self) -> Dict[str, Any]:
-        """Загрузка конфигурации из JSON-файла"""
-        try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            logger.error(f"Файл конфигурации {self.config_file} не найден")
-            raise
-        except json.JSONDecodeError:
-            logger.error(f"Ошибка парсинга JSON в файле {self.config_file}")
-            raise
-    
-    def save_config(self):
-        """Сохранение конфигурации в JSON-файл"""
-        with open(self.config_file, 'w', encoding='utf-8') as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=2)
-    
     def get_default_template(self) -> Dict[str, Any]:
         """Получение дефолтного шаблона опроса"""
-        return self.config.get('default_poll_template', {})
-    
+        return self.db.get_default_template()
+
     def update_default_template(self, updated_template: Dict[str, Any]):
         """Обновление дефолтного шаблона опроса"""
-        self.config['default_poll_template'] = updated_template
-        self.save_config()
+        self.db.set_default_template(updated_template)
     
     def get_poll_template_by_id(self, template_id: str) -> Optional[Dict[str, Any]]:
         """Получение шаблона опроса по ID"""
@@ -289,26 +290,15 @@ class VolleyBot:
     
     def add_poll_schedule(self, schedule: Dict[str, Any]):
         """Добавление расписания опроса"""
-        self.config['poll_schedules'].append(schedule)
-        self.save_config()
-    
+        self.db.add_poll_schedule(schedule)
+
     def get_poll_schedules(self) -> List[Dict[str, Any]]:
         """Получение всех расписаний опросов"""
-        return self.config.get('poll_schedules', [])
-    
-    def add_poll_template(self, template: Dict[str, Any]):
-        """Добавление шаблона опроса"""
-        if 'poll_templates' not in self.config:
-            self.config['poll_templates'] = []
-        self.config['poll_templates'].append(template)
-        self.save_config()
+        return self.db.get_poll_schedules()
 
     def remove_poll_schedule(self, schedule_id: str):
         """Удаление расписания опроса"""
-        self.config['poll_schedules'] = [
-            s for s in self.config['poll_schedules'] if s['id'] != schedule_id
-        ]
-        self.save_config()
+        self.db.remove_poll_schedule(schedule_id)
     
     async def create_polls_for_all_enabled_templates(self, bot: Bot):
         """Создание опросов для дефолтного шаблона и всех расписаний"""
@@ -406,24 +396,8 @@ class VolleyBot:
         return poll_message
 
 
-import signal
-import sys
-
-# Глобальная переменная для управления остановкой бота
-bot_should_stop = False
-
-def signal_handler(sig, frame):
-    """Обработчик сигнала остановки"""
-    global bot_should_stop
-    logger.info("Получен сигнал остановки. Завершаем работу бота...")
-    bot_should_stop = True
-
-# Регистрируем обработчик сигнала
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
 # Экземпляр бота
-volley_bot = VolleyBot()
+volley_bot = VolleyBot(db_path="volleybot.db")
 
 
 # Словарь для хранения состояния создания шаблона для каждого пользователя
@@ -434,12 +408,12 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name
     username = update.effective_user.username
-    
+
     user_info = f"Ваш ID: {user_id}\n"
     user_info += f"Имя: {first_name}\n"
     if username:
         user_info += f"Username: @{username}"
-    
+
     await update.message.reply_text(user_info)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -515,15 +489,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if len(options) < 2:
                 await update.message.reply_text("Пожалуйста, введите хотя бы 2 варианта ответа, каждый на новой строке.")
                 return
-                
+
             template = volley_bot.get_default_template()
             template['options'] = options
             volley_bot.update_default_template(template)
-            
+
             await update.message.reply_text(f"Варианты ответа изменены. Теперь их {len(options)}.")
-            
+
             # Удаляем состояние пользователя
             user_id = update.effective_user.id
+            if user_id in creation_states:
+                del creation_states[user_id]
+
+        elif state['step'] == 'waiting_admin_id':
+            # Добавление нового администратора по ID
+            try:
+                new_admin_id = int(message_text)
+                volley_bot.db.add_admin_id(new_admin_id)
+                volley_bot.admin_user_ids = volley_bot.db.get_admin_ids()
+                await update.message.reply_text(
+                    f"✅ Пользователь с ID {new_admin_id} успешно добавлен в администраторы!\n\n"
+                    f"Всего администраторов: {len(volley_bot.admin_user_ids)}"
+                )
+                logger.info(f"Администратор {new_admin_id} добавлен пользователем {user_id}")
+            except ValueError:
+                await update.message.reply_text("❌ Неверный формат ID. Пожалуйста, введите числовое значение ID.")
+            
+            # Удаляем состояние пользователя
             if user_id in creation_states:
                 del creation_states[user_id]
                 
@@ -977,9 +969,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'step': 'schedule_changing_time',
             'schedule_id': schedule_id
         }
-        
+
         await query.edit_message_text(
-            text="Введите новое время тренировки в формате ЧЧ:ММ (например, 18:00):",
+            text="Введите новое время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data=f"edit_schedule:{schedule_id}")]])
         )
 
@@ -1208,7 +1200,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         creation_states[user_id] = {'step': 'changing_training_time'}
         await query.edit_message_text(
-            text="Введите время тренировки в формате ЧЧ:ММ (например, 18:00):",
+            text="Введите время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='edit_default_template')]])
         )
         
@@ -1302,9 +1294,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'training_day': state['training_day'],
                     'poll_day': selected_day
                 }
-                
+
                 await query.edit_message_text(
-                    text="Введите время тренировки в формате ЧЧ:ММ (например, 18:00):",
+                    text="Введите время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
                 )
             else:
@@ -1474,7 +1466,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 creation_states[user_id]['step'] = 'waiting_training_time_input'
 
                 await query.edit_message_text(
-                    text="Введите время тренировки в формате ЧЧ:ММ (например, 18:00):",
+                    text="Введите время тренировки в формате чч:мм - чч:мм (например, 18:00 - 20:00):",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
                 )
             else:
@@ -1656,8 +1648,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='settings_menu')]])
         )
         
-        # Здесь в реальной реализации нужно было бы реализовать механизм получения ID
-        # Но для простоты в текущей реализации мы просто покажем инструкцию
+        # Устанавливаем состояние ожидания ID админа для текущего пользователя
+        user_id = update.effective_user.id
+        creation_states[user_id] = {'step': 'waiting_admin_id'}
         
     elif query.data == 'back_to_main':
         # При возврате в главное меню сбрасываем состояние пользователя
@@ -1692,18 +1685,6 @@ async def schedule_poll_creation(context: ContextTypes.DEFAULT_TYPE):
     await volley_bot.create_polls_for_all_enabled_templates(context.bot)
 
 
-async def stop_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда для остановки бота (только для администраторов)"""
-    user_id = update.effective_user.id
-    if user_id not in volley_bot.admin_user_ids:
-        await update.message.reply_text('❌ У вас нет прав для остановки бота.')
-        return
-    
-    global bot_should_stop
-    bot_should_stop = True
-    await update.message.reply_text('🛑 Бот будет остановлен...')
-    
-
 def main():
     """Основная функция запуска бота"""
     # Создаем приложение
@@ -1724,7 +1705,6 @@ def main():
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("getid", get_user_id))
-    application.add_handler(CommandHandler("stop_bot", stop_bot_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
