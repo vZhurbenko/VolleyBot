@@ -3,7 +3,6 @@
 Volleyball Poll Bot - продвинутый Telegram-бот для управления опросами о посещении волейбольных тренировок
 """
 
-import json
 import logging
 import asyncio
 import uuid
@@ -38,21 +37,27 @@ class VolleyBot:
     Основной класс бота для управления опросами волейбольных тренировок
     """
 
-    def __init__(self, config_file: str = "data.json", token_file: str = ".bot_token", db_path: str = "volleybot.db"):
-        self.config_file = config_file
+    def __init__(self, token_file: str = ".bot_token", db_path: str = "volleybot.db"):
         self.token_file = token_file
         self.bot_token = self.load_bot_token(token_file)
-        
+
         # Инициализация базы данных
         self.db = Database(db_path)
-        
-        # Миграция данных из JSON если БД пуста
+
+        # Проверка инициализации базы данных
         if not self.db.is_initialized():
-            self._migrate_from_json_if_needed()
-        
+            logger.error("=" * 60)
+            logger.error("База данных не инициализирована!")
+            logger.error("Для инициализации запустите: python3 init_db.py")
+            logger.error("=" * 60)
+            print("\n❌ База данных не инициализирована!")
+            print("📝 Для инициализации запустите: python3 init_db.py\n")
+            import sys
+            sys.exit(1)
+
         # Получаем список администраторов из БД
         self.admin_user_ids = self.db.get_admin_ids()
-        
+
         # Флаг для режима ожидания ID админа
         self.waiting_for_admin_id = False
         self.pending_user_id = None
@@ -71,36 +76,6 @@ class VolleyBot:
         except Exception as e:
             logger.error(f"Ошибка при чтении токена: {e}")
             raise
-
-    def _migrate_from_json_if_needed(self):
-        """Миграция данных из JSON файла при первом запуске"""
-        try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            logger.info("JSON файл не найден или некорректен, пропускаем миграцию")
-            return
-        
-        # Миграция администраторов
-        admin_ids = data.get('admin', {}).get('user_ids', [])
-        if admin_ids:
-            self.db.set_admin_ids(admin_ids)
-            logger.info(f"Мигрировано {len(admin_ids)} администраторов")
-        
-        # Миграция шаблона опроса
-        template = data.get('default_poll_template', {})
-        if template:
-            self.db.set_default_template(template)
-            logger.info("Мигрирован шаблон опроса по умолчанию")
-        
-        # Миграция расписаний
-        schedules = data.get('poll_schedules', [])
-        for schedule in schedules:
-            self.db.add_poll_schedule(schedule)
-        if schedules:
-            logger.info(f"Мигрировано {len(schedules)} расписаний")
-        
-        logger.info("Миграция данных из JSON завершена")
 
     def get_default_template(self) -> Dict[str, Any]:
         """Получение дефолтного шаблона опроса"""
@@ -450,23 +425,6 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     first_name = update.effective_user.first_name
     username = update.effective_user.username
 
-    # Если администраторы еще не настроены, добавляем первого пользователя как админа
-    if not volley_bot.admin_user_ids:
-        volley_bot.db.add_admin_id(user_id)
-        volley_bot.admin_user_ids = volley_bot.db.get_admin_ids()
-        
-        user_info = f"✅ Ваш ID: {user_id}\n"
-        user_info += f"Имя: {first_name}\n"
-        if username:
-            user_info += f"Username: @{username}\n\n"
-        user_info += "🎉 Вы были автоматически назначены администратором бота!\n"
-        user_info += "Теперь вы можете использовать все функции бота."
-        
-        await update.message.reply_text(user_info)
-        logger.info(f"Пользователь {user_id} автоматически назначен администратором")
-        return
-
-    # Обычный режим - просто показываем ID
     user_info = f"Ваш ID: {user_id}\n"
     user_info += f"Имя: {first_name}\n"
     if username:
@@ -1757,16 +1715,6 @@ async def stop_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Основная функция запуска бота"""
-    # Проверяем, настроены ли администраторы
-    if not volley_bot.admin_user_ids:
-        logger.warning("=" * 60)
-        logger.warning("ВНИМАНИЕ: Администраторы не настроены!")
-        logger.warning("Для первичной настройки отправьте команду /getid в чат с ботом")
-        logger.warning("Первый пользователь, отправивший /getid, станет администратором")
-        logger.warning("=" * 60)
-        print("\n⚠️  Администраторы не настроены!")
-        print("📝 Отправьте команду /getid в чат с ботом для первичной настройки\n")
-    
     # Создаем приложение
     application = Application.builder().token(volley_bot.bot_token).build()
 
