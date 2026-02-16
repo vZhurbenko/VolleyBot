@@ -428,23 +428,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in creation_states:
         state = creation_states[user_id]
         message_text = update.message.text.strip()
-        
-        if state['step'] == 'waiting_chat_id_for_poll':
-            # Создаем опрос в указанный чат с использованием дефолтного шаблона
-            target_chat_id = message_text
-            
-            # Создаем опрос из дефолтного шаблона
-            poll_message = await volley_bot.create_poll_from_template(context.bot, target_chat_id)
 
-            if poll_message:
-                await update.message.reply_text(f"✅ Опрос успешно создан и закреплен в чате {target_chat_id}!")
-            else:
-                await update.message.reply_text(f"❌ Ошибка при создании опроса в чате {target_chat_id}.")
-                
-            # Удаляем состояние пользователя
-            del creation_states[user_id]
-            
-        elif state['step'] == 'changing_name':
+        if state['step'] == 'changing_name':
             # Изменение названия шаблона
             template = volley_bot.get_default_template()
             template['name'] = message_text
@@ -518,60 +503,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Удаляем состояние пользователя
             if user_id in creation_states:
                 del creation_states[user_id]
-                
-        elif state['step'] == 'waiting_chat_id_for_poll':
-            # Сохраняем ID чата и запрашиваем ID топика (если нужно)
-            target_chat_id = message_text
-            user_id = update.effective_user.id
-            creation_states[user_id] = {
-                'step': 'waiting_thread_id_for_poll',
-                'chat_id': target_chat_id
-            }
 
-            await update.message.reply_text(
-                f"ID чата сохранен: {target_chat_id}\n\n"
-                "Теперь введите ID топика (темы), в который нужно создать опрос.\n"
-                "Если опрос нужно создать в общем чате (не в топике), введите 0 или нажмите кнопку ниже:",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("Создать в общем чате (без топика)", callback_data='no_topic')]
-                ])
-            )
-            
-        elif state['step'] == 'waiting_thread_id_for_poll':
-            # Сохраняем ID топика и запрашиваем день тренировки
-            target_thread_id = message_text
-            target_chat_id = state['chat_id']
-            
-            # Преобразуем ID топика в число, если это не '0'
-            thread_id = None
-            if target_thread_id.isdigit() and int(target_thread_id) != 0:
-                thread_id = int(target_thread_id)
-            
-            # Сохраняем чат и топик в состоянии и переходим к выбору дня тренировки
-            user_id = update.effective_user.id
-            creation_states[user_id] = {
-                'step': 'waiting_training_day',
-                'chat_id': target_chat_id,
-                'thread_id': thread_id
-            }
-
-            # Предлагаем выбор дня тренировки
-            keyboard = [
-                [InlineKeyboardButton("Понедельник", callback_data="selected_day:monday")],
-                [InlineKeyboardButton("Вторник", callback_data="selected_day:tuesday")],
-                [InlineKeyboardButton("Среда", callback_data="selected_day:wednesday")],
-                [InlineKeyboardButton("Четверг", callback_data="selected_day:thursday")],
-                [InlineKeyboardButton("Пятница", callback_data="selected_day:friday")],
-                [InlineKeyboardButton("Суббота", callback_data="selected_day:saturday")],
-                [InlineKeyboardButton("Воскресенье", callback_data="selected_day:sunday")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await update.message.reply_text(
-                "Выберите день недели, в который будет тренировка:",
-                reply_markup=reply_markup
-            )
-            
         elif state['step'] == 'waiting_training_time_input':
             # Сохраняем время тренировки и создаем опрос с указанными параметрами
             training_time = message_text
@@ -727,42 +659,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = []
         
-        # Если есть значения по умолчанию, добавляем кнопку для их использования
-        if default_chat_id:
-            if default_topic_id:
-                keyboard.append([InlineKeyboardButton("🚀 Создать опрос (по умолчанию)", callback_data='create_with_defaults')])
-            else:
-                keyboard.append([InlineKeyboardButton("🚀 Создать опрос в чате (по умолчанию)", callback_data='create_with_defaults')])
-        
-        # Кнопка для ручного ввода
-        keyboard.append([InlineKeyboardButton("✏️ Ввести вручную", callback_data='manual_input')])
-        
-        keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data='back_to_main')])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        info_text = "Выберите действие:\n\n"
-        if default_chat_id:
-            info_text += f"чат: {default_chat_id}\n"
-        if default_topic_id:
-            info_text += f"топик: {default_topic_id}\n"
-        
-        if default_chat_id:
+        # Если нет значений по умолчанию, предлагаем их настроить
+        if not default_chat_id:
             await query.edit_message_text(
-                text=f"Значения по умолчанию:\n{info_text}\n\nВыберите, как создать опрос:",
-                reply_markup=reply_markup
-            )
-        else:
-            await query.edit_message_text(
-                text="Введите ID чата, в который нужно создать опрос:",
+                text="❌ Не задан чат по умолчанию в шаблоне.\n\n"
+                     "Настройте шаблон опроса в разделе '✏️ Редактировать шаблон'",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='back_to_main')]])
             )
-            
-            # Сохраняем состояние пользователя для ожидания ID чата
-            user_id = update.effective_user.id
-            creation_states[user_id] = {
-                'step': 'waiting_chat_id_for_poll'
-            }
+            return
+
+        # Формируем текст с информацией о значениях по умолчанию
+        info_text = f"📍 Чат: {default_chat_id}\n"
+        if default_topic_id:
+            info_text += f"📍 Топик: {default_topic_id}\n"
+
+        keyboard.append([InlineKeyboardButton("🚀 Создать опрос", callback_data='create_with_defaults')])
+        keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data='back_to_main')])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            text=f"Значения по умолчанию:\n{info_text}\n\nНажмите кнопку ниже для создания опроса:",
+            reply_markup=reply_markup
+        )
         
     elif query.data == 'create_with_defaults':
         # Запрашиваем дни недели и время для создания опроса с использованием значений по умолчанию
@@ -801,19 +720,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="Выберите день недели, в который будет тренировка:",
             reply_markup=reply_markup
         )
-        
-    elif query.data == 'manual_input':
-        # Переход к ручному вводу данных
-        user_id = update.effective_user.id
-        creation_states[user_id] = {
-            'step': 'waiting_chat_id_for_poll'
-        }
-        
-        await query.edit_message_text(
-            text="Введите ID чата, в который нужно создать опрос:",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data='create_poll_menu')]])
-        )
-        
+
     elif query.data.startswith('create_poll:'):
         # Создаем опрос из дефолтного шаблона в указанный чат
         parts = query.data.split(':')
@@ -1420,39 +1327,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.answer(text="Ошибка: состояние не найдено", show_alert=True)
 
-    elif query.data == 'no_topic':
-        # Обработка создания опроса без топика - начинаем процесс выбора дней
-        user_id = update.effective_user.id
-        if user_id in creation_states and creation_states[user_id]['step'] == 'waiting_thread_id_for_poll':
-            state = creation_states[user_id]
-            target_chat_id = state['chat_id']
-            
-            # Сохраняем состояние для продолжения процесса
-            creation_states[user_id] = {
-                'step': 'waiting_training_day',
-                'chat_id': target_chat_id,
-                'thread_id': None
-            }
-
-            # Предлагаем выбор дня тренировки
-            keyboard = [
-                [InlineKeyboardButton("Понедельник", callback_data="selected_day:monday")],
-                [InlineKeyboardButton("Вторник", callback_data="selected_day:tuesday")],
-                [InlineKeyboardButton("Среда", callback_data="selected_day:wednesday")],
-                [InlineKeyboardButton("Четверг", callback_data="selected_day:thursday")],
-                [InlineKeyboardButton("Пятница", callback_data="selected_day:friday")],
-                [InlineKeyboardButton("Суббота", callback_data="selected_day:saturday")],
-                [InlineKeyboardButton("Воскресенье", callback_data="selected_day:sunday")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.edit_message_text(
-                text="Выберите день недели, в который будет тренировка:",
-                reply_markup=reply_markup
-            )
-        else:
-            await query.answer(text="Ошибка: неверное состояние", show_alert=True)
-            
     elif query.data.startswith('poll_day:'):
         # Обработка выбора дня - зависит от текущего состояния пользователя
         user_id = update.effective_user.id
