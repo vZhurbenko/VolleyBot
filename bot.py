@@ -234,23 +234,23 @@ class VolleyBot:
             next_sunday = today + timedelta(days=days_until_sunday)
         return next_sunday.strftime('%d.%m.%Y')
     
-    async def create_poll(self, bot: Bot, chat_id: str, question: str, options: List[str], 
+    async def create_poll(self, bot: Bot, chat_id: str, question: str, options: List[str],
                          is_anonymous: bool = False, message_thread_id: Optional[int] = None) -> Optional[Message]:
         """Создание опроса в указанном чате или топике"""
         try:
             kwargs = {
-                'chat_id': chat_id,
                 'question': question,
                 'options': options,
                 'is_anonymous': is_anonymous,
                 'allows_multiple_answers': False
             }
-            
+
             # Если указан message_thread_id, добавляем его в параметры
             if message_thread_id is not None:
                 kwargs['message_thread_id'] = message_thread_id
-            
-            message = await bot.send_poll(**kwargs)
+
+            # chat_id передаётся как позиционный аргумент
+            message = await bot.send_poll(chat_id=chat_id, **kwargs)
             return message
         except Exception as e:
             logger.error(f"Ошибка при создании опроса в чате {chat_id}{' (топик ' + str(message_thread_id) + ')' if message_thread_id else ''}: {e}")
