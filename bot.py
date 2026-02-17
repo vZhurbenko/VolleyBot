@@ -3,7 +3,11 @@
 Volleyball Poll Bot - продвинутый Telegram-бот для управления опросами о посещении волейбольных тренировок
 """
 
+import os
 import logging
+
+# Получаем директорию скрипта для абсолютных путей
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Настраиваем логирование httpx ДО импорта telegram
 # Это нужно чтобы перехватить логи до создания handler'ов
@@ -115,11 +119,11 @@ class VolleyBot:
     """
 
     def __init__(self, token_file: str = ".bot_token", db_path: str = "volleybot.db"):
-        self.token_file = token_file
-        self.bot_token = self.load_bot_token(token_file)
+        self.token_file = os.path.join(BASE_DIR, token_file)
+        self.bot_token = self.load_bot_token(self.token_file)
 
         # Инициализация базы данных
-        self.db = Database(db_path)
+        self.db = Database(os.path.join(BASE_DIR, db_path))
 
         # Проверка инициализации базы данных
         if not self.db.is_initialized():

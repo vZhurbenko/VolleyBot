@@ -55,7 +55,8 @@ Telegram-бот для создания еженедельных опросов 
 
 ```bash
 # Клонируйте репозиторий
-cd /path/to/volleybot
+git clone https://github.com/vZhurbenko/VolleyBot.git
+cd VolleyBot
 
 # Создайте виртуальное окружение
 python3 -m venv venv
