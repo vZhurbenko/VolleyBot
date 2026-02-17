@@ -234,23 +234,23 @@ class VolleyBot:
             next_sunday = today + timedelta(days=days_until_sunday)
         return next_sunday.strftime('%d.%m.%Y')
     
-    async def create_poll(self, bot: Bot, chat_id: str, question: str, options: List[str], 
+    async def create_poll(self, bot: Bot, chat_id: str, question: str, options: List[str],
                          is_anonymous: bool = False, message_thread_id: Optional[int] = None) -> Optional[Message]:
         """Создание опроса в указанном чате или топике"""
         try:
             kwargs = {
-                'chat_id': chat_id,
                 'question': question,
                 'options': options,
                 'is_anonymous': is_anonymous,
                 'allows_multiple_answers': False
             }
-            
+
             # Если указан message_thread_id, добавляем его в параметры
             if message_thread_id is not None:
                 kwargs['message_thread_id'] = message_thread_id
-            
-            message = await bot.send_poll(**kwargs)
+
+            # chat_id передаётся как позиционный аргумент
+            message = await bot.send_poll(chat_id=chat_id, **kwargs)
             return message
         except Exception as e:
             logger.error(f"Ошибка при создании опроса в чате {chat_id}{' (топик ' + str(message_thread_id) + ')' if message_thread_id else ''}: {e}")
@@ -380,37 +380,19 @@ class VolleyBot:
         self.db.remove_poll_schedule(schedule_id)
     
     async def create_polls_for_all_enabled_templates(self, bot: Bot):
-        """Создание опросов для дефолтного шаблона и всех расписаний"""
-        template = self.get_default_template()
-        if template.get('enabled', True):
-            # Проверяем, совпадает ли сегодняшний день с днем создания опроса
-            poll_day = template.get('poll_day', 'sunday')
-            
-            days_map = {
-                'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-                'friday': 4, 'saturday': 5, 'sunday': 6
-            }
-            
-            target_day = days_map.get(poll_day.lower())
-            if target_day is not None and target_day == datetime.now().weekday():
-                # Создаем опрос с использованием значений по умолчанию
-                default_chat_id = template.get('default_chat_id')
-                default_topic_id = template.get('default_topic_id')
-                if default_chat_id:
-                    await self.create_poll_from_template(bot, default_chat_id, default_topic_id)
-        
+        """Создание опросов по всем активным расписаниям"""
         # Создаем опросы для всех расписаний
         schedules = self.get_poll_schedules()
         for schedule in schedules:
             if schedule.get('enabled', True):
                 # Проверяем, совпадает ли сегодняшний день с днем создания опроса для этого расписания
                 poll_day = schedule.get('poll_day', 'sunday')
-                
+
                 days_map = {
                     'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
                     'friday': 4, 'saturday': 5, 'sunday': 6
                 }
-                
+
                 target_day = days_map.get(poll_day.lower())
                 if target_day is not None and target_day == datetime.now().weekday():
                     # Создаем опрос с параметрами из расписания
