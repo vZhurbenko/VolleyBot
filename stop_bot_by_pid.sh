@@ -1,7 +1,10 @@
 #!/bin/bash
 # Скрипт для остановки бота по PID
 
-PID_FILE="/home/vzhurbenko/volleybot/bot.pid"
+# Переходим в директорию скрипта (независимо от того, откуда запущен)
+cd "$(dirname "$0")" || exit 1
+
+PID_FILE="bot.pid"
 
 if [ ! -f "$PID_FILE" ]; then
     echo "Файл PID не найден. Бот, возможно, не запущен."
