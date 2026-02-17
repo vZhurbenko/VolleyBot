@@ -380,37 +380,19 @@ class VolleyBot:
         self.db.remove_poll_schedule(schedule_id)
     
     async def create_polls_for_all_enabled_templates(self, bot: Bot):
-        """Создание опросов для дефолтного шаблона и всех расписаний"""
-        template = self.get_default_template()
-        if template.get('enabled', True):
-            # Проверяем, совпадает ли сегодняшний день с днем создания опроса
-            poll_day = template.get('poll_day', 'sunday')
-            
-            days_map = {
-                'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-                'friday': 4, 'saturday': 5, 'sunday': 6
-            }
-            
-            target_day = days_map.get(poll_day.lower())
-            if target_day is not None and target_day == datetime.now().weekday():
-                # Создаем опрос с использованием значений по умолчанию
-                default_chat_id = template.get('default_chat_id')
-                default_topic_id = template.get('default_topic_id')
-                if default_chat_id:
-                    await self.create_poll_from_template(bot, default_chat_id, default_topic_id)
-        
+        """Создание опросов по всем активным расписаниям"""
         # Создаем опросы для всех расписаний
         schedules = self.get_poll_schedules()
         for schedule in schedules:
             if schedule.get('enabled', True):
                 # Проверяем, совпадает ли сегодняшний день с днем создания опроса для этого расписания
                 poll_day = schedule.get('poll_day', 'sunday')
-                
+
                 days_map = {
                     'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
                     'friday': 4, 'saturday': 5, 'sunday': 6
                 }
-                
+
                 target_day = days_map.get(poll_day.lower())
                 if target_day is not None and target_day == datetime.now().weekday():
                     # Создаем опрос с параметрами из расписания
