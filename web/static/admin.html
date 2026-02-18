@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VolleyBot - Админ панель</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 1.5rem 2rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .user-info img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .login-container {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 450px;
+            margin: 4rem auto;
+        }
+
+        .logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+            font-weight: 500;
+        }
+
+        #telegram-login {
+            margin: 2rem 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Admin Panel Styles */
+        .admin-panel {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .admin-panel {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .card-content {
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .tag-enabled {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .tag-disabled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login View -->
+        <div id="login-view" class="login-container hidden">
+            <div class="logo">🏐</div>
+            <h1>VolleyBot</h1>
+            <p class="subtitle">Система управления тренировками</p>
+
+            <div class="admin-badge">
+                🔐 Вход только для администраторов
+            </div>
+
+            <div id="telegram-login"></div>
+            <div id="login-message" class="message hidden"></div>
+        </div>
+
+        <!-- Admin Panel View -->
+        <div id="admin-view" class="hidden">
+            <div class="header">
+                <h1>🏐 VolleyBot Admin</h1>
+                <div class="user-menu">
+                    <div class="user-info">
+                        <img id="user-photo" src="" alt="User">
+                        <span id="user-name"></span>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">Выйти</button>
+                </div>
+            </div>
+
+            <div class="admin-panel">
+                <!-- Шаблон опроса -->
+                <div class="card">
+                    <h2>📋 Шаблон опроса</h2>
+                    <div id="template-content" class="card-content">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+
+                <!-- Расписания -->
+                <div class="card">
+                    <h2>📅 Расписания опросов</h2>
+                    <div id="schedules-content" class="card-content">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+
+                <!-- Активные опросы -->
+                <div class="card">
+                    <h2>📊 Активные опросы</h2>
+                    <div id="active-polls-content" class="card-content">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+
+                <!-- Администраторы -->
+                <div class="card">
+                    <h2>👥 Администраторы</h2>
+                    <div id="admins-content" class="card-content">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        // ==================== Auth Functions ====================
+
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me`, {
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const user = await response.json();
+                    showAdminPanel(user);
+                } else {
+                    showLogin();
+                }
+            } catch (error) {
+                console.error('Ошибка проверки авторизации:', error);
+                showLogin();
+            }
+        }
+
+        async function onTelegramAuth(user) {
+            showMessage('login-message', 'Авторизация...', 'success');
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(user),
+                    credentials: 'include'
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showAdminPanel(result.user);
+                } else {
+                    showMessage('login-message', result.detail || 'Ошибка авторизации', 'error');
+                    if (response.status === 403) {
+                        document.getElementById('telegram-login').classList.add('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showMessage('login-message', 'Ошибка соединения с сервером', 'error');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch(`${API_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                showLogin();
+            } catch (error) {
+                console.error('Ошибка выхода:', error);
+            }
+        }
+
+        // ==================== View Functions ====================
+
+        function showLogin() {
+            document.getElementById('login-view').classList.remove('hidden');
+            document.getElementById('admin-view').classList.add('hidden');
+            loadTelegramConfig();
+        }
+
+        function showAdminPanel(user) {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.remove('hidden');
+
+            document.getElementById('user-photo').src = user.photo_url || 'https://via.placeholder.com/40';
+            document.getElementById('user-name').textContent = `${user.first_name} ${user.last_name || ''}`.trim();
+
+            loadTemplate();
+            loadSchedules();
+            loadActivePolls();
+            loadAdmins();
+        }
+
+        function showMessage(elementId, text, type) {
+            const el = document.getElementById(elementId);
+            el.textContent = text;
+            el.className = `message ${type}`;
+            el.classList.remove('hidden');
+
+            if (type === 'success') {
+                setTimeout(() => el.classList.add('hidden'), 3000);
+            }
+        }
+
+        // ==================== Load Functions ====================
+
+        function loadTelegramConfig() {
+            fetch(`${API_URL}/api/auth/telegram/config`)
+                .then(r => r.json())
+                .then(config => {
+                    const script = document.createElement('script');
+                    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+                    script.setAttribute('data-telegram-login', config.bot_username);
+                    script.setAttribute('data-size', 'large');
+                    script.setAttribute('data-radius', '3');
+                    script.setAttribute('data-lang', 'ru');
+                    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+                    script.setAttribute('data-request-access', 'write');
+                    script.async = true;
+                    document.getElementById('telegram-login').appendChild(script);
+                });
+        }
+
+        async function loadTemplate() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/template`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const template = await response.json();
+                    renderTemplate(template);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки шаблона:', error);
+            }
+        }
+
+        function renderTemplate(template) {
+            const html = `
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="template-name" value="${template.name || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="template-description" rows="2">${template.description || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>День тренировки</label>
+                    <input type="text" id="template-training-day" value="${template.training_day || ''}">
+                </div>
+                <div class="form-group">
+                    <label>День опроса</label>
+                    <input type="text" id="template-poll-day" value="${template.poll_day || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Время</label>
+                    <input type="text" id="template-training-time" value="${template.training_time || ''}">
+                </div>
+                <button class="btn" onclick="saveTemplate()">Сохранить</button>
+            `;
+            document.getElementById('template-content').innerHTML = html;
+        }
+
+        async function saveTemplate() {
+            const template = {
+                name: document.getElementById('template-name').value,
+                description: document.getElementById('template-description').value,
+                training_day: document.getElementById('template-training-day').value,
+                poll_day: document.getElementById('template-poll-day').value,
+                training_time: document.getElementById('template-training-time').value,
+                options: ['Буду', '50/50', 'Не буду'],
+                enabled: true
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/template`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(template)
+                });
+
+                if (response.ok) {
+                    alert('Шаблон сохранён!');
+                } else {
+                    alert('Ошибка сохранения');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка сохранения');
+            }
+        }
+
+        async function loadSchedules() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/schedules`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const schedules = await response.json();
+                    renderSchedules(schedules);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки расписаний:', error);
+            }
+        }
+
+        function renderSchedules(schedules) {
+            if (!schedules || schedules.length === 0) {
+                document.getElementById('schedules-content').innerHTML = '<p>Нет расписаний</p>';
+                return;
+            }
+
+            const html = schedules.map(s => `
+                <div class="list-item">
+                    <div>
+                        <strong>${s.name}</strong><br>
+                        <small>${s.training_day} → ${s.poll_day} в ${s.training_time}</small>
+                    </div>
+                    <span class="tag ${s.enabled ? 'tag-enabled' : 'tag-disabled'}">
+                        ${s.enabled ? 'Активно' : 'Отключено'}
+                    </span>
+                </div>
+            `).join('');
+
+            document.getElementById('schedules-content').innerHTML = html;
+        }
+
+        async function loadActivePolls() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/active_polls`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const polls = await response.json();
+                    renderActivePolls(polls);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки опросов:', error);
+            }
+        }
+
+        function renderActivePolls(polls) {
+            if (!polls || polls.length === 0) {
+                document.getElementById('active-polls-content').innerHTML = '<p>Нет активных опросов</p>';
+                return;
+            }
+
+            const html = polls.map(p => `
+                <div class="list-item">
+                    <div>
+                        <strong>Опрос #${p.id.substr(0, 8)}</strong><br>
+                        <small>Chat: ${p.chat_id}</small>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('active-polls-content').innerHTML = html;
+        }
+
+        async function loadAdmins() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/admin_ids`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    renderAdmins(data.admin_ids);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки админов:', error);
+            }
+        }
+
+        function renderAdmins(adminIds) {
+            if (!adminIds || adminIds.length === 0) {
+                document.getElementById('admins-content').innerHTML = '<p>Нет администраторов</p>';
+                return;
+            }
+
+            const html = adminIds.map(id => `
+                <div class="list-item">
+                    <span>ID: ${id}</span>
+                    <span class="tag tag-enabled">Админ</span>
+                </div>
+            `).join('');
+
+            document.getElementById('admins-content').innerHTML = html;
+        }
+
+        // ==================== Init ====================
+
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html>

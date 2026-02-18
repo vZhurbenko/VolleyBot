@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VolleyBot - Вход для администраторов</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.8rem;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+            font-weight: 500;
+        }
+
+        #telegram-login {
+            margin: 2rem 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .user-info {
+            background: #f7f7f7;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-top: 2rem;
+        }
+
+        .user-info img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin-bottom: 1rem;
+            border: 3px solid #667eea;
+        }
+
+        .user-info h3 {
+            margin: 0.5rem 0;
+            color: #333;
+            font-size: 1.25rem;
+        }
+
+        .user-info p {
+            color: #666;
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+        }
+
+        .user-info .username {
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1.5rem;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            color: #999;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🏐</div>
+        <h1>VolleyBot</h1>
+        <p class="subtitle">Система управления тренировками</p>
+
+        <div class="admin-badge">
+            🔐 Вход только для администраторов
+        </div>
+
+        <!-- Контейнер для Telegram Login Widget -->
+        <div id="telegram-login"></div>
+
+        <!-- Сообщение об ошибке/успехе -->
+        <div id="message" class="message hidden"></div>
+
+        <!-- Информация о пользователе -->
+        <div id="user-info" class="user-info hidden">
+            <img id="user-photo" src="" alt="User photo">
+            <h3 id="user-name"></h3>
+            <p id="user-username" class="username"></p>
+            <p id="user-id"></p>
+            <button class="logout-btn" onclick="logout()">Выйти</button>
+        </div>
+
+        <div class="footer">
+            VolleyBot © 2024
+        </div>
+    </div>
+
+    <script>
+        // Конфигурация - URL API
+        const API_URL = window.location.origin;
+
+        // Функция для загрузки конфигурации бота
+        async function loadTelegramConfig() {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/telegram/config`);
+                const config = await response.json();
+                initTelegramWidget(config.bot_username);
+            } catch (error) {
+                console.error('Ошибка загрузки конфигурации:', error);
+                showMessage('Ошибка загрузки конфигурации Telegram', 'error');
+            }
+        }
+
+        // Инициализация Telegram Widget
+        function initTelegramWidget(botUsername) {
+            const script = document.createElement('script');
+            script.src = 'https://telegram.org/js/telegram-widget.js?22';
+            script.setAttribute('data-telegram-login', botUsername);
+            script.setAttribute('data-size', 'large');
+            script.setAttribute('data-radius', '3');
+            script.setAttribute('data-lang', 'ru');
+            script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+            script.setAttribute('data-request-access', 'write');
+            script.async = true;
+
+            document.getElementById('telegram-login').appendChild(script);
+        }
+
+        // Колбэк для Telegram Login
+        async function onTelegramAuth(user) {
+            console.log('Telegram user data:', user);
+
+            showMessage('Авторизация...', 'success');
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/telegram`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(user),
+                    credentials: 'include'  // Важно для cookie
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    // Токены сохранены в HttpOnly cookie автоматически
+                    showMessage('Авторизация успешна! Перенаправление...', 'success');
+                    // Перенаправляем на админ-панель
+                    setTimeout(() => {
+                        window.location.href = '/admin';
+                    }, 1000);
+                } else {
+                    showMessage(result.detail || 'Ошибка авторизации', 'error');
+                    // Скрываем виджет при ошибке (например, пользователь не админ)
+                    if (response.status === 403) {
+                        document.getElementById('telegram-login').classList.add('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showMessage('Ошибка соединения с сервером', 'error');
+            }
+        }
+
+        // Проверка текущей авторизации при загрузке
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me`, {
+                    credentials: 'include'  // Отправляем cookie
+                });
+
+                if (response.ok) {
+                    const user = await response.json();
+                    showUserInfo(user);
+                    document.getElementById('telegram-login').classList.add('hidden');
+                } else {
+                    // Пользователь не авторизован
+                    console.log('Пользователь не авторизован');
+                }
+            } catch (error) {
+                console.error('Ошибка проверки авторизации:', error);
+            }
+        }
+
+        // Отображение информации о пользователе
+        function showUserInfo(user) {
+            document.getElementById('telegram-login').classList.add('hidden');
+            document.getElementById('message').classList.add('hidden');
+            document.getElementById('user-info').classList.remove('hidden');
+
+            document.getElementById('user-photo').src = user.photo_url || 'https://via.placeholder.com/100';
+            document.getElementById('user-name').textContent = `${user.first_name} ${user.last_name || ''}`.trim();
+            document.getElementById('user-username').textContent = user.username ? `@${user.username}` : '';
+            document.getElementById('user-id').textContent = `ID: ${user.telegram_id}`;
+        }
+
+        // Выход из системы
+        async function logout() {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    // Очищаем и показываем виджет
+                    document.getElementById('telegram-login').classList.remove('hidden');
+                    document.getElementById('user-info').classList.add('hidden');
+                    showMessage('Вы вышли из системы', 'success');
+                }
+            } catch (error) {
+                console.error('Ошибка выхода:', error);
+                showMessage('Ошибка при выходе', 'error');
+            }
+        }
+
+        // Отображение сообщений
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.classList.remove('hidden');
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageEl.classList.add('hidden');
+                }, 3000);
+            }
+        }
+
+        // Загрузка страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            if (!document.getElementById('user-info').classList.contains('hidden')) {
+                // Уже авторизован
+            } else {
+                loadTelegramConfig();
+            }
+        });
+    </script>
+</body>
+</html>
