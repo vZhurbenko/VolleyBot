@@ -190,7 +190,7 @@ class VolleyBot:
             if message_thread_id is not None:
                 kwargs['message_thread_id'] = message_thread_id
 
-            message = await bot.send_poll(chat_id=chat_id, **kwargs)
+            message = await bot.send_poll(chat_id, **kwargs)
             return message
         except Exception as e:
             logger.error(f"Ошибка при создании опроса в чате {chat_id}{' (топик ' + str(message_thread_id) + ')' if message_thread_id else ''}: {e}")
