@@ -341,3 +341,183 @@ class Database:
         """Проверка, инициализирована ли база данных (есть ли администраторы)"""
         admin_ids = self.get_admin_ids()
         return len(admin_ids) > 0
+
+    # ==================== Методы для работы с пользователями (web auth) ====================
+
+    def create_tables(self):
+        """Создание таблиц если они не существуют"""
+        # Если БД не существует, создаём её
+        if not self.conn:
+            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self.conn.row_factory = sqlite3.Row
+            logger.info(f"Создана база данных: {self.db_path}")
+
+        cursor = self.conn.cursor()
+
+        # Таблица настроек бота
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Таблица расписаний опросов
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS poll_schedules (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                chat_id TEXT NOT NULL,
+                message_thread_id INTEGER,
+                training_day TEXT NOT NULL,
+                poll_day TEXT NOT NULL,
+                training_time TEXT NOT NULL,
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Таблица активных опросов
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS active_polls (
+                id TEXT PRIMARY KEY,
+                chat_id TEXT NOT NULL,
+                message_id INTEGER NOT NULL,
+                message_thread_id INTEGER,
+                template_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Таблица пользователей для веб-авторизации
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_id INTEGER UNIQUE NOT NULL,
+                first_name TEXT NOT NULL,
+                last_name TEXT,
+                username TEXT,
+                photo_url TEXT,
+                is_admin INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP
+            )
+        ''')
+
+        self.conn.commit()
+        logger.info("Таблицы базы данных созданы/проверены")
+
+    def add_user(
+        self,
+        telegram_id: int,
+        first_name: str,
+        last_name: Optional[str] = None,
+        username: Optional[str] = None,
+        photo_url: Optional[str] = None,
+        is_admin: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """Добавление нового пользователя"""
+        if not self.conn:
+            logger.error("Нельзя добавить пользователя: база данных не подключена")
+            return None
+
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, is_admin, last_login)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (
+                telegram_id,
+                first_name,
+                last_name,
+                username,
+                photo_url,
+                1 if is_admin else 0
+            ))
+            self.conn.commit()
+            logger.info(f"Пользователь добавлен: {telegram_id}")
+            return self.get_user_by_telegram_id(telegram_id)
+        except sqlite3.IntegrityError:
+            logger.warning(f"Пользователь {telegram_id} уже существует")
+            return None
+
+    def get_user_by_telegram_id(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+        """Получение пользователя по Telegram ID"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE telegram_id = ?', (telegram_id,))
+        row = cursor.fetchone()
+
+        if row:
+            user = dict(row)
+            user['is_admin'] = bool(user['is_admin'])
+            return user
+        return None
+
+    def update_user(
+        self,
+        telegram_id: int,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        username: Optional[str] = None,
+        photo_url: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Обновление данных пользователя"""
+        if not self.conn:
+            logger.error("Нельзя обновить пользователя: база данных не подключена")
+            return None
+
+        updates = []
+        values = []
+
+        if first_name is not None:
+            updates.append("first_name = ?")
+            values.append(first_name)
+        if last_name is not None:
+            updates.append("last_name = ?")
+            values.append(last_name)
+        if username is not None:
+            updates.append("username = ?")
+            values.append(username)
+        if photo_url is not None:
+            updates.append("photo_url = ?")
+            values.append(photo_url)
+
+        if not updates:
+            return self.get_user_by_telegram_id(telegram_id)
+
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        updates.append("last_login = CURRENT_TIMESTAMP")
+        values.append(telegram_id)
+
+        cursor = self.conn.cursor()
+        cursor.execute(f'''
+            UPDATE users
+            SET {', '.join(updates)}
+            WHERE telegram_id = ?
+        ''', values)
+        self.conn.commit()
+
+        return self.get_user_by_telegram_id(telegram_id)
+
+    def get_all_users(self) -> List[Dict[str, Any]]:
+        """Получение всех пользователей"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM users ORDER BY created_at DESC')
+        rows = cursor.fetchall()
+
+        users = []
+        for row in rows:
+            user = dict(row)
+            user['is_admin'] = bool(user['is_admin'])
+            users.append(user)
+
+        return users

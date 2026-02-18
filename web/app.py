@@ -47,7 +47,7 @@ app.add_middleware(
 )
 
 # Конфигурация
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or Path(__file__).parent.parent.joinpath(".bot_token").read_text().strip()
 JWT_SECRET = os.getenv("JWT_SECRET", "volleybot_jwt_secret_key_change_in_prod")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Access token живёт 30 минут
