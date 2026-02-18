@@ -159,15 +159,6 @@
         <!-- Сообщение об ошибке/успехе -->
         <div id="message" class="message hidden"></div>
 
-        <!-- Информация о пользователе -->
-        <div id="user-info" class="user-info hidden">
-            <img id="user-photo" src="" alt="User photo">
-            <h3 id="user-name"></h3>
-            <p id="user-username" class="username"></p>
-            <p id="user-id"></p>
-            <button class="logout-btn" onclick="logout()">Выйти</button>
-        </div>
-
         <div class="footer">
             VolleyBot © 2024
         </div>
@@ -217,21 +208,16 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(user),
-                    credentials: 'include'  // Важно для cookie
+                    credentials: 'include'
                 });
 
                 const result = await response.json();
 
                 if (response.ok && result.success) {
-                    // Токены сохранены в HttpOnly cookie автоматически
-                    showMessage('Авторизация успешна! Перенаправление...', 'success');
-                    // Перенаправляем на админ-панель
-                    setTimeout(() => {
-                        window.location.href = '/admin';
-                    }, 1000);
+                    // Перенаправляем в админку
+                    window.location.href = '/admin';
                 } else {
                     showMessage(result.detail || 'Ошибка авторизации', 'error');
-                    // Скрываем виджет при ошибке (например, пользователь не админ)
                     if (response.status === 403) {
                         document.getElementById('telegram-login').classList.add('hidden');
                     }
@@ -246,51 +232,16 @@
         async function checkAuth() {
             try {
                 const response = await fetch(`${API_URL}/api/auth/me`, {
-                    credentials: 'include'  // Отправляем cookie
-                });
-
-                if (response.ok) {
-                    const user = await response.json();
-                    showUserInfo(user);
-                    document.getElementById('telegram-login').classList.add('hidden');
-                } else {
-                    // Пользователь не авторизован
-                    console.log('Пользователь не авторизован');
-                }
-            } catch (error) {
-                console.error('Ошибка проверки авторизации:', error);
-            }
-        }
-
-        // Отображение информации о пользователе
-        function showUserInfo(user) {
-            document.getElementById('telegram-login').classList.add('hidden');
-            document.getElementById('message').classList.add('hidden');
-            document.getElementById('user-info').classList.remove('hidden');
-
-            document.getElementById('user-photo').src = user.photo_url || 'https://via.placeholder.com/100';
-            document.getElementById('user-name').textContent = `${user.first_name} ${user.last_name || ''}`.trim();
-            document.getElementById('user-username').textContent = user.username ? `@${user.username}` : '';
-            document.getElementById('user-id').textContent = `ID: ${user.telegram_id}`;
-        }
-
-        // Выход из системы
-        async function logout() {
-            try {
-                const response = await fetch(`${API_URL}/api/auth/logout`, {
-                    method: 'POST',
                     credentials: 'include'
                 });
 
                 if (response.ok) {
-                    // Очищаем и показываем виджет
-                    document.getElementById('telegram-login').classList.remove('hidden');
-                    document.getElementById('user-info').classList.add('hidden');
-                    showMessage('Вы вышли из системы', 'success');
+                    // Уже авторизован - перенаправляем в админку
+                    window.location.href = '/admin';
+                    return;
                 }
             } catch (error) {
-                console.error('Ошибка выхода:', error);
-                showMessage('Ошибка при выходе', 'error');
+                console.error('Ошибка проверки авторизации:', error);
             }
         }
 
@@ -311,11 +262,7 @@
         // Загрузка страницы
         document.addEventListener('DOMContentLoaded', () => {
             checkAuth();
-            if (!document.getElementById('user-info').classList.contains('hidden')) {
-                // Уже авторизован
-            } else {
-                loadTelegramConfig();
-            }
+            loadTelegramConfig();
         });
     </script>
 </body>

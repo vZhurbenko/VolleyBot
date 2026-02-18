@@ -102,22 +102,26 @@ class TokenRefreshRequest(BaseModel):
 
 def create_access_token(data: dict, expires_delta: timedelta) -> str:
     """Создание access токена"""
+    import uuid
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
     to_encode.update({
         "exp": expire,
-        "type": "access"
+        "type": "access",
+        "jti": str(uuid.uuid4())  # Уникальный ID токена (соль)
     })
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def create_refresh_token(data: dict, expires_delta: timedelta) -> str:
     """Создание refresh токена"""
+    import uuid
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
     to_encode.update({
         "exp": expire,
-        "type": "refresh"
+        "type": "refresh",
+        "jti": str(uuid.uuid4())  # Уникальный ID токена (соль)
     })
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
