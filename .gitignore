@@ -32,6 +32,7 @@ bot.pid
 bot_output.log
 data.json
 .bot_token
+.env
 volleybot.db
 QWEN.md
 
