@@ -600,7 +600,7 @@
                 </div>
                 <div class="form-group">
                     <label>Topic ID (опционально)</label>
-                    <input type="number" id="schedule-topic-id" placeholder="1159">
+                    <input type="number" id="schedule-topic-id" placeholder="Оставьте пустым если не используется">
                 </div>
                 <div class="form-group">
                     <label>День тренировки</label>
@@ -646,7 +646,7 @@
             const schedule = {
                 name: document.getElementById('schedule-name').value,
                 chat_id: document.getElementById('schedule-chat-id').value,
-                message_thread_id: document.getElementById('schedule-topic-id').value || null,
+                message_thread_id: document.getElementById('schedule-topic-id').value ? parseInt(document.getElementById('schedule-topic-id').value) : null,
                 training_day: document.getElementById('schedule-training-day').value,
                 poll_day: document.getElementById('schedule-poll-day').value,
                 training_time: document.getElementById('schedule-training-time').value,
@@ -708,7 +708,7 @@
                 </div>
                 <div class="form-group">
                     <label>Topic ID (опционально)</label>
-                    <input type="number" id="schedule-topic-id" value="${schedule.message_thread_id || ''}">
+                    <input type="number" id="schedule-topic-id" value="${schedule.message_thread_id || ''}" placeholder="Оставьте пустым если не используется">
                 </div>
                 <div class="form-group">
                     <label>День тренировки</label>
@@ -754,7 +754,7 @@
             const updates = {
                 name: document.getElementById('schedule-name').value,
                 chat_id: document.getElementById('schedule-chat-id').value,
-                message_thread_id: document.getElementById('schedule-topic-id').value || null,
+                message_thread_id: document.getElementById('schedule-topic-id').value ? parseInt(document.getElementById('schedule-topic-id').value) : null,
                 training_day: document.getElementById('schedule-training-day').value,
                 poll_day: document.getElementById('schedule-poll-day').value,
                 training_time: document.getElementById('schedule-training-time').value,
