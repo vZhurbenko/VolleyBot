@@ -566,9 +566,12 @@
         async function showAddScheduleForm() {
             // Загружаем шаблон по умолчанию для предзаполнения
             let defaultTemplate = {
+                name: '',
                 training_day: 'sunday',
                 poll_day: 'friday',
-                training_time: '18:00 - 20:00'
+                training_time: '18:00 - 20:00',
+                default_chat_id: '',
+                default_topic_id: null
             };
             
             try {
@@ -579,9 +582,12 @@
                     const template = await response.json();
                     if (template) {
                         defaultTemplate = {
+                            name: template.name || defaultTemplate.name,
                             training_day: template.training_day || defaultTemplate.training_day,
                             poll_day: template.poll_day || defaultTemplate.poll_day,
-                            training_time: template.training_time || defaultTemplate.training_time
+                            training_time: template.training_time || defaultTemplate.training_time,
+                            default_chat_id: template.default_chat_id || defaultTemplate.default_chat_id,
+                            default_topic_id: template.default_topic_id || defaultTemplate.default_topic_id
                         };
                     }
                 }
@@ -592,15 +598,15 @@
             const html = `
                 <div class="form-group">
                     <label>Название</label>
-                    <input type="text" id="schedule-name" placeholder="Например: Воскресенье">
+                    <input type="text" id="schedule-name" value="${defaultTemplate.name}" placeholder="Например: Воскресенье">
                 </div>
                 <div class="form-group">
                     <label>Chat ID</label>
-                    <input type="text" id="schedule-chat-id" placeholder="-1002588984009">
+                    <input type="text" id="schedule-chat-id" value="${defaultTemplate.default_chat_id}" placeholder="-1002588984009">
                 </div>
                 <div class="form-group">
                     <label>Topic ID (опционально)</label>
-                    <input type="number" id="schedule-topic-id" placeholder="Оставьте пустым если не используется">
+                    <input type="number" id="schedule-topic-id" value="${defaultTemplate.default_topic_id || ''}" placeholder="Оставьте пустым если не используется">
                 </div>
                 <div class="form-group">
                     <label>День тренировки</label>
