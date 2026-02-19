@@ -6,6 +6,8 @@ Volleyball Poll Bot - продвинутый Telegram-бот для управл
 import os
 import logging
 import uuid
+import httpx
+import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
@@ -180,16 +182,38 @@ class VolleyBot:
                          is_anonymous: bool = False, message_thread_id: Optional[int] = None) -> Optional[Message]:
         """Создание опроса в указанном чате или топике"""
         try:
-            kwargs = {
+            # Прямой запрос к API через httpx для обхода проблемы сериализации options
+            data = {
+                'chat_id': chat_id,
+                'question': question,
+                'options': json.dumps(options, ensure_ascii=False),  # Сериализуем как JSON строку
                 'is_anonymous': is_anonymous,
                 'allows_multiple_answers': False
             }
-
             if message_thread_id is not None:
-                kwargs['message_thread_id'] = message_thread_id
-
-            message = await bot.send_poll(chat_id, question, options, **kwargs)
-            return message
+                data['message_thread_id'] = message_thread_id
+            
+            # Получаем токен из бота
+            token = bot._bot.token
+            
+            # Используем httpx напрямую
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f'https://api.telegram.org/bot{token}/sendPoll',
+                    json=data,
+                    timeout=30
+                )
+                response.raise_for_status()
+                result = response.json()
+            
+            # Создаем Message из результата
+            from telegram import Message
+            if result.get('ok'):
+                message = Message.de_json(result['result'], bot)
+                return message
+            else:
+                logger.error(f"Telegram API error: {result}")
+                return None
         except Exception as e:
             logger.error(f"Ошибка при создании опроса в чате {chat_id}{' (топик ' + str(message_thread_id) + ')' if message_thread_id else ''}: {e}")
             return None
@@ -346,7 +370,6 @@ class VolleyBot:
         )
 
         if poll_message:
-            await self.pin_message(bot, chat_id, poll_message.message_id)
             logger.info(f"Опрос создан из расписания {schedule['id']} в чате {chat_id}")
 
         return poll_message
