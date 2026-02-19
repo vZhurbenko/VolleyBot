@@ -532,23 +532,248 @@
 
         function renderSchedules(schedules) {
             if (!schedules || schedules.length === 0) {
-                document.getElementById('schedules-content').innerHTML = '<p>Нет расписаний</p>';
+                document.getElementById('schedules-content').innerHTML = `
+                    <p>Нет расписаний</p>
+                    <button class="btn" onclick="showAddScheduleForm()" style="margin-top: 1rem;">Добавить расписание</button>
+                `;
                 return;
             }
 
-            const html = schedules.map(s => `
-                <div class="list-item">
+            let html = `
+                <button class="btn" onclick="showAddScheduleForm()" style="margin-bottom: 1rem;">Добавить расписание</button>
+            `;
+            
+            html += schedules.map(s => `
+                <div class="list-item" style="align-items: flex-start;">
                     <div>
                         <strong>${s.name}</strong><br>
-                        <small>${s.training_day} → ${s.poll_day} в ${s.training_time}</small>
+                        <small>${s.training_day} → ${s.poll_day} в ${s.training_time}</small><br>
+                        <small>Chat: ${s.chat_id}${s.message_thread_id ? ' (топик ' + s.message_thread_id + ')' : ''}</small>
                     </div>
-                    <span class="tag ${s.enabled ? 'tag-enabled' : 'tag-disabled'}">
-                        ${s.enabled ? 'Активно' : 'Отключено'}
-                    </span>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span class="tag ${s.enabled ? 'tag-enabled' : 'tag-disabled'}">
+                            ${s.enabled ? 'Активно' : 'Отключено'}
+                        </span>
+                        <button class="btn" style="padding: 0.25rem 0.75rem;" onclick="editSchedule('${s.id}')">✎</button>
+                        <button class="btn btn-danger" style="padding: 0.25rem 0.75rem;" onclick="deleteSchedule('${s.id}')">✕</button>
+                    </div>
                 </div>
             `).join('');
 
             document.getElementById('schedules-content').innerHTML = html;
+        }
+
+        function showAddScheduleForm() {
+            const html = `
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="schedule-name" placeholder="Например: Воскресенье">
+                </div>
+                <div class="form-group">
+                    <label>Chat ID</label>
+                    <input type="text" id="schedule-chat-id" placeholder="-1002588984009">
+                </div>
+                <div class="form-group">
+                    <label>Topic ID (опционально)</label>
+                    <input type="number" id="schedule-topic-id" placeholder="1159">
+                </div>
+                <div class="form-group">
+                    <label>День тренировки</label>
+                    <select id="schedule-training-day">
+                        <option value="monday">Понедельник</option>
+                        <option value="tuesday">Вторник</option>
+                        <option value="wednesday">Среда</option>
+                        <option value="thursday">Четверг</option>
+                        <option value="friday">Пятница</option>
+                        <option value="saturday">Суббота</option>
+                        <option value="sunday">Воскресенье</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>День создания опроса</label>
+                    <select id="schedule-poll-day">
+                        <option value="monday">Понедельник</option>
+                        <option value="tuesday">Вторник</option>
+                        <option value="wednesday">Среда</option>
+                        <option value="thursday">Четверг</option>
+                        <option value="friday">Пятница</option>
+                        <option value="saturday">Суббота</option>
+                        <option value="sunday">Воскресенье</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Время тренировки</label>
+                    <input type="text" id="schedule-training-time" placeholder="18:00 - 20:00">
+                </div>
+                <div class="form-group">
+                    <label>Включено</label>
+                    <input type="checkbox" id="schedule-enabled" checked style="width: auto;">
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn" onclick="addSchedule()">Сохранить</button>
+                    <button class="btn" style="background: #6c757d;" onclick="loadSchedules()">Отмена</button>
+                </div>
+            `;
+            document.getElementById('schedules-content').innerHTML = html;
+        }
+
+        async function addSchedule() {
+            const schedule = {
+                name: document.getElementById('schedule-name').value,
+                chat_id: document.getElementById('schedule-chat-id').value,
+                message_thread_id: document.getElementById('schedule-topic-id').value || null,
+                training_day: document.getElementById('schedule-training-day').value,
+                poll_day: document.getElementById('schedule-poll-day').value,
+                training_time: document.getElementById('schedule-training-time').value,
+                enabled: document.getElementById('schedule-enabled').checked
+            };
+
+            if (!schedule.name || !schedule.chat_id) {
+                alert('Заполните название и Chat ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/schedules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(schedule)
+                });
+
+                if (response.ok) {
+                    loadSchedules();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Ошибка добавления');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка добавления расписания');
+            }
+        }
+
+        async function editSchedule(scheduleId) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/schedules`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const schedules = await response.json();
+                    const schedule = schedules.find(s => s.id === scheduleId);
+                    if (schedule) {
+                        showEditScheduleForm(schedule);
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка загрузки расписания');
+            }
+        }
+
+        function showEditScheduleForm(schedule) {
+            const html = `
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="schedule-name" value="${schedule.name || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Chat ID</label>
+                    <input type="text" id="schedule-chat-id" value="${schedule.chat_id || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Topic ID (опционально)</label>
+                    <input type="number" id="schedule-topic-id" value="${schedule.message_thread_id || ''}">
+                </div>
+                <div class="form-group">
+                    <label>День тренировки</label>
+                    <select id="schedule-training-day">
+                        <option value="monday" ${schedule.training_day === 'monday' ? 'selected' : ''}>Понедельник</option>
+                        <option value="tuesday" ${schedule.training_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
+                        <option value="wednesday" ${schedule.training_day === 'wednesday' ? 'selected' : ''}>Среда</option>
+                        <option value="thursday" ${schedule.training_day === 'thursday' ? 'selected' : ''}>Четверг</option>
+                        <option value="friday" ${schedule.training_day === 'friday' ? 'selected' : ''}>Пятница</option>
+                        <option value="saturday" ${schedule.training_day === 'saturday' ? 'selected' : ''}>Суббота</option>
+                        <option value="sunday" ${schedule.training_day === 'sunday' ? 'selected' : ''}>Воскресенье</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>День создания опроса</label>
+                    <select id="schedule-poll-day">
+                        <option value="monday" ${schedule.poll_day === 'monday' ? 'selected' : ''}>Понедельник</option>
+                        <option value="tuesday" ${schedule.poll_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
+                        <option value="wednesday" ${schedule.poll_day === 'wednesday' ? 'selected' : ''}>Среда</option>
+                        <option value="thursday" ${schedule.poll_day === 'thursday' ? 'selected' : ''}>Четверг</option>
+                        <option value="friday" ${schedule.poll_day === 'friday' ? 'selected' : ''}>Пятница</option>
+                        <option value="saturday" ${schedule.poll_day === 'saturday' ? 'selected' : ''}>Суббота</option>
+                        <option value="sunday" ${schedule.poll_day === 'sunday' ? 'selected' : ''}>Воскресенье</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Время тренировки</label>
+                    <input type="text" id="schedule-training-time" value="${schedule.training_time || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Включено</label>
+                    <input type="checkbox" id="schedule-enabled" ${schedule.enabled ? 'checked' : ''} style="width: auto;">
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn" onclick="updateSchedule('${schedule.id}')">Сохранить</button>
+                    <button class="btn" style="background: #6c757d;" onclick="loadSchedules()">Отмена</button>
+                </div>
+            `;
+            document.getElementById('schedules-content').innerHTML = html;
+        }
+
+        async function updateSchedule(scheduleId) {
+            const updates = {
+                name: document.getElementById('schedule-name').value,
+                chat_id: document.getElementById('schedule-chat-id').value,
+                message_thread_id: document.getElementById('schedule-topic-id').value || null,
+                training_day: document.getElementById('schedule-training-day').value,
+                poll_day: document.getElementById('schedule-poll-day').value,
+                training_time: document.getElementById('schedule-training-time').value,
+                enabled: document.getElementById('schedule-enabled').checked
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/schedules/${scheduleId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(updates)
+                });
+
+                if (response.ok) {
+                    loadSchedules();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Ошибка обновления');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка обновления расписания');
+            }
+        }
+
+        async function deleteSchedule(scheduleId) {
+            if (!confirm('Удалить это расписание?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/schedules/${scheduleId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    loadSchedules();
+                } else {
+                    alert('Ошибка удаления');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка удаления расписания');
+            }
         }
 
         async function loadActivePolls() {
@@ -599,18 +824,90 @@
 
         function renderAdmins(adminIds) {
             if (!adminIds || adminIds.length === 0) {
-                document.getElementById('admins-content').innerHTML = '<p>Нет администраторов</p>';
+                document.getElementById('admins-content').innerHTML = `
+                    <p>Нет администраторов</p>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label>Добавить администратора</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="number" id="new-admin-id" placeholder="Telegram ID">
+                            <button class="btn" onclick="addAdmin()">Добавить</button>
+                        </div>
+                    </div>
+                `;
                 return;
             }
 
-            const html = adminIds.map(id => `
+            let html = `
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label>Добавить администратора</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="number" id="new-admin-id" placeholder="Telegram ID">
+                        <button class="btn" onclick="addAdmin()">Добавить</button>
+                    </div>
+                </div>
+            `;
+            
+            html += adminIds.map(id => `
                 <div class="list-item">
-                    <span>ID: ${id}</span>
-                    <span class="tag tag-enabled">Админ</span>
+                    <div>
+                        <span>ID: ${id}</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span class="tag tag-enabled">Админ</span>
+                        <button class="btn btn-danger" style="padding: 0.25rem 0.75rem;" onclick="removeAdmin(${id})">✕</button>
+                    </div>
                 </div>
             `).join('');
 
             document.getElementById('admins-content').innerHTML = html;
+        }
+
+        async function addAdmin() {
+            const adminId = document.getElementById('new-admin-id').value;
+            if (!adminId) {
+                alert('Введите Telegram ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/admin_ids`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ admin_id: parseInt(adminId) })
+                });
+
+                if (response.ok) {
+                    document.getElementById('new-admin-id').value = '';
+                    loadAdmins();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Ошибка добавления');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка добавления администратора');
+            }
+        }
+
+        async function removeAdmin(adminId) {
+            if (!confirm(`Удалить администратора ${adminId}?`)) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/admin_ids/${adminId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    loadAdmins();
+                } else {
+                    alert('Ошибка удаления');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка удаления администратора');
+            }
         }
 
         // ==================== Init ====================
