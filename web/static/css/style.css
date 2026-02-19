@@ -6,17 +6,9 @@
 /* ==================== Базовые стили ==================== */
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
     padding: 20px;
-    margin: 0;
-}
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
 }
 
 .container {
@@ -62,6 +54,13 @@ body {
 
 /* ==================== Login Page ==================== */
 
+.login-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
 .login-container {
     background: white;
     padding: 2.5rem;
@@ -69,7 +68,7 @@ body {
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     text-align: center;
     max-width: 450px;
-    margin: 4rem auto;
+    width: 100%;
 }
 
 .logo {
@@ -146,7 +145,7 @@ body {
     gap: 2rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48em) {
     .admin-panel {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -184,69 +183,70 @@ body {
     font-weight: 500;
 }
 
-.form-group input,
-.form-group textarea,
-.form-group select {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
+/* Pure CSS form overrides */
+.pure-form input[type="number"],
+.pure-form input[type="text"],
+.pure-form textarea,
+.pure-form select {
     border-radius: 8px;
-    font-size: 1rem;
+    border: 1px solid #ddd;
+    padding: 0.75rem;
 }
 
-.form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
+.pure-form input:focus,
+.pure-form textarea:focus,
+.pure-form select:focus {
     outline: none;
     border-color: #667eea;
-}
-
-.form-group input[type="checkbox"] {
-    width: auto;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 /* ==================== Buttons ==================== */
 
-.btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
+/* Pure CSS button overrides */
+.pure-button {
     border-radius: 8px;
-    cursor: pointer;
-    font-size: 1rem;
     transition: transform 0.2s, background 0.3s;
 }
 
-.btn:hover {
+.pure-button:hover {
     transform: translateY(-2px);
-    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
 }
 
-.btn:active {
+.pure-button:active {
     transform: translateY(0);
 }
 
-.btn:disabled {
+.pure-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
 }
 
+.pure-button-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.pure-button-primary:hover {
+    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+}
+
 .btn-danger {
-    background: #dc3545;
+    background: #dc3545 !important;
+    color: white;
 }
 
 .btn-danger:hover {
-    background: #c82333;
+    background: #c82333 !important;
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: #6c757d !important;
+    color: white;
 }
 
 .btn-secondary:hover {
-    background: #5a6268;
+    background: #5a6268 !important;
 }
 
 .btn-small {
@@ -265,12 +265,14 @@ body {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    margin-top: 1rem;
 }
 
 .input-group {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    margin-top: 0.5rem;
 }
 
 .input-group input {

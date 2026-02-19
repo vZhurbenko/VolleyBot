@@ -207,25 +207,25 @@
             const html = `
                 <div class="form-group">
                     <label>Название</label>
-                    <input type="text" id="template-name" value="${template.name || ''}">
+                    <input type="text" class="pure-form" id="template-name" value="${template.name || ''}">
                 </div>
                 <div class="form-group">
                     <label>Описание</label>
-                    <textarea id="template-description" rows="2">${template.description || ''}</textarea>
+                    <textarea class="pure-form" id="template-description" rows="2">${template.description || ''}</textarea>
                 </div>
                 <div class="form-group">
                     <label>День тренировки</label>
-                    <input type="text" id="template-training-day" value="${template.training_day || ''}">
+                    <input type="text" class="pure-form" id="template-training-day" value="${template.training_day || ''}">
                 </div>
                 <div class="form-group">
                     <label>День опроса</label>
-                    <input type="text" id="template-poll-day" value="${template.poll_day || ''}">
+                    <input type="text" class="pure-form" id="template-poll-day" value="${template.poll_day || ''}">
                 </div>
                 <div class="form-group">
                     <label>Время</label>
-                    <input type="text" id="template-training-time" value="${template.training_time || ''}">
+                    <input type="text" class="pure-form" id="template-training-time" value="${template.training_time || ''}">
                 </div>
-                <button class="btn" onclick="saveTemplate()">Сохранить</button>
+                <button class="pure-button pure-button-primary" onclick="saveTemplate()">Сохранить</button>
             `;
             document.getElementById('template-content').innerHTML = html;
         }
@@ -278,13 +278,13 @@
             if (!schedules || schedules.length === 0) {
                 document.getElementById('schedules-content').innerHTML = `
                     <p>Нет расписаний</p>
-                    <button class="btn" onclick="showAddScheduleForm()" style="margin-top: 1rem;">Добавить расписание</button>
+                    <button class="pure-button pure-button-primary" onclick="showAddScheduleForm()" style="margin-top: 1rem;">Добавить расписание</button>
                 `;
                 return;
             }
 
             let html = `
-                <button class="btn" onclick="showAddScheduleForm()" style="margin-bottom: 1rem;">Добавить расписание</button>
+                <button class="pure-button pure-button-primary" onclick="showAddScheduleForm()" style="margin-bottom: 1rem;">Добавить расписание</button>
             `;
             
             html += schedules.map(s => `
@@ -298,7 +298,7 @@
                         <span class="tag ${s.enabled ? 'tag-enabled' : 'tag-disabled'}">
                             ${s.enabled ? 'Активно' : 'Отключено'}
                         </span>
-                        <button class="btn btn-small" onclick="editSchedule('${s.id}')">✎</button>
+                        <button class="pure-button btn-small" onclick="editSchedule('${s.id}')">✎</button>
                         <button class="btn btn-danger btn-small" onclick="deleteSchedule('${s.id}')">✕</button>
                     </div>
                 </div>
@@ -342,19 +342,19 @@
             const html = `
                 <div class="form-group">
                     <label>Название</label>
-                    <input type="text" id="schedule-name" value="${defaultTemplate.name}" placeholder="Например: Воскресенье">
+                    <input type="text" class="pure-form" id="schedule-name" value="${defaultTemplate.name}" placeholder="Например: Воскресенье">
                 </div>
                 <div class="form-group">
                     <label>Chat ID</label>
-                    <input type="text" id="schedule-chat-id" value="${defaultTemplate.default_chat_id}" placeholder="-1002588984009">
+                    <input type="text" class="pure-form" id="schedule-chat-id" value="${defaultTemplate.default_chat_id}" placeholder="-1002588984009">
                 </div>
                 <div class="form-group">
                     <label>Topic ID (опционально)</label>
-                    <input type="number" id="schedule-topic-id" value="${defaultTemplate.default_topic_id !== null && defaultTemplate.default_topic_id !== undefined ? defaultTemplate.default_topic_id : ''}" placeholder="Оставьте пустым если не используется">
+                    <input type="number" class="pure-form" id="schedule-topic-id" value="${defaultTemplate.default_topic_id !== null && defaultTemplate.default_topic_id !== undefined ? defaultTemplate.default_topic_id : ''}" placeholder="Оставьте пустым если не используется">
                 </div>
                 <div class="form-group">
                     <label>День тренировки</label>
-                    <select id="schedule-training-day">
+                    <select class="pure-form" id="schedule-training-day">
                         <option value="monday" ${defaultTemplate.training_day === 'monday' ? 'selected' : ''}>Понедельник</option>
                         <option value="tuesday" ${defaultTemplate.training_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
                         <option value="wednesday" ${defaultTemplate.training_day === 'wednesday' ? 'selected' : ''}>Среда</option>
@@ -366,7 +366,7 @@
                 </div>
                 <div class="form-group">
                     <label>День создания опроса</label>
-                    <select id="schedule-poll-day">
+                    <select class="pure-form" id="schedule-poll-day">
                         <option value="monday" ${defaultTemplate.poll_day === 'monday' ? 'selected' : ''}>Понедельник</option>
                         <option value="tuesday" ${defaultTemplate.poll_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
                         <option value="wednesday" ${defaultTemplate.poll_day === 'wednesday' ? 'selected' : ''}>Среда</option>
@@ -378,15 +378,15 @@
                 </div>
                 <div class="form-group">
                     <label>Время тренировки</label>
-                    <input type="text" id="schedule-training-time" value="${defaultTemplate.training_time}" placeholder="18:00 - 20:00">
+                    <input type="text" class="pure-form" id="schedule-training-time" value="${defaultTemplate.training_time}" placeholder="18:00 - 20:00">
                 </div>
                 <div class="form-group">
                     <label>Включено</label>
                     <input type="checkbox" id="schedule-enabled" checked style="width: auto;">
                 </div>
                 <div class="form-actions">
-                    <button class="btn" onclick="addSchedule()">Сохранить</button>
-                    <button class="btn btn-secondary" onclick="loadSchedules()">Отмена</button>
+                    <button class="pure-button pure-button-primary" onclick="addSchedule()">Сохранить</button>
+                    <button class="pure-button btn-secondary" onclick="loadSchedules()">Отмена</button>
                 </div>
             `;
             document.getElementById('schedules-content').innerHTML = html;
@@ -450,19 +450,19 @@
             const html = `
                 <div class="form-group">
                     <label>Название</label>
-                    <input type="text" id="schedule-name" value="${schedule.name || ''}">
+                    <input type="text" class="pure-form" id="schedule-name" value="${schedule.name || ''}">
                 </div>
                 <div class="form-group">
                     <label>Chat ID</label>
-                    <input type="text" id="schedule-chat-id" value="${schedule.chat_id || ''}">
+                    <input type="text" class="pure-form" id="schedule-chat-id" value="${schedule.chat_id || ''}">
                 </div>
                 <div class="form-group">
                     <label>Topic ID (опционально)</label>
-                    <input type="number" id="schedule-topic-id" value="${schedule.message_thread_id || ''}" placeholder="Оставьте пустым если не используется">
+                    <input type="number" class="pure-form" id="schedule-topic-id" value="${schedule.message_thread_id || ''}" placeholder="Оставьте пустым если не используется">
                 </div>
                 <div class="form-group">
                     <label>День тренировки</label>
-                    <select id="schedule-training-day">
+                    <select class="pure-form" id="schedule-training-day">
                         <option value="monday" ${schedule.training_day === 'monday' ? 'selected' : ''}>Понедельник</option>
                         <option value="tuesday" ${schedule.training_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
                         <option value="wednesday" ${schedule.training_day === 'wednesday' ? 'selected' : ''}>Среда</option>
@@ -474,7 +474,7 @@
                 </div>
                 <div class="form-group">
                     <label>День создания опроса</label>
-                    <select id="schedule-poll-day">
+                    <select class="pure-form" id="schedule-poll-day">
                         <option value="monday" ${schedule.poll_day === 'monday' ? 'selected' : ''}>Понедельник</option>
                         <option value="tuesday" ${schedule.poll_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
                         <option value="wednesday" ${schedule.poll_day === 'wednesday' ? 'selected' : ''}>Среда</option>
@@ -486,15 +486,15 @@
                 </div>
                 <div class="form-group">
                     <label>Время тренировки</label>
-                    <input type="text" id="schedule-training-time" value="${schedule.training_time || ''}">
+                    <input type="text" class="pure-form" id="schedule-training-time" value="${schedule.training_time || ''}">
                 </div>
                 <div class="form-group">
                     <label>Включено</label>
                     <input type="checkbox" id="schedule-enabled" ${schedule.enabled ? 'checked' : ''} style="width: auto;">
                 </div>
                 <div class="form-actions">
-                    <button class="btn" onclick="updateSchedule('${schedule.id}')">Сохранить</button>
-                    <button class="btn btn-secondary" onclick="loadSchedules()">Отмена</button>
+                    <button class="pure-button pure-button-primary" onclick="updateSchedule('${schedule.id}')">Сохранить</button>
+                    <button class="pure-button btn-secondary" onclick="loadSchedules()">Отмена</button>
                 </div>
             `;
             document.getElementById('schedules-content').innerHTML = html;
@@ -604,8 +604,8 @@
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>Добавить администратора</label>
                         <div class="input-group">
-                            <input type="number" id="new-admin-id" placeholder="Telegram ID">
-                            <button class="btn" onclick="addAdmin()">Добавить</button>
+                            <input type="number" class="pure-form" id="new-admin-id" placeholder="Telegram ID">
+                            <button class="pure-button pure-button-primary" onclick="addAdmin()">Добавить</button>
                         </div>
                     </div>
                 `;
@@ -616,8 +616,8 @@
                 <div class="form-group" style="margin-bottom: 1rem;">
                     <label>Добавить администратора</label>
                     <div class="input-group">
-                        <input type="number" id="new-admin-id" placeholder="Telegram ID">
-                        <button class="btn" onclick="addAdmin()">Добавить</button>
+                        <input type="number" class="pure-form" id="new-admin-id" placeholder="Telegram ID">
+                        <button class="pure-button pure-button-primary" onclick="addAdmin()">Добавить</button>
                     </div>
                 </div>
             `;
