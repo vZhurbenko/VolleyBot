@@ -181,8 +181,6 @@ class VolleyBot:
         """Создание опроса в указанном чате или топике"""
         try:
             kwargs = {
-                'question': question,
-                'options': options,
                 'is_anonymous': is_anonymous,
                 'allows_multiple_answers': False
             }
@@ -190,7 +188,7 @@ class VolleyBot:
             if message_thread_id is not None:
                 kwargs['message_thread_id'] = message_thread_id
 
-            message = await bot.send_poll(chat_id, **kwargs)
+            message = await bot.send_poll(chat_id, question, options, **kwargs)
             return message
         except Exception as e:
             logger.error(f"Ошибка при создании опроса в чате {chat_id}{' (топик ' + str(message_thread_id) + ')' if message_thread_id else ''}: {e}")
