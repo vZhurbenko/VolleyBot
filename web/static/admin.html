@@ -563,7 +563,32 @@
             document.getElementById('schedules-content').innerHTML = html;
         }
 
-        function showAddScheduleForm() {
+        async function showAddScheduleForm() {
+            // Загружаем шаблон по умолчанию для предзаполнения
+            let defaultTemplate = {
+                training_day: 'sunday',
+                poll_day: 'friday',
+                training_time: '18:00 - 20:00'
+            };
+            
+            try {
+                const response = await fetch(`${API_URL}/api/admin/settings/template`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const template = await response.json();
+                    if (template) {
+                        defaultTemplate = {
+                            training_day: template.training_day || defaultTemplate.training_day,
+                            poll_day: template.poll_day || defaultTemplate.poll_day,
+                            training_time: template.training_time || defaultTemplate.training_time
+                        };
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки шаблона:', error);
+            }
+
             const html = `
                 <div class="form-group">
                     <label>Название</label>
@@ -580,30 +605,30 @@
                 <div class="form-group">
                     <label>День тренировки</label>
                     <select id="schedule-training-day">
-                        <option value="monday">Понедельник</option>
-                        <option value="tuesday">Вторник</option>
-                        <option value="wednesday">Среда</option>
-                        <option value="thursday">Четверг</option>
-                        <option value="friday">Пятница</option>
-                        <option value="saturday">Суббота</option>
-                        <option value="sunday">Воскресенье</option>
+                        <option value="monday" ${defaultTemplate.training_day === 'monday' ? 'selected' : ''}>Понедельник</option>
+                        <option value="tuesday" ${defaultTemplate.training_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
+                        <option value="wednesday" ${defaultTemplate.training_day === 'wednesday' ? 'selected' : ''}>Среда</option>
+                        <option value="thursday" ${defaultTemplate.training_day === 'thursday' ? 'selected' : ''}>Четверг</option>
+                        <option value="friday" ${defaultTemplate.training_day === 'friday' ? 'selected' : ''}>Пятница</option>
+                        <option value="saturday" ${defaultTemplate.training_day === 'saturday' ? 'selected' : ''}>Суббота</option>
+                        <option value="sunday" ${defaultTemplate.training_day === 'sunday' ? 'selected' : ''}>Воскресенье</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>День создания опроса</label>
                     <select id="schedule-poll-day">
-                        <option value="monday">Понедельник</option>
-                        <option value="tuesday">Вторник</option>
-                        <option value="wednesday">Среда</option>
-                        <option value="thursday">Четверг</option>
-                        <option value="friday">Пятница</option>
-                        <option value="saturday">Суббота</option>
-                        <option value="sunday">Воскресенье</option>
+                        <option value="monday" ${defaultTemplate.poll_day === 'monday' ? 'selected' : ''}>Понедельник</option>
+                        <option value="tuesday" ${defaultTemplate.poll_day === 'tuesday' ? 'selected' : ''}>Вторник</option>
+                        <option value="wednesday" ${defaultTemplate.poll_day === 'wednesday' ? 'selected' : ''}>Среда</option>
+                        <option value="thursday" ${defaultTemplate.poll_day === 'thursday' ? 'selected' : ''}>Четверг</option>
+                        <option value="friday" ${defaultTemplate.poll_day === 'friday' ? 'selected' : ''}>Пятница</option>
+                        <option value="saturday" ${defaultTemplate.poll_day === 'saturday' ? 'selected' : ''}>Суббота</option>
+                        <option value="sunday" ${defaultTemplate.poll_day === 'sunday' ? 'selected' : ''}>Воскресенье</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Время тренировки</label>
-                    <input type="text" id="schedule-training-time" placeholder="18:00 - 20:00">
+                    <input type="text" id="schedule-training-time" value="${defaultTemplate.training_time}" placeholder="18:00 - 20:00">
                 </div>
                 <div class="form-group">
                     <label>Включено</label>
