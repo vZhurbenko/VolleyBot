@@ -265,6 +265,40 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .form-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-small {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .input-group input {
+            flex: 1;
+        }
+
+        .list-item-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -550,12 +584,12 @@
                         <small>${s.training_day} → ${s.poll_day} в ${s.training_time}</small><br>
                         <small>Chat: ${s.chat_id}${s.message_thread_id ? ' (топик ' + s.message_thread_id + ')' : ''}</small>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div class="list-item-actions">
                         <span class="tag ${s.enabled ? 'tag-enabled' : 'tag-disabled'}">
                             ${s.enabled ? 'Активно' : 'Отключено'}
                         </span>
-                        <button class="btn" style="padding: 0.25rem 0.75rem;" onclick="editSchedule('${s.id}')">✎</button>
-                        <button class="btn btn-danger" style="padding: 0.25rem 0.75rem;" onclick="deleteSchedule('${s.id}')">✕</button>
+                        <button class="btn btn-small" onclick="editSchedule('${s.id}')">✎</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteSchedule('${s.id}')">✕</button>
                     </div>
                 </div>
             `).join('');
@@ -640,9 +674,9 @@
                     <label>Включено</label>
                     <input type="checkbox" id="schedule-enabled" checked style="width: auto;">
                 </div>
-                <div style="display: flex; gap: 0.5rem;">
+                <div class="form-actions">
                     <button class="btn" onclick="addSchedule()">Сохранить</button>
-                    <button class="btn" style="background: #6c757d;" onclick="loadSchedules()">Отмена</button>
+                    <button class="btn btn-secondary" onclick="loadSchedules()">Отмена</button>
                 </div>
             `;
             document.getElementById('schedules-content').innerHTML = html;
@@ -748,9 +782,9 @@
                     <label>Включено</label>
                     <input type="checkbox" id="schedule-enabled" ${schedule.enabled ? 'checked' : ''} style="width: auto;">
                 </div>
-                <div style="display: flex; gap: 0.5rem;">
+                <div class="form-actions">
                     <button class="btn" onclick="updateSchedule('${schedule.id}')">Сохранить</button>
-                    <button class="btn" style="background: #6c757d;" onclick="loadSchedules()">Отмена</button>
+                    <button class="btn btn-secondary" onclick="loadSchedules()">Отмена</button>
                 </div>
             `;
             document.getElementById('schedules-content').innerHTML = html;
@@ -859,7 +893,7 @@
                     <p>Нет администраторов</p>
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>Добавить администратора</label>
-                        <div style="display: flex; gap: 0.5rem;">
+                        <div class="input-group">
                             <input type="number" id="new-admin-id" placeholder="Telegram ID">
                             <button class="btn" onclick="addAdmin()">Добавить</button>
                         </div>
@@ -871,7 +905,7 @@
             let html = `
                 <div class="form-group" style="margin-bottom: 1rem;">
                     <label>Добавить администратора</label>
-                    <div style="display: flex; gap: 0.5rem;">
+                    <div class="input-group">
                         <input type="number" id="new-admin-id" placeholder="Telegram ID">
                         <button class="btn" onclick="addAdmin()">Добавить</button>
                     </div>
@@ -883,9 +917,9 @@
                     <div>
                         <span>ID: ${id}</span>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div class="list-item-actions">
                         <span class="tag tag-enabled">Админ</span>
-                        <button class="btn btn-danger" style="padding: 0.25rem 0.75rem;" onclick="removeAdmin(${id})">✕</button>
+                        <button class="btn btn-danger btn-small" onclick="removeAdmin(${id})">✕</button>
                     </div>
                 </div>
             `).join('');
