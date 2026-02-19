@@ -587,7 +587,7 @@
                             poll_day: template.poll_day || defaultTemplate.poll_day,
                             training_time: template.training_time || defaultTemplate.training_time,
                             default_chat_id: template.default_chat_id || defaultTemplate.default_chat_id,
-                            default_topic_id: template.default_topic_id || defaultTemplate.default_topic_id
+                            default_topic_id: 'default_topic_id' in template ? template.default_topic_id : defaultTemplate.default_topic_id
                         };
                     }
                 }
@@ -606,7 +606,7 @@
                 </div>
                 <div class="form-group">
                     <label>Topic ID (опционально)</label>
-                    <input type="number" id="schedule-topic-id" value="${defaultTemplate.default_topic_id || ''}" placeholder="Оставьте пустым если не используется">
+                    <input type="number" id="schedule-topic-id" value="${defaultTemplate.default_topic_id !== null && defaultTemplate.default_topic_id !== undefined ? defaultTemplate.default_topic_id : ''}" placeholder="Оставьте пустым если не используется">
                 </div>
                 <div class="form-group">
                     <label>День тренировки</label>
