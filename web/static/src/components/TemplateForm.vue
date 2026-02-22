@@ -87,7 +87,7 @@
     </div>
 
     <div class="pt-6 border-t border-gray-200">
-      <button @click="handleSave" class="px-6 py-3 rounded-lg font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800">
+      <button @click="handleSave" class="px-6 py-3 rounded-lg font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
         Сохранить
       </button>
     </div>

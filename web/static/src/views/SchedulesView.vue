@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-4">
     <div class="flex justify-end">
-      <button @click="showForm = true" class="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800">
+      <button @click="showForm = true" class="px-4 py-2 rounded-lg font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
         + Добавить расписание
       </button>
     </div>

@@ -78,7 +78,7 @@
     </div>
     
     <div class="flex gap-3 pt-6 border-t border-gray-200">
-      <button type="submit" class="px-6 py-3 rounded-lg font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800">
+      <button type="submit" class="px-6 py-3 rounded-lg font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
         {{ isEdit ? 'Сохранить' : 'Добавить' }}
       </button>
       <button type="button" @click="$emit('cancel')" class="px-6 py-3 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">

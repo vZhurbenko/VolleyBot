@@ -4,7 +4,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-2xl">
+          <div class="w-12 h-12 rounded-lg bg-teal-100 flex items-center justify-center text-2xl">
             📅
           </div>
           <div>
@@ -13,10 +13,10 @@
           </div>
         </div>
       </div>
-      
+
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-2xl">
+          <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-2xl">
             📊
           </div>
           <div>
@@ -25,7 +25,7 @@
           </div>
         </div>
       </div>
-      
+
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center text-2xl">
@@ -43,8 +43,8 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <router-link to="/admin/schedules" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl">
+        <router-link to="/admin/schedules" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
             📅
           </div>
           <div>
@@ -52,9 +52,9 @@
             <p class="text-sm text-gray-500">Создать новое расписание опросов</p>
           </div>
         </router-link>
-        
-        <router-link to="/admin/template" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-xl">
+
+        <router-link to="/admin/template" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
             📋
           </div>
           <div>
@@ -62,9 +62,9 @@
             <p class="text-sm text-gray-500">Редактировать шаблон опроса</p>
           </div>
         </router-link>
-        
-        <router-link to="/admin/admins" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-xl">
+
+        <router-link to="/admin/admins" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
             👥
           </div>
           <div>
@@ -72,9 +72,9 @@
             <p class="text-sm text-gray-500">Добавить или удалить администратора</p>
           </div>
         </router-link>
-        
-        <router-link to="/admin/polls" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-xl">
+
+        <router-link to="/admin/polls" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
             📈
           </div>
           <div>
