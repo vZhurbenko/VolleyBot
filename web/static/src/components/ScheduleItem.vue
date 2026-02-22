@@ -2,12 +2,10 @@
   <div class="flex items-center justify-between py-4 border-b border-gray-100 last:border-0">
     <div class="flex-1">
       <h3 class="font-semibold text-gray-900 mb-1">{{ schedule.name }}</h3>
-      <p class="text-sm text-gray-500 flex items-center gap-2 mb-1">
-        <span>{{ formatDay(schedule.training_day) }}</span>
-        <span class="text-gray-400">→</span>
-        <span>{{ formatDay(schedule.poll_day) }}</span>
-        <span class="text-gray-300">•</span>
-        <span>{{ schedule.training_time }}</span>
+      <p class="text-sm text-gray-500 mb-1">
+        <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}
+        <span class="mx-2 text-gray-300">|</span>
+        <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(schedule.poll_day) }}
       </p>
       <p class="text-xs text-gray-400">
         Chat: {{ schedule.chat_id }}
