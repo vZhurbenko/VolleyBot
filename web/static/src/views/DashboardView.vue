@@ -96,7 +96,7 @@
         <div v-for="schedule in settingsStore.schedules.slice(0, 3)" :key="schedule.id" class="py-3 flex items-center justify-between">
           <div>
             <p class="font-medium text-gray-900">{{ schedule.name }}</p>
-            <p class="text-sm text-gray-500">{{ schedule.training_day }} → {{ schedule.poll_day }}</p>
+            <p class="text-sm text-gray-500">{{ formatDay(schedule.training_day) }} → {{ formatDay(schedule.poll_day) }}</p>
           </div>
           <span :class="['px-3 py-1 rounded-full text-xs font-medium', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
             {{ schedule.enabled ? 'Активно' : 'Отключено' }}
@@ -115,6 +115,18 @@ import { onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 
 const settingsStore = useSettingsStore()
+
+const days = {
+  monday: 'Пн',
+  tuesday: 'Вт',
+  wednesday: 'Ср',
+  thursday: 'Чт',
+  friday: 'Пт',
+  saturday: 'Сб',
+  sunday: 'Вс'
+}
+
+const formatDay = (day) => days[day] || day
 
 onMounted(async () => {
   await Promise.all([
