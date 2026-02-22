@@ -79,6 +79,7 @@ const initTelegramWidget = (botUsername) => {
 
 const onTelegramAuth = async (user) => {
   console.log('Telegram user data:', user)
+  console.log('Начало авторизации...')
 
   try {
     const response = await fetch('/api/auth/telegram', {
@@ -90,12 +91,17 @@ const onTelegramAuth = async (user) => {
       credentials: 'include'
     })
 
+    console.log('Ответ сервера:', response.status)
     const result = await response.json()
+    console.log('Результат:', result)
 
     if (response.ok && result.success) {
-      router.push('/admin')
+      console.log('Авторизация успешна, переход на /admin...')
+      await router.push('/admin')
+      console.log('Переход выполнен')
     } else {
       errorMessage.value = result.detail || 'Ошибка авторизации'
+      console.error('Ошибка авторизации:', errorMessage.value)
       if (response.status === 403) {
         const loginWidget = document.getElementById('telegram-login')
         if (loginWidget) {
