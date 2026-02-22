@@ -1,7 +1,11 @@
+<script setup>
+import logo from '@/img/logo.svg'
+</script>
+
 <template>
   <aside class="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
     <div class="p-6 border-b border-gray-200 flex items-center gap-3">
-      <span class="text-3xl">🏐</span>
+      <img :src="logo" alt="Team R Logo" class="w-10 h-10" />
       <span class="text-xl font-bold text-gray-900">Team R</span>
     </div>
 

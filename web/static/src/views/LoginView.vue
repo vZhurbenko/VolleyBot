@@ -3,7 +3,7 @@
     class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
   >
     <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md text-center">
-      <div class="text-6xl mb-4">🏐</div>
+      <img :src="logo" alt="Team R Logo" class="w-20 h-20 mx-auto mb-4" />
       <h1 class="text-2xl font-bold text-gray-900 mb-2">Team R</h1>
       <p class="text-gray-500 mb-6">Система управления тренировками</p>
 
@@ -37,6 +37,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import logo from "@/img/logo.svg";
 
 const router = useRouter();
 const authStore = useAuthStore();
