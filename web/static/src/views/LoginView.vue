@@ -102,9 +102,9 @@ const onTelegramAuth = async (user) => {
       // Обновляем auth store перед редиректом
       authStore.setUser(result.user);
       
-      console.log("Переход на /admin...");
-      await router.push("/admin");
-      console.log("Переход выполнен");
+      console.log("Переход на /admin через window.location...");
+      // Используем window.location для гарантированного редиректа
+      window.location.href = "/admin";
     } else {
       errorMessage.value = result.detail || "Ошибка авторизации";
       console.error("Ошибка авторизации:", errorMessage.value);
