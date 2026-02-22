@@ -11,9 +11,35 @@ const router = createRouter({
     },
     {
       path: '/admin',
-      name: 'admin',
-      component: () => import('@/views/DashboardView.vue'),
-      meta: { requiresAuth: true }
+      component: () => import('@/views/AdminLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'dashboard',
+          component: () => import('@/views/DashboardView.vue')
+        },
+        {
+          path: 'template',
+          name: 'template',
+          component: () => import('@/views/TemplateView.vue')
+        },
+        {
+          path: 'schedules',
+          name: 'schedules',
+          component: () => import('@/views/SchedulesView.vue')
+        },
+        {
+          path: 'polls',
+          name: 'polls',
+          component: () => import('@/views/PollsView.vue')
+        },
+        {
+          path: 'admins',
+          name: 'admins',
+          component: () => import('@/views/AdminsView.vue')
+        }
+      ]
     }
   ]
 })

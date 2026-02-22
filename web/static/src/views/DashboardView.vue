@@ -1,187 +1,126 @@
 <template>
-  <div class="flex min-h-screen bg-gray-50">
-    <Sidebar />
-    
-    <div class="flex-1 flex flex-col">
-      <Topbar>
-        <template #title>Панель управления</template>
-      </Topbar>
-      
-      <main class="flex-1 p-6 overflow-auto">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl">
-          <!-- Шаблон опроса -->
-          <DashboardCard icon="📋">
-            <template #title>Шаблон опроса</template>
-            
-            <template v-if="settingsStore.template">
-              <TemplateForm 
-                :template="settingsStore.template" 
-                @save="handleSaveTemplate" 
-              />
-            </template>
-            <template v-else>
-              <div class="text-gray-500 text-center py-8">Загрузка...</div>
-            </template>
-          </DashboardCard>
-          
-          <!-- Расписания -->
-          <DashboardCard icon="📅">
-            <template #title>Расписания опросов</template>
-            <template #header-action>
-              <button @click="showAddSchedule = true" class="px-3 py-1.5 rounded-lg font-medium transition-colors text-sm bg-gray-900 text-white hover:bg-gray-800">
-                + Добавить
-              </button>
-            </template>
-            
-            <div v-if="settingsStore.schedules.length > 0" class="divide-y divide-gray-100">
-              <ScheduleItem
-                v-for="schedule in settingsStore.schedules"
-                :key="schedule.id"
-                :schedule="schedule"
-                @edit="handleEditSchedule"
-                @delete="handleDeleteSchedule"
-              />
-            </div>
-            <div v-else class="text-gray-500 text-center py-8">
-              Нет расписаний
-            </div>
-          </DashboardCard>
-          
-          <!-- Активные опросы -->
-          <DashboardCard icon="📊">
-            <template #title>Активные опросы</template>
-            
-            <div v-if="settingsStore.activePolls.length > 0" class="divide-y divide-gray-100">
-              <div v-for="poll in settingsStore.activePolls" :key="poll.id" class="py-4 flex items-center justify-between">
-                <div>
-                  <strong>Опрос #{{ poll.id.slice(0, 8) }}</strong>
-                  <p class="text-sm text-gray-500 mt-1">Chat: {{ poll.chat_id }}</p>
-                </div>
-              </div>
-            </div>
-            <div v-else class="text-gray-500 text-center py-8">
-              Нет активных опросов
-            </div>
-          </DashboardCard>
-          
-          <!-- Администраторы -->
-          <DashboardCard icon="👥">
-            <template #title>Администраторы</template>
-            
-            <AdminList 
-              :admin-ids="settingsStore.adminIds"
-              @add="handleAddAdmin"
-              @remove="handleRemoveAdmin"
-            />
-          </DashboardCard>
+  <div class="space-y-6">
+    <!-- Краткая статистика -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-2xl">
+            📅
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Расписаний</p>
+            <p class="text-2xl font-bold text-gray-900">{{ settingsStore.schedules.length }}</p>
+          </div>
         </div>
-      </main>
+      </div>
+      
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-2xl">
+            📊
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Активных опросов</p>
+            <p class="text-2xl font-bold text-gray-900">{{ settingsStore.activePolls.length }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center text-2xl">
+            👥
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Администраторов</p>
+            <p class="text-2xl font-bold text-gray-900">{{ settingsStore.adminIds.length }}</p>
+          </div>
+        </div>
+      </div>
     </div>
     
-    <!-- Модальное окно для добавления/редактирования расписания -->
-    <div v-if="showAddSchedule || editingSchedule" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="closeModal">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto" @click.stop>
-        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
-          <h2 class="text-lg font-semibold">{{ editingSchedule ? 'Редактировать расписание' : 'Новое расписание' }}</h2>
-          <button @click="closeModal" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">✕</button>
-        </div>
+    <!-- Быстрые действия -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <router-link to="/admin/schedules" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl">
+            📅
+          </div>
+          <div>
+            <p class="font-medium text-gray-900">Добавить расписание</p>
+            <p class="text-sm text-gray-500">Создать новое расписание опросов</p>
+          </div>
+        </router-link>
         
-        <ScheduleForm
-          :schedule="editingSchedule"
-          :is-edit="!!editingSchedule"
-          @submit="handleScheduleSubmit"
-          @cancel="closeModal"
-        />
+        <router-link to="/admin/template" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-xl">
+            📋
+          </div>
+          <div>
+            <p class="font-medium text-gray-900">Изменить шаблон</p>
+            <p class="text-sm text-gray-500">Редактировать шаблон опроса</p>
+          </div>
+        </router-link>
+        
+        <router-link to="/admin/admins" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-xl">
+            👥
+          </div>
+          <div>
+            <p class="font-medium text-gray-900">Управление админами</p>
+            <p class="text-sm text-gray-500">Добавить или удалить администратора</p>
+          </div>
+        </router-link>
+        
+        <router-link to="/admin/polls" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-xl">
+            📈
+          </div>
+          <div>
+            <p class="font-medium text-gray-900">Активные опросы</p>
+            <p class="text-sm text-gray-500">Просмотр текущих опросов</p>
+          </div>
+        </router-link>
+      </div>
+    </div>
+    
+    <!-- Последние расписания -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Расписания</h2>
+        <router-link to="/admin/schedules" class="text-sm text-blue-600 hover:underline">Все →</router-link>
+      </div>
+      
+      <div v-if="settingsStore.schedules.length > 0" class="divide-y divide-gray-100">
+        <div v-for="schedule in settingsStore.schedules.slice(0, 3)" :key="schedule.id" class="py-3 flex items-center justify-between">
+          <div>
+            <p class="font-medium text-gray-900">{{ schedule.name }}</p>
+            <p class="text-sm text-gray-500">{{ schedule.training_day }} → {{ schedule.poll_day }}</p>
+          </div>
+          <span :class="['px-3 py-1 rounded-full text-xs font-medium', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+            {{ schedule.enabled ? 'Активно' : 'Отключено' }}
+          </span>
+        </div>
+      </div>
+      <div v-else class="text-gray-500 text-center py-8">
+        Нет расписаний
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
-import Sidebar from '@/components/Sidebar.vue'
-import Topbar from '@/components/Topbar.vue'
-import DashboardCard from '@/components/DashboardCard.vue'
-import TemplateForm from '@/components/TemplateForm.vue'
-import ScheduleItem from '@/components/ScheduleItem.vue'
-import ScheduleForm from '@/components/ScheduleForm.vue'
-import AdminList from '@/components/AdminList.vue'
 
 const settingsStore = useSettingsStore()
 
-const showAddSchedule = ref(false)
-const editingSchedule = ref(null)
-
 onMounted(async () => {
   await Promise.all([
-    settingsStore.loadTemplate(),
     settingsStore.loadSchedules(),
     settingsStore.loadActivePolls(),
     settingsStore.loadAdminIds()
   ])
 })
-
-// Template
-const handleSaveTemplate = async (templateData) => {
-  const success = await settingsStore.saveTemplate(templateData)
-  if (success) {
-    alert('Шаблон сохранён!')
-  } else {
-    alert('Ошибка сохранения')
-  }
-}
-
-// Schedules
-const handleEditSchedule = (schedule) => {
-  editingSchedule.value = schedule
-  showAddSchedule.value = false
-}
-
-const handleDeleteSchedule = async (id) => {
-  if (!confirm('Удалить это расписание?')) return
-  
-  const success = await settingsStore.deleteSchedule(id)
-  if (!success) {
-    alert('Ошибка удаления')
-  }
-}
-
-const handleScheduleSubmit = async (scheduleData) => {
-  let success
-  
-  if (editingSchedule.value) {
-    success = await settingsStore.updateSchedule(editingSchedule.value.id, scheduleData)
-  } else {
-    success = await settingsStore.addSchedule(scheduleData)
-  }
-  
-  if (success) {
-    closeModal()
-  } else {
-    alert('Ошибка сохранения')
-  }
-}
-
-const closeModal = () => {
-  showAddSchedule.value = false
-  editingSchedule.value = null
-}
-
-// Admins
-const handleAddAdmin = async (adminId) => {
-  const success = await settingsStore.addAdminId(adminId)
-  if (!success) {
-    alert('Ошибка добавления администратора')
-  }
-}
-
-const handleRemoveAdmin = async (adminId) => {
-  if (!confirm(`Удалить администратора ${adminId}?`)) return
-  
-  const success = await settingsStore.removeAdminId(adminId)
-  if (!success) {
-    alert('Ошибка удаления')
-  }
-}
 </script>
