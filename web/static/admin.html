@@ -9,9 +9,9 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Login View -->
-        <div id="login-view" class="login-container hidden">
+    <!-- Login View -->
+    <div id="login-view" class="login-wrapper hidden">
+        <div class="login-container">
             <div class="logo">🏐</div>
             <h1>VolleyBot</h1>
             <p class="subtitle">Система управления тренировками</p>
@@ -23,10 +23,12 @@
             <div id="telegram-login"></div>
             <div id="login-message" class="message hidden"></div>
         </div>
+    </div>
 
-        <!-- Admin Panel View -->
-        <div id="admin-view" class="hidden">
-            <div class="header">
+    <!-- Admin Panel View -->
+    <div id="admin-view" class="hidden">
+        <div class="header">
+            <div class="container">
                 <h1>🏐 VolleyBot Admin</h1>
                 <div class="user-menu">
                     <div class="user-info">
@@ -36,7 +38,9 @@
                     <button class="logout-btn" onclick="logout()">Выйти</button>
                 </div>
             </div>
+        </div>
 
+        <div class="container">
             <div class="admin-panel">
                 <!-- Шаблон опроса -->
                 <div class="card">
