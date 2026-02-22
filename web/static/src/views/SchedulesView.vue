@@ -30,6 +30,8 @@
         <ScheduleForm
           :schedule="editingSchedule"
           :is-edit="!!editingSchedule"
+          :default-chat-id="defaultChatId"
+          :default-topic-id="defaultTopicId"
           @submit="handleSubmit"
           @cancel="closeModal"
         />
@@ -48,9 +50,21 @@ const settingsStore = useSettingsStore()
 
 const showForm = ref(false)
 const editingSchedule = ref(null)
+const defaultChatId = ref('')
+const defaultTopicId = ref(null)
 
 onMounted(async () => {
-  await settingsStore.loadSchedules()
+  await Promise.all([
+    settingsStore.loadSchedules(),
+    settingsStore.loadTemplate()
+  ])
+  
+  // Загружаем значения по умолчанию из шаблона
+  const template = settingsStore.template
+  if (template) {
+    defaultChatId.value = template.default_chat_id || ''
+    defaultTopicId.value = template.default_topic_id !== undefined ? template.default_topic_id : null
+  }
 })
 
 const handleEdit = (schedule) => {
@@ -73,7 +87,7 @@ const handleSubmit = async (scheduleData) => {
   } else {
     success = await settingsStore.addSchedule(scheduleData)
   }
-  
+
   if (success) {
     closeModal()
   } else {

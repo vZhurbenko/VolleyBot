@@ -99,6 +99,14 @@ const props = defineProps({
   isEdit: {
     type: Boolean,
     default: false
+  },
+  defaultChatId: {
+    type: String,
+    default: ''
+  },
+  defaultTopicId: {
+    type: [Number, String],
+    default: null
   }
 })
 
@@ -106,8 +114,8 @@ const emit = defineEmits(['submit', 'cancel'])
 
 const defaultForm = {
   name: '',
-  chat_id: '',
-  message_thread_id: null,
+  chat_id: props.defaultChatId || '',
+  message_thread_id: props.defaultTopicId || null,
   training_day: 'sunday',
   poll_day: 'friday',
   training_time: '18:00 - 20:00',
@@ -127,10 +135,31 @@ watch(() => props.schedule, (newSchedule) => {
       training_time: newSchedule.training_time || '18:00 - 20:00',
       enabled: newSchedule.enabled !== false
     }
-  } else {
-    form.value = { ...defaultForm }
+  } else if (!props.isEdit) {
+    // Сброс к значениям по умолчанию при открытии формы добавления
+    form.value = {
+      name: '',
+      chat_id: props.defaultChatId || '',
+      message_thread_id: props.defaultTopicId || null,
+      training_day: 'sunday',
+      poll_day: 'friday',
+      training_time: '18:00 - 20:00',
+      enabled: true
+    }
   }
 }, { immediate: true })
+
+watch(() => props.defaultChatId, (newVal) => {
+  if (!props.isEdit && !form.value.chat_id) {
+    form.value.chat_id = newVal
+  }
+})
+
+watch(() => props.defaultTopicId, (newVal) => {
+  if (!props.isEdit && !form.value.message_thread_id) {
+    form.value.message_thread_id = newVal
+  }
+})
 
 const handleSubmit = () => {
   emit('submit', { ...form.value })

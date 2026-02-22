@@ -43,15 +43,37 @@
       
       <div class="space-y-2">
         <label class="block text-sm font-medium text-gray-700">Время</label>
-        <input 
-          v-model="form.training_time" 
-          type="text" 
+        <input
+          v-model="form.training_time"
+          type="text"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           placeholder="18:00 - 20:00"
         />
       </div>
     </div>
-    
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Chat ID по умолчанию</label>
+        <input
+          v-model="form.default_chat_id"
+          type="text"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          placeholder="-1002588984009"
+        />
+      </div>
+
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Topic ID по умолчанию (опционально)</label>
+        <input
+          v-model.number="form.default_topic_id"
+          type="number"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          placeholder="Оставьте пустым если не используется"
+        />
+      </div>
+    </div>
+
     <div class="pt-4">
       <button @click="handleSave" class="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800">
         Сохранить
@@ -79,7 +101,9 @@ const defaultForm = {
   poll_day: '',
   training_time: '',
   options: ['Буду', '50/50', 'Не буду'],
-  enabled: true
+  enabled: true,
+  default_chat_id: '',
+  default_topic_id: null
 }
 
 const form = ref({ ...defaultForm })
@@ -93,7 +117,9 @@ watch(() => props.template, (newTemplate) => {
       poll_day: newTemplate.poll_day || '',
       training_time: newTemplate.training_time || '',
       options: newTemplate.options || ['Буду', '50/50', 'Не буду'],
-      enabled: newTemplate.enabled !== false
+      enabled: newTemplate.enabled !== false,
+      default_chat_id: newTemplate.default_chat_id || '',
+      default_topic_id: newTemplate.default_topic_id !== undefined ? newTemplate.default_topic_id : null
     }
   }
 }, { immediate: true })
