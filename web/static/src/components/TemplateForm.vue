@@ -1,6 +1,6 @@
 <template>
-  <div class="space-y-6">
-    <div class="space-y-2">
+  <div class="flex flex-col gap-6 p-6">
+    <div class="flex flex-col gap-2">
       <label class="block text-sm font-medium text-gray-700">Название</label>
       <input
         v-model="form.name"
@@ -10,7 +10,7 @@
       />
     </div>
 
-    <div class="space-y-2">
+    <div class="flex flex-col gap-2">
       <label class="block text-sm font-medium text-gray-700">Описание</label>
       <textarea
         v-model="form.description"
@@ -21,7 +21,7 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">День тренировки</label>
         <select
           v-model="form.training_day"
@@ -37,7 +37,7 @@
         </select>
       </div>
 
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">День опроса</label>
         <select
           v-model="form.poll_day"
@@ -53,7 +53,7 @@
         </select>
       </div>
 
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Время</label>
         <input
           v-model="form.training_time"
@@ -65,7 +65,7 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-200">
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Chat ID по умолчанию</label>
         <input
           v-model="form.default_chat_id"
@@ -75,7 +75,7 @@
         />
       </div>
 
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Topic ID по умолчанию (опционально)</label>
         <input
           v-model.number="form.default_topic_id"

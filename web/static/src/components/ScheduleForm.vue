@@ -1,7 +1,7 @@
 <template>
-  <form @submit.prevent="handleSubmit" class="space-y-6">
+  <form @submit.prevent="handleSubmit" class="flex flex-col gap-6 p-6">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Название</label>
         <input 
           v-model="form.name" 
@@ -12,7 +12,7 @@
         />
       </div>
       
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Chat ID</label>
         <input 
           v-model="form.chat_id" 
@@ -23,7 +23,7 @@
         />
       </div>
       
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Topic ID (опционально)</label>
         <input 
           v-model.number="form.message_thread_id" 
@@ -33,7 +33,7 @@
         />
       </div>
       
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">День тренировки</label>
         <select v-model="form.training_day" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
           <option value="monday">Понедельник</option>
@@ -46,7 +46,7 @@
         </select>
       </div>
       
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">День создания опроса</label>
         <select v-model="form.poll_day" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
           <option value="monday">Понедельник</option>
@@ -59,7 +59,7 @@
         </select>
       </div>
       
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Время тренировки</label>
         <input 
           v-model="form.training_time" 
