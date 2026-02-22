@@ -1,59 +1,59 @@
 <template>
-  <div class="template-form">
-    <div class="form-group">
-      <label class="form-label">Название</label>
+  <div class="space-y-4">
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-gray-700">Название</label>
       <input 
         v-model="form.name" 
         type="text" 
-        class="form-input"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
         placeholder="Название шаблона"
       />
     </div>
     
-    <div class="form-group">
-      <label class="form-label">Описание</label>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-gray-700">Описание</label>
       <textarea 
         v-model="form.description" 
         rows="2"
-        class="form-input"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
         placeholder="Описание тренировки"
       ></textarea>
     </div>
     
-    <div class="form-grid">
-      <div class="form-group">
-        <label class="form-label">День тренировки</label>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">День тренировки</label>
         <input 
           v-model="form.training_day" 
           type="text" 
-          class="form-input"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           placeholder="Например: Воскресенье"
         />
       </div>
       
-      <div class="form-group">
-        <label class="form-label">День опроса</label>
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">День опроса</label>
         <input 
           v-model="form.poll_day" 
           type="text" 
-          class="form-input"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           placeholder="Например: Пятница"
         />
       </div>
       
-      <div class="form-group">
-        <label class="form-label">Время</label>
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Время</label>
         <input 
           v-model="form.training_time" 
           type="text" 
-          class="form-input"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           placeholder="18:00 - 20:00"
         />
       </div>
     </div>
     
-    <div class="form-actions">
-      <button @click="handleSave" class="btn btn-primary">
+    <div class="pt-4">
+      <button @click="handleSave" class="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800">
         Сохранить
       </button>
     </div>
@@ -102,37 +102,3 @@ const handleSave = () => {
   emit('save', { ...form.value })
 }
 </script>
-
-<style scoped>
-.template-form {
-  @apply space-y-4;
-}
-
-.form-grid {
-  @apply grid grid-cols-1 md:grid-cols-3 gap-4;
-}
-
-.form-group {
-  @apply space-y-2;
-}
-
-.form-label {
-  @apply block text-sm font-medium text-gray-700;
-}
-
-.form-input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors;
-}
-
-.form-actions {
-  @apply pt-4;
-}
-
-.btn {
-  @apply px-4 py-2 rounded-lg font-medium transition-colors;
-}
-
-.btn-primary {
-  @apply bg-gray-900 text-white hover:bg-gray-800;
-}
-</style>

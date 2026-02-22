@@ -1,14 +1,14 @@
 <template>
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">
-        <span v-if="icon" class="card-icon">{{ icon }}</span>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        <span v-if="icon" class="text-xl">{{ icon }}</span>
         <slot name="title">Заголовок</slot>
       </h2>
       <slot name="header-action"></slot>
     </div>
     
-    <div class="card-content">
+    <div class="p-6">
       <slot></slot>
     </div>
   </div>
@@ -22,25 +22,3 @@ defineProps({
   }
 })
 </script>
-
-<style scoped>
-.card {
-  @apply bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden;
-}
-
-.card-header {
-  @apply px-6 py-4 border-b border-gray-100 flex items-center justify-between;
-}
-
-.card-title {
-  @apply text-lg font-semibold text-gray-900 flex items-center gap-2;
-}
-
-.card-icon {
-  @apply text-xl;
-}
-
-.card-content {
-  @apply p-6;
-}
-</style>

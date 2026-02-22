@@ -1,14 +1,14 @@
 <template>
-  <div class="dashboard-layout">
+  <div class="flex min-h-screen bg-gray-50">
     <Sidebar />
     
-    <div class="dashboard-main">
+    <div class="flex-1 flex flex-col">
       <Topbar>
         <template #title>Панель управления</template>
       </Topbar>
       
-      <main class="dashboard-content">
-        <div class="cards-grid">
+      <main class="flex-1 p-6 overflow-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl">
           <!-- Шаблон опроса -->
           <DashboardCard icon="📋">
             <template #title>Шаблон опроса</template>
@@ -20,7 +20,7 @@
               />
             </template>
             <template v-else>
-              <div class="loading">Загрузка...</div>
+              <div class="text-gray-500 text-center py-8">Загрузка...</div>
             </template>
           </DashboardCard>
           
@@ -28,12 +28,12 @@
           <DashboardCard icon="📅">
             <template #title>Расписания опросов</template>
             <template #header-action>
-              <button @click="showAddSchedule = true" class="btn btn-small btn-primary">
+              <button @click="showAddSchedule = true" class="px-3 py-1.5 rounded-lg font-medium transition-colors text-sm bg-gray-900 text-white hover:bg-gray-800">
                 + Добавить
               </button>
             </template>
             
-            <div v-if="settingsStore.schedules.length > 0" class="schedules-list">
+            <div v-if="settingsStore.schedules.length > 0" class="divide-y divide-gray-100">
               <ScheduleItem
                 v-for="schedule in settingsStore.schedules"
                 :key="schedule.id"
@@ -42,7 +42,7 @@
                 @delete="handleDeleteSchedule"
               />
             </div>
-            <div v-else class="empty-state">
+            <div v-else class="text-gray-500 text-center py-8">
               Нет расписаний
             </div>
           </DashboardCard>
@@ -51,15 +51,15 @@
           <DashboardCard icon="📊">
             <template #title>Активные опросы</template>
             
-            <div v-if="settingsStore.activePolls.length > 0" class="polls-list">
-              <div v-for="poll in settingsStore.activePolls" :key="poll.id" class="poll-item">
+            <div v-if="settingsStore.activePolls.length > 0" class="divide-y divide-gray-100">
+              <div v-for="poll in settingsStore.activePolls" :key="poll.id" class="py-4 flex items-center justify-between">
                 <div>
                   <strong>Опрос #{{ poll.id.slice(0, 8) }}</strong>
-                  <p class="poll-chat">Chat: {{ poll.chat_id }}</p>
+                  <p class="text-sm text-gray-500 mt-1">Chat: {{ poll.chat_id }}</p>
                 </div>
               </div>
             </div>
-            <div v-else class="empty-state">
+            <div v-else class="text-gray-500 text-center py-8">
               Нет активных опросов
             </div>
           </DashboardCard>
@@ -79,11 +79,11 @@
     </div>
     
     <!-- Модальное окно для добавления/редактирования расписания -->
-    <div v-if="showAddSchedule || editingSchedule" class="modal-overlay" @click="closeModal">
-      <div class="modal" @click.stop>
-        <div class="modal-header">
-          <h2>{{ editingSchedule ? 'Редактировать расписание' : 'Новое расписание' }}</h2>
-          <button @click="closeModal" class="modal-close">✕</button>
+    <div v-if="showAddSchedule || editingSchedule" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="closeModal">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto" @click.stop>
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+          <h2 class="text-lg font-semibold">{{ editingSchedule ? 'Редактировать расписание' : 'Новое расписание' }}</h2>
+          <button @click="closeModal" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">✕</button>
         </div>
         
         <ScheduleForm
@@ -98,7 +98,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import Sidebar from '@/components/Sidebar.vue'
 import Topbar from '@/components/Topbar.vue'
@@ -185,72 +185,3 @@ const handleRemoveAdmin = async (adminId) => {
   }
 }
 </script>
-
-<style scoped>
-.dashboard-layout {
-  @apply flex min-h-screen bg-gray-50;
-}
-
-.dashboard-main {
-  @apply flex-1 flex flex-col;
-}
-
-.dashboard-content {
-  @apply flex-1 p-6 overflow-auto;
-}
-
-.cards-grid {
-  @apply grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl;
-}
-
-.loading,
-.empty-state {
-  @apply text-gray-500 text-center py-8;
-}
-
-.schedules-list,
-.polls-list {
-  @apply divide-y divide-gray-100;
-}
-
-.poll-item {
-  @apply py-4 flex items-center justify-between;
-}
-
-.poll-chat {
-  @apply text-sm text-gray-500 mt-1;
-}
-
-.btn {
-  @apply px-3 py-1.5 rounded-lg font-medium transition-colors text-sm;
-}
-
-.btn-primary {
-  @apply bg-gray-900 text-white hover:bg-gray-800;
-}
-
-.btn-small {
-  @apply px-3 py-1.5;
-}
-
-/* Modal */
-.modal-overlay {
-  @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4;
-}
-
-.modal {
-  @apply bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto;
-}
-
-.modal-header {
-  @apply px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white;
-}
-
-.modal-header h2 {
-  @apply text-lg font-semibold;
-}
-
-.modal-close {
-  @apply w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors;
-}
-</style>
