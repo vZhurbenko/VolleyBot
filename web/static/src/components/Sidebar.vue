@@ -2,7 +2,7 @@
   <aside class="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
     <div class="p-6 border-b border-gray-200 flex items-center gap-3">
       <span class="text-3xl">🏐</span>
-      <span class="text-xl font-bold text-gray-900">VolleyBot</span>
+      <span class="text-xl font-bold text-gray-900">Team R</span>
     </div>
 
     <nav class="flex-1 p-4 flex flex-col gap-2">

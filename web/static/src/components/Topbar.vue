@@ -2,7 +2,7 @@
   <header class="bg-white border-b border-gray-200">
     <div class="flex items-center justify-between max-w-7xl mx-auto px-6 py-4">
       <h1 class="text-xl font-bold text-gray-900">
-        <slot name="title">VolleyBot Admin</slot>
+        <slot name="title">Team R Admin</slot>
       </h1>
 
       <div class="flex items-center gap-4 p-2">

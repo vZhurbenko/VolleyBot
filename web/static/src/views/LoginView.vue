@@ -4,7 +4,7 @@
   >
     <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md text-center">
       <div class="text-6xl mb-4">🏐</div>
-      <h1 class="text-2xl font-bold text-gray-900 mb-2">VolleyBot</h1>
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">Team R</h1>
       <p class="text-gray-500 mb-6">Система управления тренировками</p>
 
       <div v-if="isAuthenticated" class="mt-6">

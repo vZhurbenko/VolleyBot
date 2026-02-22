@@ -32,6 +32,6 @@ const pageTitle = computed(() => {
     polls: 'Опросы',
     admins: 'Администраторы'
   }
-  return titles[route.name] || 'VolleyBot Admin'
+  return titles[route.name] || 'Team R Admin'
 })
 </script>
