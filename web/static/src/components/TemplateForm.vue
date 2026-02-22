@@ -23,24 +23,36 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="space-y-2">
         <label class="block text-sm font-medium text-gray-700">День тренировки</label>
-        <input 
-          v-model="form.training_day" 
-          type="text" 
+        <select
+          v-model="form.training_day"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          placeholder="Например: Воскресенье"
-        />
+        >
+          <option value="monday">Понедельник</option>
+          <option value="tuesday">Вторник</option>
+          <option value="wednesday">Среда</option>
+          <option value="thursday">Четверг</option>
+          <option value="friday">Пятница</option>
+          <option value="saturday">Суббота</option>
+          <option value="sunday">Воскресенье</option>
+        </select>
       </div>
-      
+
       <div class="space-y-2">
         <label class="block text-sm font-medium text-gray-700">День опроса</label>
-        <input 
-          v-model="form.poll_day" 
-          type="text" 
+        <select
+          v-model="form.poll_day"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          placeholder="Например: Пятница"
-        />
+        >
+          <option value="monday">Понедельник</option>
+          <option value="tuesday">Вторник</option>
+          <option value="wednesday">Среда</option>
+          <option value="thursday">Четверг</option>
+          <option value="friday">Пятница</option>
+          <option value="saturday">Суббота</option>
+          <option value="sunday">Воскресенье</option>
+        </select>
       </div>
-      
+
       <div class="space-y-2">
         <label class="block text-sm font-medium text-gray-700">Время</label>
         <input
