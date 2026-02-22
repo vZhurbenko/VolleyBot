@@ -548,31 +548,25 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 
 # ==================== Статика ====================
 
-static_path = Path(__file__).parent / "static"
+static_path = Path(__file__).parent / "static" / "dist"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 
-@app.get("/")
-async def root():
+@app.get("/{full_path:path}")
+async def root(full_path: str):
     """
-    Главная страница - отдаёт фронтенд
+    Главная страница и все роуты - отдаём Vue.js приложение
     """
-    index_path = Path(__file__).parent / "static" / "index.html"
+    # Если это API запрос - пропускаем
+    if full_path.startswith('api/'):
+        raise HTTPException(status_code=404)
+    
+    # Иначе отдаём index.html для Vue Router
+    index_path = Path(__file__).parent / "static" / "dist" / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
-    return {"message": "VolleyBot Auth API"}
-
-
-@app.get("/admin")
-async def admin_panel():
-    """
-    Админ-панель
-    """
-    admin_path = Path(__file__).parent / "static" / "admin.html"
-    if admin_path.exists():
-        return FileResponse(admin_path)
-    return {"message": "Admin panel not found"}
+    return {"message": "VolleyBot Auth API - build not found"}
 
 
 @app.get("/health")
