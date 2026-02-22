@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-4">
+  <div class="flex flex-col gap-4">
     <div v-if="settingsStore.activePolls.length > 0" class="divide-y divide-gray-100">
       <div v-for="poll in settingsStore.activePolls" :key="poll.id" class="py-4 flex items-center justify-between">
         <div>

@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-4">
+  <div class="flex flex-col gap-4">
     <div class="pb-4 border-b border-gray-100">
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Добавить администратора</label>
         <div class="flex gap-2">
           <input 

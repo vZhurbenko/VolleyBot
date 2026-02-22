@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-4">
+  <div class="flex flex-col gap-4">
     <div v-if="settingsStore.template">
       <TemplateForm 
         :template="settingsStore.template" 
