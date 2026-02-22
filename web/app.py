@@ -553,22 +553,6 @@ if static_path.exists():
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 
-@app.get("/{full_path:path}")
-async def root(full_path: str):
-    """
-    Главная страница и все роуты - отдаём Vue.js приложение
-    """
-    # Если это API запрос - пропускаем
-    if full_path.startswith('api/'):
-        raise HTTPException(status_code=404)
-    
-    # Иначе отдаём index.html для Vue Router
-    index_path = Path(__file__).parent / "static" / "dist" / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    return {"message": "VolleyBot Auth API - build not found"}
-
-
 @app.get("/health")
 async def health_check():
     """
@@ -578,3 +562,19 @@ async def health_check():
         "status": "ok",
         "database": "connected" if db.conn else "disconnected"
     }
+
+
+@app.get("/{full_path:path}")
+async def root(full_path: str):
+    """
+    Главная страница и все роуты - отдаём Vue.js приложение
+    """
+    # Если это API запрос или ассеты - пропускаем
+    if full_path.startswith('api/') or full_path.startswith('static/'):
+        raise HTTPException(status_code=404)
+
+    # Иначе отдаём index.html для Vue Router
+    index_path = Path(__file__).parent / "static" / "dist" / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    return {"message": "VolleyBot Auth API - build not found"}
