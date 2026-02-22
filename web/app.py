@@ -549,8 +549,15 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 # ==================== Статика ====================
 
 static_path = Path(__file__).parent / "static" / "dist"
+assets_path = static_path / "assets"
+
+# Монтируем директорию ассетов для CSS/JS файлов
+if assets_path.exists():
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+
+# Монтируем dist для favicon и других файлов
 if static_path.exists():
-    app.mount("/static", StaticFiles(directory=static_path), name="static")
+    app.mount("/static", StaticFiles(directory=static_path, html=True), name="static")
 
 
 @app.get("/health")
@@ -570,7 +577,7 @@ async def root(full_path: str):
     Главная страница и все роуты - отдаём Vue.js приложение
     """
     # Если это API запрос или ассеты - пропускаем
-    if full_path.startswith('api/') or full_path.startswith('static/'):
+    if full_path.startswith('api/') or full_path.startswith('static/') or full_path.startswith('assets/'):
         raise HTTPException(status_code=404)
 
     # Иначе отдаём index.html для Vue Router
