@@ -5,7 +5,7 @@
       <span class="text-xl font-bold">VolleyBot</span>
     </div>
     
-    <nav class="flex-1 p-4 space-y-2">
+    <nav class="flex-1 p-4 flex flex-col gap-2">
       <router-link to="/admin" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors" :class="{ 'bg-gray-800 text-white': $route.name === 'dashboard' }">
         <span class="text-xl">📊</span>
         <span class="font-medium">Дашборд</span>
