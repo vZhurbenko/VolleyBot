@@ -98,7 +98,11 @@ const onTelegramAuth = async (user) => {
     console.log("Результат:", result);
 
     if (response.ok && result.success) {
-      console.log("Авторизация успешна, переход на /admin...");
+      console.log("Авторизация успешна, обновляем store...");
+      // Обновляем auth store перед редиректом
+      authStore.setUser(result.user);
+      
+      console.log("Переход на /admin...");
       await router.push("/admin");
       console.log("Переход выполнен");
     } else {
