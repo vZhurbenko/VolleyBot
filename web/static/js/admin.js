@@ -8,11 +8,15 @@ async function checkAuth() {
             credentials: 'include'
         });
 
+        console.log('admin.js checkAuth status:', response.status);
+
         if (response.ok) {
             const user = await response.json();
+            console.log('admin.js: пользователь авторизован, показываем панель');
             showAdminPanel(user);
         } else {
             // Не авторизован - перенаправляем на страницу входа
+            console.log('admin.js: не авторизован, редирект на /');
             window.location.href = '/';
         }
     } catch (error) {
@@ -50,25 +54,37 @@ async function onTelegramAuth(user) {
 
 async function logout() {
     try {
-        await fetch(`${API_URL}/api/auth/logout`, {
+        const response = await fetch(`${API_URL}/api/auth/logout`, {
             method: 'POST',
             credentials: 'include'
         });
+        console.log('Logout response:', response.status);
         // После выхода перенаправляем на страницу входа
         window.location.href = '/';
     } catch (error) {
         console.error('Ошибка выхода:', error);
+        window.location.href = '/';
     }
 }
 
 // ==================== View Functions ====================
 
 function showAdminPanel(user) {
-    document.getElementById('login-view').classList.add('hidden');
-    document.getElementById('admin-view').classList.remove('hidden');
+    console.log('showAdminPanel: показываем админ-панель');
+    const adminView = document.getElementById('admin-view');
+    if (adminView) {
+        adminView.classList.remove('hidden');
+    }
 
-    document.getElementById('user-photo').src = user.photo_url || 'https://via.placeholder.com/40';
-    document.getElementById('user-name').textContent = `${user.first_name} ${user.last_name || ''}`.trim();
+    const userPhoto = document.getElementById('user-photo');
+    if (userPhoto) {
+        userPhoto.src = user.photo_url || 'https://via.placeholder.com/40';
+    }
+    
+    const userName = document.getElementById('user-name');
+    if (userName) {
+        userName.textContent = `${user.first_name} ${user.last_name || ''}`.trim();
+    }
 
     loadTemplate();
     loadSchedules();

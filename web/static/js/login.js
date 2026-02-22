@@ -68,9 +68,54 @@ async function checkAuth() {
             credentials: 'include'
         });
 
+        console.log('checkAuth response status:', response.status);
+
         if (response.ok) {
-            // Уже авторизован - перенаправляем в админку
-            window.location.href = '/admin';
+            console.log('Пользователь авторизован, добавляем кнопку...');
+            
+            // Уже авторизован - скрываем виджет и показываем кнопку перехода в админку
+            const loginWidget = document.getElementById('telegram-login');
+            if (loginWidget) {
+                loginWidget.classList.add('hidden');
+                console.log('Виджет скрыт');
+            }
+
+            // Добавляем кнопку перехода в админку
+            const adminBtn = document.createElement('button');
+            adminBtn.type = 'button';
+            adminBtn.className = 'btn btn-block mt-2';
+            adminBtn.textContent = 'Перейти в админ-панель';
+            adminBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Клик по кнопке сработал!');
+                try {
+                    window.location.assign('/admin');
+                } catch (err) {
+                    console.error('Ошибка редиректа:', err);
+                    // Если assign не сработал, пробуем href
+                    window.location.href = '/admin';
+                }
+            });
+
+            const container = document.querySelector('.login-container');
+            const messageEl = document.getElementById('message');
+            if (messageEl) {
+                container.insertBefore(adminBtn, messageEl);
+                console.log('Кнопка вставлена перед message');
+            } else {
+                container.appendChild(adminBtn);
+                console.log('Кнопка добавлена в конец container');
+            }
+
+            // Проверка видимости кнопки
+            setTimeout(() => {
+                console.log('Кнопка в DOM:', document.contains(adminBtn));
+                console.log('Кнопка видима:', adminBtn.offsetParent !== null);
+                console.log('Кнопка styles:', window.getComputedStyle(adminBtn).display);
+            }, 100);
+
+            showMessage('Вы уже авторизованы', 'success');
             return;
         }
     } catch (error) {
