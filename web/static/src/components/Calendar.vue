@@ -1,10 +1,10 @@
 <template>
-  <div class="bg-white rounded shadow overflow-hidden">
+  <div class="bg-white rounded shadow overflow-hidden border border-gray-200">
     <!-- Заголовок с навигацией -->
-    <div class="flex items-center justify-between p-4 border-b border-gray-200">
+    <div class="flex items-center justify-between p-4 border-b border-gray-300 bg-gray-50">
       <button
         @click="previousMonth"
-        class="p-2 rounded hover:bg-gray-100 transition-colors"
+        class="p-2 rounded hover:bg-gray-200 transition-colors font-medium"
       >
         ←
       </button>
@@ -13,41 +13,41 @@
       </h2>
       <button
         @click="nextMonth"
-        class="p-2 rounded hover:bg-gray-100 transition-colors"
+        class="p-2 rounded hover:bg-gray-200 transition-colors font-medium"
       >
         →
       </button>
     </div>
 
     <!-- Сетка календаря -->
-    <div class="grid grid-cols-7 border-b border-gray-200">
+    <div class="grid grid-cols-7 border-b border-gray-300">
       <div
         v-for="day in dayNames"
         :key="day"
-        class="py-2 text-center text-sm font-medium text-gray-500 border-r border-gray-100 last:border-r-0"
+        class="py-2 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0"
       >
         {{ day }}
       </div>
     </div>
 
     <!-- Дни месяца -->
-    <div class="grid grid-cols-7">
+    <div class="grid grid-cols-7 gap-px bg-gray-200">
       <!-- Пустые ячейки для дней предыдущего месяца -->
       <div
         v-for="n in firstDayOffset"
         :key="'empty-' + n"
-        class="min-h-[100px] bg-gray-50 border-r border-b border-gray-100"
+        class="min-h-[100px] bg-gray-50"
       ></div>
 
       <!-- Дни месяца -->
       <div
         v-for="day in daysInMonth"
         :key="day"
-        class="min-h-[100px] border-r border-b border-gray-100 last:border-r-0 p-2 relative group"
+        class="min-h-[100px] bg-white p-2 relative group"
         :class="{ 'bg-gray-50': isWeekend(day) }"
       >
         <div class="flex items-center justify-between mb-1 min-h-[20px]">
-          <div class="text-sm font-medium text-gray-700">
+          <div class="text-sm font-semibold" :class="isWeekend(day) ? 'text-red-600' : 'text-gray-900'">
             {{ day }}
           </div>
           <!-- Кнопка добавления для админов -->
@@ -67,7 +67,7 @@
             v-for="training in getTrainingsForDay(day)"
             :key="training.key"
             @click="$emit('click-training', training)"
-            class="text-xs p-1.5 rounded cursor-pointer transition-colors"
+            class="text-xs p-1.5 rounded cursor-pointer transition-colors border"
             :class="getTrainingClass(training)"
           >
             <div class="font-medium truncate">{{ training.time }}</div>
@@ -177,13 +177,13 @@ const getTrainingsForDay = (day) => {
 
 const getTrainingClass = (training) => {
   if (training.user_status === 'registered') {
-    return 'bg-teal-100 text-teal-800 hover:bg-teal-200'
+    return 'bg-teal-100 text-teal-800 hover:bg-teal-200 border-teal-200'
   } else if (training.user_status === 'waitlist') {
-    return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+    return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200'
   } else if (training.registered_count >= 12) {
-    return 'bg-red-50 text-red-700 hover:bg-red-100'
+    return 'bg-red-100 text-red-800 hover:bg-red-200 border-red-200'
   } else {
-    return 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+    return 'bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200'
   }
 }
 </script>

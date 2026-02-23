@@ -65,8 +65,16 @@ const defaultChatId = ref('')
 const defaultTopicId = ref(null)
 
 const now = new Date()
-const currentYear = ref(parseInt(route.query.year) || now.getFullYear())
-const currentMonth = ref(parseInt(route.query.month) || now.getMonth() + 1)
+const currentYear = ref(now.getFullYear())
+const currentMonth = ref(now.getMonth() + 1)
+
+// Обновляем из query параметров при загрузке
+if (route.query.year) {
+  currentYear.value = parseInt(route.query.year) || now.getFullYear()
+}
+if (route.query.month) {
+  currentMonth.value = parseInt(route.query.month) || now.getMonth() + 1
+}
 
 onMounted(async () => {
   await Promise.all([
