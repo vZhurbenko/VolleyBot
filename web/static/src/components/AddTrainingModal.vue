@@ -89,6 +89,14 @@ const props = defineProps({
   date: {
     type: String,
     default: ''
+  },
+  defaultChatId: {
+    type: String,
+    default: ''
+  },
+  defaultTopicId: {
+    type: Number,
+    default: null
   }
 })
 
@@ -98,8 +106,8 @@ const formData = ref({
   training_date: props.date || '',
   training_time: '',
   name: '',
-  chat_id: '',
-  topic_id: null
+  chat_id: props.defaultChatId || '',
+  topic_id: props.defaultTopicId !== undefined ? props.defaultTopicId : null
 })
 
 const handleSubmit = () => {

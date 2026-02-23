@@ -39,6 +39,8 @@
     <AddTrainingModal
       v-if="showAddModal"
       :date="selectedDate"
+      :default-chat-id="defaultChatId"
+      :default-topic-id="defaultTopicId"
       @close="closeAddTrainingModal"
       @add="addOneTimeTraining"
     />
@@ -49,6 +51,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 import Calendar from '@/components/Calendar.vue'
 import TrainingModal from '@/components/TrainingModal.vue'
 import AddTrainingModal from '@/components/AddTrainingModal.vue'
@@ -56,6 +59,7 @@ import AddTrainingModal from '@/components/AddTrainingModal.vue'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 
 const trainings = ref([])
 const selectedTraining = ref(null)
@@ -64,13 +68,25 @@ const loading = ref(false)
 // Для добавления тренировки
 const showAddModal = ref(false)
 const selectedDate = ref('')
+const defaultChatId = ref('')
+const defaultTopicId = ref(null)
 
 const now = new Date()
 const currentYear = ref(parseInt(route.query.year) || now.getFullYear())
 const currentMonth = ref(parseInt(route.query.month) || now.getMonth() + 1)
 
-onMounted(() => {
-  loadCalendar()
+onMounted(async () => {
+  await Promise.all([
+    loadCalendar(),
+    settingsStore.loadTemplate()
+  ])
+
+  // Загружаем значения по умолчанию из шаблона
+  const template = settingsStore.template
+  if (template) {
+    defaultChatId.value = template.default_chat_id || ''
+    defaultTopicId.value = template.default_topic_id !== undefined ? template.default_topic_id : null
+  }
 })
 
 const loadCalendar = async () => {
