@@ -14,16 +14,16 @@
         </span>
       </p>
     </div>
-    
+
     <div class="flex items-center gap-2">
-      <span :class="['px-3 py-1 rounded-full text-xs font-medium', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+      <span :class="['px-3 py-1 rounded text-xs font-medium', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
         {{ schedule.enabled ? 'Активно' : 'Отключено' }}
       </span>
-      
-      <button @click="$emit('edit', schedule)" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors" title="Редактировать">
+
+      <button @click="$emit('edit', schedule)" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors" title="Редактировать">
         ✎
       </button>
-      <button @click="$emit('delete', schedule.id)" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-500 transition-colors" title="Удалить">
+      <button @click="$emit('delete', schedule.id)" class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors" title="Удалить">
         ✕
       </button>
     </div>

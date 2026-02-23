@@ -1,14 +1,14 @@
 <template>
-  <div class="flex min-h-screen bg-gray-50">
+  <div class="flex min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
     <Sidebar />
-    
+
     <div class="flex-1 flex flex-col">
-      <Topbar>
-        <template #title>{{ pageTitle }}</template>
-      </Topbar>
-      
       <main class="flex-1 p-6 overflow-auto">
         <div class="max-w-7xl mx-auto">
+          <Topbar>
+            <template #title>{{ pageTitle }}</template>
+          </Topbar>
+
           <RouterView />
         </div>
       </main>

@@ -1,11 +1,11 @@
 <template>
-  <header class="bg-white border-b border-gray-200">
-    <div class="flex items-center justify-between max-w-7xl mx-auto px-6 py-4">
+  <div class="bg-white rounded shadow p-6 mb-6">
+    <div class="flex items-center justify-between">
       <h1 class="text-xl font-bold text-gray-900">
         <slot name="title">Team R Admin</slot>
       </h1>
 
-      <div class="flex items-center gap-4 p-2">
+      <div class="flex items-center gap-4">
         <img
           v-if="user?.photo_url"
           :src="user.photo_url"
@@ -25,13 +25,13 @@
 
         <button
           @click="handleLogout"
-          class="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          class="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
         >
           Выйти
         </button>
       </div>
     </div>
-  </header>
+  </div>
 </template>
 
 <script setup>

@@ -1,11 +1,11 @@
 <template>
-  <div class="flex flex-col gap-4">
-    <div class="flex justify-end">
-      <button @click="showForm = true" class="px-4 py-2 rounded-lg font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
+  <div class="bg-white rounded shadow p-6">
+    <div class="flex justify-end mb-4">
+      <button @click="showForm = true" class="px-6 py-3 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
         + Добавить расписание
       </button>
     </div>
-    
+
     <div v-if="settingsStore.schedules.length > 0" class="divide-y divide-gray-100">
       <ScheduleItem
         v-for="schedule in settingsStore.schedules"
@@ -18,15 +18,15 @@
     <div v-else class="text-gray-500 text-center py-8">
       Нет расписаний
     </div>
-    
+
     <!-- Модальное окно -->
     <div v-if="showForm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="closeModal">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto" @click.stop>
+      <div class="bg-white rounded shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto" @click.stop>
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
           <h2 class="text-lg font-semibold">{{ editingSchedule ? 'Редактировать расписание' : 'Новое расписание' }}</h2>
-          <button @click="closeModal" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">✕</button>
+          <button @click="closeModal" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors">✕</button>
         </div>
-        
+
         <ScheduleForm
           :schedule="editingSchedule"
           :is-edit="!!editingSchedule"
