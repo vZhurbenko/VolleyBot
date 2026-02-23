@@ -521,3 +521,265 @@ class Database:
             users.append(user)
 
         return users
+
+    # ==================== Методы для работы с тренировками ====================
+
+    def get_training_registrations(self, training_date: str, training_time: str, chat_id: str) -> List[Dict[str, Any]]:
+        """Получение всех записей на тренировку"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT tr.*, u.first_name, u.last_name, u.username, u.photo_url
+            FROM training_registrations tr
+            LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
+            WHERE tr.training_date = ? AND tr.training_time = ? AND tr.chat_id = ?
+            ORDER BY tr.registered_at ASC
+        ''', (training_date, training_time, chat_id))
+        
+        return [dict(row) for row in cursor.fetchall()]
+
+    def register_for_training(self, training_id: str, training_date: str, training_time: str, 
+                              chat_id: str, topic_id: Optional[int], user_telegram_id: int) -> Dict[str, Any]:
+        """Запись на тренировку с проверкой лимита (12 человек)"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        # Считаем сколько уже записано со статусом 'registered'
+        cursor.execute('''
+            SELECT COUNT(*) as count FROM training_registrations
+            WHERE training_date = ? AND training_time = ? AND chat_id = ? AND status = 'registered'
+        ''', (training_date, training_time, chat_id))
+        
+        result = cursor.fetchone()
+        registered_count = result['count'] if result else 0
+        
+        # Определяем статус
+        if registered_count < 12:
+            status = 'registered'
+        else:
+            status = 'waitlist'
+        
+        try:
+            cursor.execute('''
+                INSERT OR REPLACE INTO training_registrations 
+                (id, training_date, training_time, chat_id, topic_id, user_telegram_id, status, registered_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_date, training_time, chat_id, topic_id, user_telegram_id, status))
+            
+            self.conn.commit()
+            
+            # Если только что записался в waitlist, проверяем не стал ли registered после замены
+            if status == 'waitlist':
+                # Проверяем текущий статус (мог измениться если кто-то отписался)
+                cursor.execute('''
+                    SELECT status FROM training_registrations
+                    WHERE training_date = ? AND training_time = ? AND user_telegram_id = ?
+                ''', (training_date, training_time, user_telegram_id))
+                result = cursor.fetchone()
+                status = result['status'] if result else 'waitlist'
+            
+            return {"success": True, "status": status}
+        except Exception as e:
+            logger.error(f"Ошибка записи на тренировку: {e}")
+            return {"success": False, "error": str(e)}
+
+    def unregister_from_training(self, training_date: str, training_time: str, 
+                                 chat_id: str, user_telegram_id: int) -> Dict[str, Any]:
+        """Отписка от тренировки с автоматическим зачислением из waitlist"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        try:
+            # Удаляем запись
+            cursor.execute('''
+                DELETE FROM training_registrations
+                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
+            ''', (training_date, training_time, chat_id, user_telegram_id))
+            
+            self.conn.commit()
+            
+            # Находим первого в waitlist и переводим в registered
+            cursor.execute('''
+                SELECT id FROM training_registrations
+                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND status = 'waitlist'
+                ORDER BY registered_at ASC
+                LIMIT 1
+            ''', (training_date, training_time, chat_id))
+            
+            waitlist_user = cursor.fetchone()
+            if waitlist_user:
+                cursor.execute('''
+                    UPDATE training_registrations
+                    SET status = 'registered'
+                    WHERE id = ?
+                ''', (waitlist_user['id'],))
+                self.conn.commit()
+            
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка отписки от тренировки: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_user_trainings(self, user_telegram_id: int) -> List[Dict[str, Any]]:
+        """Получение всех записей пользователя"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM training_registrations
+            WHERE user_telegram_id = ?
+            ORDER BY training_date ASC, training_time ASC
+        ''', (user_telegram_id,))
+        
+        return [dict(row) for row in cursor.fetchall()]
+
+    def add_one_time_training(self, training_id: str, training_date: str, training_time: str,
+                              chat_id: str, topic_id: Optional[int], name: str) -> Dict[str, Any]:
+        """Добавление разовой тренировки"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT INTO one_time_trainings (id, training_date, training_time, chat_id, topic_id, name, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_date, training_time, chat_id, topic_id, name))
+            
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка добавления разовой тренировки: {e}")
+            return {"success": False, "error": str(e)}
+
+    def remove_one_time_training(self, training_id: str) -> Dict[str, Any]:
+        """Удаление разовой тренировки"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        try:
+            # Сначала удаляем все записи на эту тренировку
+            cursor.execute('DELETE FROM training_registrations WHERE training_date = ? AND chat_id = ?',
+                          (training_id.split('_')[0], training_id.split('_')[1] if '_' in training_id else None))
+            
+            # Удаляем саму тренировку
+            cursor.execute('DELETE FROM one_time_trainings WHERE id = ?', (training_id,))
+            
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка удаления разовой тренировки: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_one_time_trainings(self, year: int, month: int) -> List[Dict[str, Any]]:
+        """Получение всех разовых тренировок за месяц"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM one_time_trainings
+            WHERE strftime('%Y', training_date) = ? AND strftime('%m', training_date) = ?
+            ORDER BY training_date ASC
+        ''', (str(year), str(month).zfill(2)))
+        
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_all_trainings(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """Получение всех записей на тренировки за период (для админа)"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT tr.*, u.first_name, u.last_name, u.username
+            FROM training_registrations tr
+            LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
+            WHERE tr.training_date BETWEEN ? AND ?
+            ORDER BY tr.training_date ASC, tr.training_time ASC, tr.registered_at ASC
+        ''', (start_date, end_date))
+        
+        return [dict(row) for row in cursor.fetchall()]
+
+    # ==================== Методы для работы с пользователями (admin) ====================
+
+    def get_all_web_users(self) -> List[Dict[str, Any]]:
+        """Получение всех пользователей веб-интерфейса"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE is_active = 1 ORDER BY created_at DESC')
+        rows = cursor.fetchall()
+
+        users = []
+        for row in rows:
+            user = dict(row)
+            user['is_admin'] = bool(user['is_admin'])
+            user['is_active'] = bool(user['is_active'])
+            users.append(user)
+
+        return users
+
+    def add_web_user_by_telegram_id(self, telegram_id: int) -> Dict[str, Any]:
+        """Добавление пользователя по Telegram ID (админ добавляет)"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        # Проверяем существует ли уже
+        cursor.execute('SELECT * FROM users WHERE telegram_id = ?', (telegram_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Активируем если был деактивирован
+            cursor.execute('UPDATE users SET is_active = 1 WHERE telegram_id = ?', (telegram_id,))
+            self.conn.commit()
+            return {"success": True, "message": "Пользователь активирован", "user": dict(existing)}
+        
+        # Получаем данные через Telegram API (если бот может)
+        # Для простоты создаём с минимальными данными
+        try:
+            cursor.execute('''
+                INSERT INTO users (telegram_id, first_name, last_name, username, is_admin, is_active, created_at)
+                VALUES (?, ?, ?, ?, 0, 1, CURRENT_TIMESTAMP)
+            ''', (telegram_id, f'User{telegram_id}', '', ''))
+            
+            self.conn.commit()
+            
+            cursor.execute('SELECT * FROM users WHERE telegram_id = ?', (telegram_id,))
+            user = dict(cursor.fetchone())
+            user['is_admin'] = bool(user['is_admin'])
+            
+            return {"success": True, "message": "Пользователь добавлен", "user": user}
+        except Exception as e:
+            logger.error(f"Ошибка добавления пользователя: {e}")
+            return {"success": False, "error": str(e)}
+
+    def remove_web_user(self, telegram_id: int) -> Dict[str, Any]:
+        """Удаление (деактивация) пользователя"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        try:
+            # Деактивируем пользователя
+            cursor.execute('UPDATE users SET is_active = 0 WHERE telegram_id = ?', (telegram_id,))
+            self.conn.commit()
+            
+            return {"success": True, "message": "Пользователь деактивирован"}
+        except Exception as e:
+            logger.error(f"Ошибка удаления пользователя: {e}")
+            return {"success": False, "error": str(e)}

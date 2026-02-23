@@ -57,13 +57,13 @@ onUnmounted(() => {
         <span class="font-medium">Дашборд</span>
       </router-link>
       <router-link
-        to="/admin/template"
+        to="/user/calendar"
         class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-        :class="{ 'bg-teal-50 text-teal-700': $route.name === 'template' }"
+        :class="{ 'bg-teal-50 text-teal-700': $route.name === 'user-calendar' }"
         @click="isOpen = false"
       >
-        <span class="text-xl">📋</span>
-        <span class="font-medium">Шаблон</span>
+        <span class="text-xl">📅</span>
+        <span class="font-medium">Календарь</span>
       </router-link>
       <router-link
         to="/admin/schedules"
@@ -71,26 +71,26 @@ onUnmounted(() => {
         :class="{ 'bg-teal-50 text-teal-700': $route.name === 'schedules' }"
         @click="isOpen = false"
       >
-        <span class="text-xl">📅</span>
+        <span class="text-xl">📋</span>
         <span class="font-medium">Расписания</span>
       </router-link>
       <router-link
-        to="/admin/polls"
+        to="/admin/users"
         class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-        :class="{ 'bg-teal-50 text-teal-700': $route.name === 'polls' }"
-        @click="isOpen = false"
-      >
-        <span class="text-xl">📈</span>
-        <span class="font-medium">Опросы</span>
-      </router-link>
-      <router-link
-        to="/admin/admins"
-        class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-        :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admins' }"
+        :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-users' }"
         @click="isOpen = false"
       >
         <span class="text-xl">👥</span>
-        <span class="font-medium">Админы</span>
+        <span class="font-medium">Пользователи</span>
+      </router-link>
+      <router-link
+        to="/admin/trainings"
+        class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+        :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-trainings' }"
+        @click="isOpen = false"
+      >
+        <span class="text-xl">📝</span>
+        <span class="font-medium">Записи</span>
       </router-link>
     </nav>
   </aside>
