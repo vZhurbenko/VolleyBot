@@ -7,6 +7,7 @@ import sqlite3
 import json
 import logging
 import os
+import sys
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -427,8 +428,8 @@ class Database:
         cursor = self.conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, is_admin, last_login)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, is_admin, is_active, last_login)
+                VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
             ''', (
                 telegram_id,
                 first_name,
@@ -456,6 +457,7 @@ class Database:
         if row:
             user = dict(row)
             user['is_admin'] = bool(user['is_admin'])
+            user['is_active'] = bool(user['is_active']) if 'is_active' in user else True
             return user
         return None
 
@@ -518,6 +520,7 @@ class Database:
         for row in rows:
             user = dict(row)
             user['is_admin'] = bool(user['is_admin'])
+            user['is_active'] = bool(user['is_active']) if 'is_active' in user else True
             users.append(user)
 
         return users
@@ -795,6 +798,23 @@ class Database:
             return {"success": True, "message": "Пользователь деактивирован"}
         except Exception as e:
             logger.error(f"Ошибка удаления пользователя: {e}")
+            return {"success": False, "error": str(e)}
+
+    def delete_web_user(self, telegram_id: int) -> Dict[str, Any]:
+        """Полное удаление пользователя из БД"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Удаляем пользователя
+            cursor.execute('DELETE FROM users WHERE telegram_id = ?', (telegram_id,))
+            self.conn.commit()
+
+            return {"success": True, "message": "Пользователь удалён"}
+        except Exception as e:
+            logger.error(f"Ошибка полного удаления пользователя: {e}")
             return {"success": False, "error": str(e)}
 
     # ==================== Методы для работы с приглашениями ====================

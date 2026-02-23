@@ -82,6 +82,12 @@
             >
               {{ user.is_active ? 'Деактивировать' : 'Активировать' }}
             </button>
+            <button
+              @click="handleDelete(user.telegram_id, user.first_name)"
+              class="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-red-100 text-red-700 hover:bg-red-200"
+            >
+              Удалить
+            </button>
           </div>
         </div>
       </div>
@@ -119,9 +125,7 @@ const loadUsers = async () => {
     }
 
     const data = await response.json()
-    console.log('Пользователи:', data)
-    // API возвращает массив напрямую, а не объект {users: [...]}
-    users.value = Array.isArray(data) ? data : (data.users || [])
+    users.value = data
   } catch (error) {
     console.error('Error loading users:', error)
     alert('Ошибка сети: ' + error.message)
@@ -238,6 +242,29 @@ const handleRemoveAdmin = async (telegramId) => {
   } catch (error) {
     console.error('Error removing admin:', error)
     alert('Ошибка снятия админских прав')
+  }
+}
+
+const handleDelete = async (telegramId, firstName) => {
+  if (!confirm(`Полностью удалить пользователя "${firstName}"? Это действие необратимо.`)) return
+
+  try {
+    const response = await fetch(`/api/admin/users/${telegramId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      loadUsers()
+      alert(result.message || 'Пользователь удалён')
+    } else {
+      alert(result.detail || 'Ошибка удаления')
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    alert('Ошибка удаления пользователя')
   }
 }
 

@@ -34,6 +34,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+print("DEBUG: app.py загружен!", file=sys.stderr, flush=True)
+
 # Инициализация приложения
 app = FastAPI(title="VolleyBot Auth API")
 
@@ -90,6 +92,7 @@ class UserInfo(BaseModel):
     username: Optional[str] = None
     photo_url: Optional[str] = None
     is_admin: bool
+    is_active: bool
     last_login: Optional[str] = None
 
 
@@ -727,19 +730,6 @@ async def get_my_trainings(user: dict = Depends(get_current_user_from_access_coo
 
 # ==================== API для админов (Users & Trainings) ====================
 
-@app.get("/api/admin/users")
-async def get_users(user: dict = Depends(get_current_user_from_access_cookie)):
-    """
-    Получение списка всех пользователей (только админы)
-    """
-    require_admin(user)
-    users = db.get_all_web_users()
-    logger.info(f"get_all_web_users returned {len(users)} users")
-    if users:
-        logger.info(f"First user keys: {list(users[0].keys())}")
-    return {"users": users}
-
-
 @app.post("/api/admin/users")
 async def add_user(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
     """
@@ -764,11 +754,11 @@ async def add_user(request: Request, user: dict = Depends(get_current_user_from_
 @app.delete("/api/admin/users/{telegram_id}")
 async def remove_user(telegram_id: int, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Удаление пользователя (только админы)
+    Полное удаление пользователя (только админы)
     """
     require_admin(user)
 
-    result = db.remove_web_user(telegram_id)
+    result = db.delete_web_user(telegram_id)
 
     if result.get('success'):
         return result
