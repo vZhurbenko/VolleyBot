@@ -8,8 +8,12 @@
 
     <Calendar
       v-else
+      v-model:year="currentYear"
+      v-model:month="currentMonth"
       :trainings="trainings"
       @click-training="openTrainingModal"
+      @update:year="updateMonth"
+      @update:month="updateMonth"
     />
 
     <!-- Модалка тренировки -->
@@ -25,36 +29,33 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Calendar from '@/components/Calendar.vue'
 import TrainingModal from '@/components/TrainingModal.vue'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 const trainings = ref([])
 const selectedTraining = ref(null)
 const loading = ref(false)
 
-onMounted(() => {
-  loadCalendar()
-})
+const now = new Date()
+const currentYear = ref(parseInt(route.query.year) || now.getFullYear())
+const currentMonth = ref(parseInt(route.query.month) || now.getMonth() + 1)
 
-watch(() => route.query, () => {
+onMounted(() => {
   loadCalendar()
 })
 
 const loadCalendar = async () => {
   loading.value = true
 
-  const now = new Date()
-  const year = route.query.year || now.getFullYear()
-  const month = route.query.month || now.getMonth() + 1
-
   try {
-    const response = await fetch(`/api/user/calendar?year=${year}&month=${month}`)
+    const response = await fetch(`/api/user/calendar?year=${currentYear.value}&month=${currentMonth.value}`)
 
     if (!response.ok) {
       throw new Error('Failed to load calendar')
@@ -67,6 +68,18 @@ const loadCalendar = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Обновляем query параметры и загружаем данные
+const updateMonth = (year, month) => {
+  router.push({
+    query: {
+      ...route.query,
+      year,
+      month
+    }
+  })
+  loadCalendar()
 }
 
 const openTrainingModal = (training) => {

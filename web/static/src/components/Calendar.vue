@@ -69,18 +69,31 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   trainings: {
     type: Array,
     default: () => []
+  },
+  year: {
+    type: Number,
+    default: () => new Date().getFullYear()
+  },
+  month: {
+    type: Number,
+    default: () => new Date().getMonth() + 1
   }
 })
 
-defineEmits(['click-training'])
+const emit = defineEmits(['click-training', 'update:year', 'update:month'])
 
-const currentDate = ref(new Date())
+const currentDate = ref(new Date(props.year, props.month - 1, 1))
+
+// Следим за изменением пропсов
+watch(() => [props.year, props.month], ([newYear, newMonth]) => {
+  currentDate.value = new Date(newYear, newMonth - 1, 1)
+})
 
 const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
@@ -111,17 +124,17 @@ const firstDayOffset = computed(() => {
 })
 
 const previousMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1)
-  emitUpdate()
+  const newDate = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1)
+  currentDate.value = newDate
+  emit('update:year', newDate.getFullYear())
+  emit('update:month', newDate.getMonth() + 1)
 }
 
 const nextMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1, 1)
-  emitUpdate()
-}
-
-const emitUpdate = () => {
-  // Можно добавить emit для уведомления родителя об изменении месяца
+  const newDate = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1, 1)
+  currentDate.value = newDate
+  emit('update:year', newDate.getFullYear())
+  emit('update:month', newDate.getMonth() + 1)
 }
 
 const isWeekend = (day) => {
