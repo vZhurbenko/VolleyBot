@@ -39,12 +39,6 @@
       </div>
     </div>
 
-    <!-- Карточка календаря -->
-    <CalendarCard />
-
-    <!-- Карточка моих тренировок -->
-    <MyTrainingsCard />
-
     <!-- Быстрые действия -->
     <div class="bg-white rounded shadow p-4 lg:p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
@@ -123,8 +117,6 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
-import CalendarCard from '@/components/CalendarCard.vue'
-import MyTrainingsCard from '@/components/MyTrainingsCard.vue'
 
 const settingsStore = useSettingsStore()
 

@@ -16,7 +16,8 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: '/user/calendar'
+          name: 'user-dashboard',
+          component: () => import('@/views/user/UserDashboard.vue')
         },
         {
           path: 'calendar',
