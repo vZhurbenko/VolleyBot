@@ -16,6 +16,7 @@
           <input
             v-model="formData.training_date"
             type="date"
+            :min="today"
             class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
             required
           />
@@ -101,6 +102,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'add'])
+
+// Сегодняшняя дата для минимальной даты
+const today = new Date().toISOString().split('T')[0]
 
 const formData = ref({
   training_date: props.date || '',

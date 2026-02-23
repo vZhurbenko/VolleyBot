@@ -52,10 +52,11 @@
           </div>
           <!-- Кнопка добавления для админов -->
           <button
-            v-if="isAdmin"
+            v-if="isAdmin && !isPastDate(day)"
             @click="handleAddTraining(day)"
             class="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded bg-teal-100 text-teal-600 hover:bg-teal-200 transition-opacity"
             title="Добавить тренировку"
+            :disabled="isPastDate(day)"
           >
             +
           </button>
@@ -66,9 +67,9 @@
           <div
             v-for="training in getTrainingsForDay(day)"
             :key="training.key"
-            @click="$emit('click-training', training)"
+            @click="!isPastDate(day) && $emit('click-training', training)"
             class="text-xs p-1.5 rounded cursor-pointer transition-colors border"
-            :class="getTrainingClass(training)"
+            :class="getTrainingClass(training, day)"
           >
             <div class="font-medium truncate">{{ training.time }}</div>
             <div class="truncate opacity-75">{{ training.registered_count }}/12</div>
@@ -159,6 +160,15 @@ const handleAddTraining = (day) => {
   emit('add-training', dateStr)
 }
 
+const isPastDate = (day) => {
+  const year = currentDate.value.getFullYear()
+  const month = currentDate.value.getMonth()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const date = new Date(year, month, day)
+  return date < today
+}
+
 const isWeekend = (day) => {
   const year = currentDate.value.getFullYear()
   const month = currentDate.value.getMonth()
@@ -175,7 +185,11 @@ const getTrainingsForDay = (day) => {
   return props.trainings.filter(t => t.date === dateStr)
 }
 
-const getTrainingClass = (training) => {
+const getTrainingClass = (training, day) => {
+  // Если тренировка прошла, делаем её серой и неактивной
+  if (isPastDate(day)) {
+    return 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300 opacity-50'
+  }
   if (training.user_status === 'registered') {
     return 'bg-teal-100 text-teal-800 hover:bg-teal-200 border-teal-200'
   } else if (training.user_status === 'waitlist') {
