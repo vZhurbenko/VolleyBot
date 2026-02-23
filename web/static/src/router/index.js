@@ -10,6 +10,27 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue')
     },
     {
+      path: '/user',
+      component: () => import('@/views/user/UserLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          redirect: '/user/calendar'
+        },
+        {
+          path: 'calendar',
+          name: 'user-calendar',
+          component: () => import('@/views/user/UserCalendar.vue')
+        },
+        {
+          path: 'my-trainings',
+          name: 'my-trainings',
+          component: () => import('@/views/user/MyTrainings.vue')
+        }
+      ]
+    },
+    {
       path: '/admin',
       component: () => import('@/views/AdminLayout.vue'),
       meta: { requiresAuth: true },
@@ -38,6 +59,16 @@ const router = createRouter({
           path: 'admins',
           name: 'admins',
           component: () => import('@/views/AdminsView.vue')
+        },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('@/views/AdminsView.vue')
+        },
+        {
+          path: 'trainings',
+          name: 'admin-trainings',
+          component: () => import('@/views/TrainingsView.vue')
         }
       ]
     }
@@ -46,17 +77,17 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-  
+
   if (to.meta.requiresAuth) {
     if (authStore.isLoading) {
       await authStore.checkAuth()
     }
-    
+
     if (!authStore.isAuthenticated) {
       return next('/')
     }
   }
-  
+
   next()
 })
 

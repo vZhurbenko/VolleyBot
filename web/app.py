@@ -546,6 +546,267 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
     return {"success": True, "message": "Администратор удалён"}
 
 
+
+# ==================== API для пользователей (Calendar) ====================
+
+@app.get("/api/user/calendar")
+async def get_calendar(year: int, month: int, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение календаря тренировок на месяц
+    Возвращает все тренировки месяца с записями
+    """
+    from datetime import datetime, timedelta
+    import calendar
+    
+    # Получаем все расписания
+    schedules = db.get_poll_schedules()
+    
+    # Получаем разовые тренировки на месяц
+    one_time_trainings = db.get_one_time_trainings(year, month)
+    
+    # Генерируем все даты тренировок на месяц
+    trainings = {}
+    
+    # Дни недели для mapping
+    day_map = {'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 
+               'friday': 4, 'saturday': 5, 'sunday': 6}
+    
+    # Для каждого расписания генерируем даты
+    for schedule in schedules:
+        if not schedule.get('enabled', True):
+            continue
+            
+        training_day = schedule.get('training_day', 'monday')
+        training_time = schedule.get('training_time', '')
+        chat_id = schedule.get('chat_id', '')
+        topic_id = schedule.get('message_thread_id')
+        
+        weekday = day_map.get(training_day.lower(), 0)
+        
+        # Находим все дни этого weekday в месяце
+        cal = calendar.monthcalendar(year, month)
+        for week in cal:
+            day = week[weekday]
+            if day == 0:
+                continue
+            
+            date_str = f"{year}-{month:02d}-{day:02d}"
+            key = f"{date_str}_{training_time}_{chat_id}"
+            
+            if key not in trainings:
+                trainings[key] = {
+                    'date': date_str,
+                    'time': training_time,
+                    'chat_id': chat_id,
+                    'topic_id': topic_id,
+                    'is_one_time': False,
+                    'registrations': []
+                }
+    
+    # Добавляем разовые тренировки
+    for training in one_time_trainings:
+        date_str = training.get('training_date', '')
+        time = training.get('training_time', '')
+        chat_id = training.get('chat_id', '')
+        topic_id = training.get('topic_id')
+        name = training.get('name', '')
+        
+        key = f"{date_str}_{time}_{chat_id}"
+        if key not in trainings:
+            trainings[key] = {
+                'date': date_str,
+                'time': time,
+                'chat_id': chat_id,
+                'topic_id': topic_id,
+                'is_one_time': True,
+                'name': name,
+                'registrations': []
+            }
+    
+    # Для каждой тренировки получаем записи
+    for key, training in trainings.items():
+        registrations = db.get_training_registrations(
+            training['date'], training['time'], training['chat_id']
+        )
+        training['registrations'] = registrations
+        training['registered_count'] = len([r for r in registrations if r.get('status') == 'registered'])
+        training['waitlist_count'] = len([r for r in registrations if r.get('status') == 'waitlist'])
+        
+        # Проверяем записан ли текущий пользователь
+        user_telegram_id = user.get('telegram_id')
+        user_registration = next((r for r in registrations if r.get('user_telegram_id') == user_telegram_id), None)
+        training['user_status'] = user_registration['status'] if user_registration else None
+    
+    return {"trainings": list(trainings.values())}
+
+
+@app.post("/api/user/calendar/register")
+async def register_for_training(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Запись на тренировку
+    """
+    require_auth(user)
+    
+    body = await request.json()
+    training_date = body.get('training_date')
+    training_time = body.get('training_time')
+    chat_id = body.get('chat_id')
+    topic_id = body.get('topic_id')
+    
+    if not all([training_date, training_time, chat_id]):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
+    user_telegram_id = user.get('telegram_id')
+    training_id = f"{training_date}_{training_time}_{chat_id}"
+    
+    result = db.register_for_training(
+        training_id, training_date, training_time, chat_id, topic_id, user_telegram_id
+    )
+    
+    if result.get('success'):
+        return {"success": True, "status": result.get('status')}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Registration failed'))
+
+
+@app.post("/api/user/calendar/unregister")
+async def unregister_from_training(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Отписка от тренировки
+    """
+    require_auth(user)
+    
+    body = await request.json()
+    training_date = body.get('training_date')
+    training_time = body.get('training_time')
+    chat_id = body.get('chat_id')
+    
+    if not all([training_date, training_time, chat_id]):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
+    user_telegram_id = user.get('telegram_id')
+    
+    result = db.unregister_from_training(training_date, training_time, chat_id, user_telegram_id)
+    
+    if result.get('success'):
+        return {"success": True}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Unregistration failed'))
+
+
+@app.get("/api/user/my-trainings")
+async def get_my_trainings(user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение моих записей на тренировки
+    """
+    require_auth(user)
+    
+    user_telegram_id = user.get('telegram_id')
+    trainings = db.get_user_trainings(user_telegram_id)
+    
+    return {"trainings": trainings}
+
+
+# ==================== API для админов (Users & Trainings) ====================
+
+@app.get("/api/admin/users")
+async def get_users(user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение списка всех пользователей (только админы)
+    """
+    require_admin(user)
+    users = db.get_all_web_users()
+    return {"users": users}
+
+
+@app.post("/api/admin/users")
+async def add_user(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Добавление пользователя по Telegram ID (только админы)
+    """
+    require_admin(user)
+    
+    body = await request.json()
+    telegram_id = body.get('telegram_id')
+    
+    if not telegram_id:
+        raise HTTPException(status_code=400, detail="telegram_id required")
+    
+    result = db.add_web_user_by_telegram_id(int(telegram_id))
+    
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to add user'))
+
+
+@app.delete("/api/admin/users/{telegram_id}")
+async def remove_user(telegram_id: int, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Удаление пользователя (только админы)
+    """
+    require_admin(user)
+    
+    result = db.remove_web_user(telegram_id)
+    
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove user'))
+
+
+@app.post("/api/admin/calendar/add-training")
+async def add_one_time_training(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Добавление разовой тренировки (только админы)
+    """
+    require_admin(user)
+    
+    body = await request.json()
+    training_date = body.get('training_date')
+    training_time = body.get('training_time')
+    chat_id = body.get('chat_id')
+    topic_id = body.get('topic_id')
+    name = body.get('name', 'Тренировка')
+    
+    if not all([training_date, training_time, chat_id]):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
+    training_id = f"{training_date}_{training_time}_{chat_id}"
+    
+    result = db.add_one_time_training(training_id, training_date, training_time, chat_id, topic_id, name)
+    
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to add training'))
+
+
+@app.delete("/api/admin/calendar/remove-training/{training_id}")
+async def remove_one_time_training(training_id: str, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Удаление разовой тренировки (только админы)
+    """
+    require_admin(user)
+    
+    result = db.remove_one_time_training(training_id)
+    
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove training'))
+
+
+@app.get("/api/admin/trainings")
+async def get_all_trainings(start_date: str, end_date: str, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение всех записей на тренировки за период (только админы)
+    """
+    require_admin(user)
+    
+    trainings = db.get_all_trainings(start_date, end_date)
+    return {"trainings": trainings}
+
 # ==================== Статика ====================
 
 static_path = Path(__file__).parent / "static" / "dist"
