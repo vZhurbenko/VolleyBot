@@ -102,10 +102,33 @@ const loadCalendar = async () => {
 
     const data = await response.json()
     trainings.value = data.trainings || []
+    
+    // Проверяем, есть ли параметры для открытия конкретной тренировки
+    if (route.query.date && route.query.chat_id && route.query.time) {
+      openTrainingByParams()
+    }
   } catch (error) {
     console.error('Error loading calendar:', error)
   } finally {
     loading.value = false
+  }
+}
+
+const openTrainingByParams = () => {
+  const targetDate = route.query.date
+  const targetChatId = route.query.chat_id
+  const targetTime = decodeURIComponent(route.query.time || '')
+  
+  const training = trainings.value.find(t => 
+    t.date === targetDate && 
+    t.chat_id === targetChatId && 
+    t.time === targetTime
+  )
+  
+  if (training) {
+    selectedTraining.value = { ...training }
+  } else {
+    alert('Тренировка не найдена')
   }
 }
 
@@ -127,6 +150,17 @@ const openTrainingModal = (training) => {
 
 const closeTrainingModal = () => {
   selectedTraining.value = null
+  
+  // Очищаем query параметры, чтобы модалка не открывалась снова
+  router.push({
+    query: {
+      ...route.query,
+      date: undefined,
+      chat_id: undefined,
+      time: undefined
+    }
+  })
+  
   loadCalendar()
 }
 
