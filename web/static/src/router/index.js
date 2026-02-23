@@ -20,6 +20,11 @@ const router = createRouter({
           component: () => import('@/views/user/UserDashboard.vue')
         },
         {
+          path: 'calendar',
+          name: 'calendar',
+          component: () => import('@/views/CalendarView.vue')
+        },
+        {
           path: 'my-trainings',
           name: 'my-trainings',
           component: () => import('@/views/user/MyTrainings.vue')
@@ -35,6 +40,16 @@ const router = createRouter({
           path: '',
           name: 'dashboard',
           component: () => import('@/views/DashboardView.vue')
+        },
+        {
+          path: 'calendar',
+          name: 'admin-calendar',
+          component: () => import('@/views/CalendarView.vue')
+        },
+        {
+          path: 'my-trainings',
+          name: 'admin-my-trainings',
+          component: () => import('@/views/user/MyTrainings.vue')
         },
         {
           path: 'template',

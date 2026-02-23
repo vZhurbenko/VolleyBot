@@ -61,22 +61,24 @@ onUnmounted(() => {
           <span class="text-xl">📊</span>
           <span class="font-medium">Дашборд</span>
         </router-link>
-        <a
-          href="#calendar"
+        <router-link
+          to="/admin/calendar"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-calendar' }"
           @click="isOpen = false"
         >
           <span class="text-xl">📅</span>
           <span class="font-medium">Календарь</span>
-        </a>
-        <a
-          href="#my-trainings"
+        </router-link>
+        <router-link
+          to="/admin/my-trainings"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-my-trainings' }"
           @click="isOpen = false"
         >
           <span class="text-xl">📝</span>
           <span class="font-medium">Мои тренировки</span>
-        </a>
+        </router-link>
         <router-link
           to="/admin/schedules"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
@@ -135,14 +137,15 @@ onUnmounted(() => {
           <span class="text-xl">🏠</span>
           <span class="font-medium">Главная</span>
         </router-link>
-        <a
-          href="#calendar"
+        <router-link
+          to="/user/calendar"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'calendar' }"
           @click="isOpen = false"
         >
           <span class="text-xl">📅</span>
           <span class="font-medium">Календарь</span>
-        </a>
+        </router-link>
         <router-link
           to="/user/my-trainings"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
