@@ -37,11 +37,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import logo from "@/img/logo.svg";
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);
@@ -104,10 +105,16 @@ const onTelegramAuth = async (user) => {
       console.log("Авторизация успешна, обновляем store...");
       // Обновляем auth store перед редиректом
       authStore.setUser(result.user);
-      
-      console.log("Переход на /admin через window.location...");
-      // Используем window.location для гарантированного редиректа
-      window.location.href = "/admin";
+
+      // Проверяем, есть ли redirect параметр
+      const redirect = route.query.redirect;
+      if (redirect) {
+        console.log("Редирект на:", redirect);
+        window.location.href = redirect;
+      } else {
+        console.log("Переход на /admin через window.location...");
+        window.location.href = "/admin";
+      }
     } else {
       errorMessage.value = result.detail || "Ошибка авторизации";
       console.error("Ошибка авторизации:", errorMessage.value);

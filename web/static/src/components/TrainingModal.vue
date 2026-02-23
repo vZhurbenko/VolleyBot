@@ -7,9 +7,18 @@
           <h3 class="text-lg font-semibold text-gray-900">Тренировка</h3>
           <p class="text-sm text-gray-500">{{ training.date }} • {{ training.time }}</p>
         </div>
-        <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
-          ✕
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            @click="shareTraining"
+            class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+            title="Поделиться"
+          >
+            🔗
+          </button>
+          <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
+            ✕
+          </button>
+        </div>
       </div>
 
       <!-- Контент -->
@@ -192,6 +201,16 @@ const handleAction = () => {
   } else {
     emit('register')
   }
+}
+
+const shareTraining = () => {
+  // Генерируем ссылку на общий календарь (/dashboard)
+  const url = `${window.location.origin}/dashboard/calendar?date=${props.training.date}&chat_id=${props.training.chat_id}&time=${encodeURIComponent(props.training.time)}`
+  navigator.clipboard.writeText(url).then(() => {
+    alert('Ссылка скопирована в буфер обмена!')
+  }).catch(() => {
+    alert('Не удалось скопировать ссылку')
+  })
 }
 
 const getInitials = (reg) => {

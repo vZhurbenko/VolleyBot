@@ -10,28 +10,7 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue')
     },
     {
-      path: '/user',
-      component: () => import('@/views/user/UserLayout.vue'),
-      meta: { requiresAuth: true },
-      children: [
-        {
-          path: '',
-          redirect: '/user/calendar'
-        },
-        {
-          path: 'calendar',
-          name: 'user-calendar',
-          component: () => import('@/views/user/UserCalendar.vue')
-        },
-        {
-          path: 'my-trainings',
-          name: 'my-trainings',
-          component: () => import('@/views/user/MyTrainings.vue')
-        }
-      ]
-    },
-    {
-      path: '/admin',
+      path: '/dashboard',
       component: () => import('@/views/AdminLayout.vue'),
       meta: { requiresAuth: true },
       children: [
@@ -39,6 +18,16 @@ const router = createRouter({
           path: '',
           name: 'dashboard',
           component: () => import('@/views/DashboardView.vue')
+        },
+        {
+          path: 'calendar',
+          name: 'calendar',
+          component: () => import('@/views/CalendarView.vue')
+        },
+        {
+          path: 'my-trainings',
+          name: 'my-trainings',
+          component: () => import('@/views/user/MyTrainings.vue')
         },
         {
           path: 'template',
@@ -51,27 +40,25 @@ const router = createRouter({
           component: () => import('@/views/SchedulesView.vue')
         },
         {
-          path: 'polls',
-          name: 'polls',
-          component: () => import('@/views/PollsView.vue')
-        },
-        {
-          path: 'admins',
-          name: 'admins',
-          component: () => import('@/views/AdminsView.vue')
-        },
-        {
           path: 'users',
-          name: 'admin-users',
+          name: 'users',
           component: () => import('@/views/AdminsView.vue')
         },
         {
           path: 'trainings',
-          name: 'admin-trainings',
+          name: 'trainings',
           component: () => import('@/views/TrainingsView.vue')
         }
       ]
-    }
+    },
+    {
+      path: '/user',
+      redirect: '/dashboard'
+    },
+    {
+      path: '/admin',
+      redirect: '/dashboard'
+    },
   ]
 })
 
