@@ -165,10 +165,18 @@ const createInviteCode = async () => {
     const result = await response.json()
 
     if (response.ok && result.success) {
-      // Копируем ссылку в буфер
+      // Сначала показываем ссылку, потом пробуем копировать
       const url = `${window.location.origin}/invite/${result.code}`
-      await navigator.clipboard.writeText(url)
-      alert('Приглашение создано! Ссылка скопирована в буфер обмена.')
+      
+      // Пробуем скопировать
+      try {
+        await navigator.clipboard.writeText(url)
+        alert(`Приглашение создано!\n\nСсылка: ${url}\n\nСкопировано в буфер обмена.`)
+      } catch (copyError) {
+        // Если не удалось скопировать, просто показываем ссылку
+        alert(`Приглашение создано!\n\nСсылка:\n${url}\n\nСкопируйте её вручную.`)
+      }
+      
       showCreateModal.value = false
       selectedExpiresIn.value = null
       loadCodes()

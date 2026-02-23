@@ -540,6 +540,10 @@ async def add_admin_id(request: Request, user: dict = Depends(get_current_user_f
     if not admin_id:
         raise HTTPException(status_code=400, detail="admin_id required")
     db.add_admin_id(int(admin_id))
+    
+    # Обновляем поле is_admin в таблице users
+    db.update_user_admin_status(int(admin_id), True)
+    
     return {"success": True, "message": "Администратор добавлен"}
 
 
@@ -553,6 +557,10 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
     if admin_id in admin_ids:
         admin_ids.remove(admin_id)
         db.set_admin_ids(admin_ids)
+    
+    # Обновляем поле is_admin в таблице users
+    db.update_user_admin_status(int(admin_id), False)
+    
     return {"success": True, "message": "Администратор удалён"}
 
 
@@ -726,6 +734,9 @@ async def get_users(user: dict = Depends(get_current_user_from_access_cookie)):
     """
     require_admin(user)
     users = db.get_all_web_users()
+    logger.info(f"get_all_web_users returned {len(users)} users")
+    if users:
+        logger.info(f"First user keys: {list(users[0].keys())}")
     return {"users": users}
 
 
@@ -756,13 +767,37 @@ async def remove_user(telegram_id: int, user: dict = Depends(get_current_user_fr
     Удаление пользователя (только админы)
     """
     require_admin(user)
-    
+
     result = db.remove_web_user(telegram_id)
-    
+
     if result.get('success'):
         return result
     else:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove user'))
+
+
+@app.post("/api/admin/users/{telegram_id}/toggle-active")
+async def toggle_user_active(
+    telegram_id: int,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Переключение статуса активности пользователя (только админы)
+    """
+    require_admin(user)
+    
+    # Получаем текущий статус
+    user_data = db.get_user_by_telegram_id(telegram_id)
+    if not user_data:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    new_status = not user_data.get('is_active', True)
+    result = db.toggle_user_active_status(telegram_id, new_status)
+    
+    if result.get('success'):
+        return {"success": True, "message": f"Пользователь {'активирован' if new_status else 'деактивирован'}"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to toggle status'))
 
 
 @app.post("/api/admin/calendar/add-training")
