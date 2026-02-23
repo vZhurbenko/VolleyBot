@@ -507,6 +507,25 @@ class Database:
 
         return self.get_user_by_telegram_id(telegram_id)
 
+    def set_user_admin(self, telegram_id: int, is_admin: bool) -> Dict[str, Any]:
+        """Установка/снятие статуса администратора пользователя"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute(
+                'UPDATE users SET is_admin = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?',
+                (1 if is_admin else 0, telegram_id)
+            )
+            self.conn.commit()
+
+            return {"success": True, "message": f"Статус администратора {'установлен' if is_admin else 'снят'}"}
+        except Exception as e:
+            logger.error(f"Ошибка установки статуса админа: {e}")
+            return {"success": False, "error": str(e)}
+
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Получение всех пользователей"""
         if not self.conn:
@@ -543,48 +562,55 @@ class Database:
         
         return [dict(row) for row in cursor.fetchall()]
 
-    def register_for_training(self, training_id: str, training_date: str, training_time: str, 
+    def register_for_training(self, training_id: str, training_date: str, training_time: str,
                               chat_id: str, topic_id: Optional[int], user_telegram_id: int) -> Dict[str, Any]:
         """Запись на тренировку с проверкой лимита (12 человек)"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
-        
+
         # Считаем сколько уже записано со статусом 'registered'
         cursor.execute('''
             SELECT COUNT(*) as count FROM training_registrations
             WHERE training_date = ? AND training_time = ? AND chat_id = ? AND status = 'registered'
         ''', (training_date, training_time, chat_id))
-        
+
         result = cursor.fetchone()
         registered_count = result['count'] if result else 0
-        
+
         # Определяем статус
         if registered_count < 12:
             status = 'registered'
         else:
             status = 'waitlist'
-        
+
         try:
+            # Проверяем, есть ли уже запись этого пользователя
             cursor.execute('''
-                INSERT OR REPLACE INTO training_registrations 
-                (id, training_date, training_time, chat_id, topic_id, user_telegram_id, status, registered_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (training_id, training_date, training_time, chat_id, topic_id, user_telegram_id, status))
-            
-            self.conn.commit()
-            
-            # Если только что записался в waitlist, проверяем не стал ли registered после замены
-            if status == 'waitlist':
-                # Проверяем текущий статус (мог измениться если кто-то отписался)
+                SELECT id, status FROM training_registrations
+                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
+            ''', (training_date, training_time, chat_id, user_telegram_id))
+
+            existing = cursor.fetchone()
+
+            if existing:
+                # Обновляем существующую запись
                 cursor.execute('''
-                    SELECT status FROM training_registrations
-                    WHERE training_date = ? AND training_time = ? AND user_telegram_id = ?
-                ''', (training_date, training_time, user_telegram_id))
-                result = cursor.fetchone()
-                status = result['status'] if result else 'waitlist'
-            
+                    UPDATE training_registrations
+                    SET status = ?, topic_id = ?, registered_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (status, topic_id, existing['id']))
+            else:
+                # Создаём новую запись
+                cursor.execute('''
+                    INSERT INTO training_registrations
+                    (id, training_date, training_time, chat_id, topic_id, user_telegram_id, status, registered_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (training_id, training_date, training_time, chat_id, topic_id, user_telegram_id, status))
+
+            self.conn.commit()
+
             return {"success": True, "status": status}
         except Exception as e:
             logger.error(f"Ошибка записи на тренировку: {e}")

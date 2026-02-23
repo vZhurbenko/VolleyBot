@@ -186,8 +186,10 @@ const actionButtonText = computed(() => {
 })
 
 const actionButtonClass = computed(() => {
-  if (props.training.user_status) {
-    return 'bg-red-500 text-white hover:bg-red-600'
+  if (props.training.user_status === 'registered') {
+    return 'text-red-600 hover:text-red-700 bg-transparent'
+  } else if (props.training.user_status === 'waitlist') {
+    return 'text-red-600 hover:text-red-700 bg-transparent'
   } else if (props.training.registered_count >= 12) {
     return 'bg-yellow-500 text-white hover:bg-yellow-600'
   } else {

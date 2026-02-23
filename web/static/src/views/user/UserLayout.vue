@@ -54,7 +54,7 @@
             </span>
             <button
               @click="handleLogout"
-              class="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
+              class="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 rounded transition-colors"
             >
               Выйти
             </button>
