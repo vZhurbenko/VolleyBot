@@ -264,31 +264,36 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
 
     telegram_id = user_data.id
 
-    # 3. Проверяем является ли пользователь администратором
-    admin_ids = db.get_admin_ids()
-    is_admin = telegram_id in admin_ids
-
-    if not is_admin:
-        logger.warning(f"Пользователь {telegram_id} не является администратором")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только администраторы могут войти"
-        )
-
-    # 4. Сохраняем или обновляем пользователя в БД
+    # 3. Проверяем, существует ли пользователь в БД и активен ли он
     existing_user = db.get_user_by_telegram_id(telegram_id)
 
+    # Если пользователь не найден в БД — создаём его (авторизация через Telegram = доверенный источник)
     if not existing_user:
+        # Проверяем, является ли пользователь администратором
+        admin_ids = db.get_admin_ids()
+        is_admin = telegram_id in admin_ids
+        
         db.add_user(
             telegram_id=telegram_id,
             first_name=user_data.first_name,
             last_name=user_data.last_name,
             username=user_data.username,
             photo_url=user_data.photo_url,
-            is_admin=is_admin
+            is_admin=is_admin,
+            is_active=True
         )
-        logger.info(f"Новый администратор зарегистрирован: {user_data.username or user_data.first_name}")
+        logger.info(f"Новый пользователь зарегистрирован: {user_data.username or user_data.first_name} (admin={is_admin})")
+        existing_user = db.get_user_by_telegram_id(telegram_id)
     else:
+        # Проверяем, активен ли пользователь
+        if not existing_user.get('is_active', True):
+            logger.warning(f"Пользователь {telegram_id} деактивирован")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Ваш аккаунт деактивирован"
+            )
+        
+        # Обновляем данные пользователя из Telegram (аватар, имя, username)
         db.update_user(
             telegram_id=telegram_id,
             first_name=user_data.first_name,
@@ -296,29 +301,37 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
             username=user_data.username,
             photo_url=user_data.photo_url
         )
-        logger.info(f"Администратор обновил данные: {user_data.username or user_data.first_name}")
+        logger.info(f"Пользователь обновил данные: {user_data.username or user_data.first_name}")
+        
+        # Обновляем статус админа, если он был изменён
+        admin_ids = db.get_admin_ids()
+        is_admin = telegram_id in admin_ids
+        if existing_user.get('is_admin') != is_admin:
+            db.set_user_admin(telegram_id, is_admin)
+            logger.info(f"Статус админа обновлён для {telegram_id}: {is_admin}")
 
-    # 5. Создаём токены
+    # 4. Создаём токены
+    is_admin = existing_user.get('is_admin', False)
     token_data = {
         "sub": str(telegram_id),
         "username": user_data.username,
         "is_admin": is_admin
     }
-    
+
     access_token = create_access_token(
         data=token_data,
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    
+
     refresh_token = create_refresh_token(
         data=token_data,
         expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     )
 
-    # 6. Устанавливаем cookie
+    # 5. Устанавливаем cookie
     set_auth_cookies(response, access_token, refresh_token)
 
-    # 7. Возвращаем данные пользователя (без токенов)
+    # 6. Возвращаем данные пользователя (без токенов)
     user = db.get_user_by_telegram_id(telegram_id)
     return {
         "success": True,

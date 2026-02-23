@@ -507,6 +507,25 @@ class Database:
 
         return self.get_user_by_telegram_id(telegram_id)
 
+    def set_user_admin(self, telegram_id: int, is_admin: bool) -> Dict[str, Any]:
+        """Установка/снятие статуса администратора пользователя"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute(
+                'UPDATE users SET is_admin = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?',
+                (1 if is_admin else 0, telegram_id)
+            )
+            self.conn.commit()
+
+            return {"success": True, "message": f"Статус администратора {'установлен' if is_admin else 'снят'}"}
+        except Exception as e:
+            logger.error(f"Ошибка установки статуса админа: {e}")
+            return {"success": False, "error": str(e)}
+
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Получение всех пользователей"""
         if not self.conn:
