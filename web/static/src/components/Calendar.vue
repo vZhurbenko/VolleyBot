@@ -43,11 +43,22 @@
       <div
         v-for="day in daysInMonth"
         :key="day"
-        class="min-h-[100px] border-r border-b border-gray-100 last:border-r-0 p-2"
+        class="min-h-[100px] border-r border-b border-gray-100 last:border-r-0 p-2 relative group"
         :class="{ 'bg-gray-50': isWeekend(day) }"
       >
-        <div class="text-sm font-medium text-gray-700 mb-1">
-          {{ day }}
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-sm font-medium text-gray-700">
+            {{ day }}
+          </div>
+          <!-- Кнопка добавления для админов -->
+          <button
+            v-if="isAdmin"
+            @click="handleAddTraining(day)"
+            class="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded bg-teal-100 text-teal-600 hover:bg-teal-200 transition-opacity"
+            title="Добавить тренировку"
+          >
+            +
+          </button>
         </div>
 
         <!-- Тренировки в этот день -->
@@ -83,10 +94,14 @@ const props = defineProps({
   month: {
     type: Number,
     default: () => new Date().getMonth() + 1
+  },
+  isAdmin: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['click-training', 'update:year', 'update:month'])
+const emit = defineEmits(['click-training', 'update:year', 'update:month', 'add-training'])
 
 const currentDate = ref(new Date(props.year, props.month - 1, 1))
 
@@ -135,6 +150,13 @@ const nextMonth = () => {
   currentDate.value = newDate
   emit('update:year', newDate.getFullYear())
   emit('update:month', newDate.getMonth() + 1)
+}
+
+const handleAddTraining = (day) => {
+  const year = currentDate.value.getFullYear()
+  const month = currentDate.value.getMonth() + 1
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  emit('add-training', dateStr)
 }
 
 const isWeekend = (day) => {

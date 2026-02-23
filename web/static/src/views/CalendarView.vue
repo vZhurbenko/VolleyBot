@@ -1,15 +1,6 @@
 <template>
   <div class="bg-white rounded shadow p-4 lg:p-6">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Календарь тренировок</h1>
-      <button
-        v-if="authStore.isAdmin"
-        @click="openAddTrainingModal"
-        class="px-4 py-2 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
-      >
-        + Добавить тренировку
-      </button>
-    </div>
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Календарь тренировок</h1>
 
     <div v-if="loading" class="text-center py-8 text-gray-500">
       Загрузка...
@@ -20,9 +11,11 @@
       v-model:year="currentYear"
       v-model:month="currentMonth"
       :trainings="trainings"
+      :is-admin="authStore.isAdmin"
       @click-training="openTrainingModal"
       @update:year="updateMonth"
       @update:month="updateMonth"
+      @add-training="openAddTrainingModal"
     />
 
     <!-- Модалка тренировки -->
@@ -130,8 +123,8 @@ const closeTrainingModal = () => {
 }
 
 // Добавление тренировки
-const openAddTrainingModal = () => {
-  selectedDate.value = ''
+const openAddTrainingModal = (dateStr) => {
+  selectedDate.value = dateStr || ''
   showAddModal.value = true
 }
 
