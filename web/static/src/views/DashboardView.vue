@@ -2,9 +2,9 @@
   <div class="flex flex-col gap-6">
     <!-- Краткая статистика -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded shadow p-6">
         <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-lg bg-teal-100 flex items-center justify-center text-2xl">
+          <div class="w-12 h-12 rounded bg-teal-100 flex items-center justify-center text-2xl">
             📅
           </div>
           <div>
@@ -14,9 +14,9 @@
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded shadow p-6">
         <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-2xl">
+          <div class="w-12 h-12 rounded bg-blue-100 flex items-center justify-center text-2xl">
             📊
           </div>
           <div>
@@ -26,9 +26,9 @@
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-white rounded shadow p-6">
         <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center text-2xl">
+          <div class="w-12 h-12 rounded bg-purple-100 flex items-center justify-center text-2xl">
             👥
           </div>
           <div>
@@ -38,13 +38,13 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Быстрые действия -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div class="bg-white rounded shadow p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <router-link to="/admin/schedules" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
+        <router-link to="/admin/schedules" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded bg-teal-100 flex items-center justify-center text-xl">
             📅
           </div>
           <div>
@@ -53,8 +53,8 @@
           </div>
         </router-link>
 
-        <router-link to="/admin/template" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
+        <router-link to="/admin/template" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded bg-teal-100 flex items-center justify-center text-xl">
             📋
           </div>
           <div>
@@ -63,8 +63,8 @@
           </div>
         </router-link>
 
-        <router-link to="/admin/admins" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
+        <router-link to="/admin/admins" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded bg-teal-100 flex items-center justify-center text-xl">
             👥
           </div>
           <div>
@@ -73,8 +73,8 @@
           </div>
         </router-link>
 
-        <router-link to="/admin/polls" class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-          <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-xl">
+        <router-link to="/admin/polls" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <div class="w-10 h-10 rounded bg-teal-100 flex items-center justify-center text-xl">
             📈
           </div>
           <div>
@@ -84,14 +84,14 @@
         </router-link>
       </div>
     </div>
-    
+
     <!-- Последние расписания -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div class="bg-white rounded shadow p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-gray-900">Расписания</h2>
-        <router-link to="/admin/schedules" class="text-sm text-blue-600 hover:underline">Все →</router-link>
+        <router-link to="/admin/schedules" class="text-sm text-teal-600 hover:underline">Все →</router-link>
       </div>
-      
+
       <div v-if="settingsStore.schedules.length > 0" class="divide-y divide-gray-100">
         <div v-for="schedule in settingsStore.schedules.slice(0, 3)" :key="schedule.id" class="py-3 flex items-center justify-between">
           <div>
@@ -102,7 +102,7 @@
               <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(schedule.poll_day) }}
             </p>
           </div>
-          <span :class="['px-3 py-1 rounded-full text-xs font-medium', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+          <span :class="['px-3 py-1 rounded text-xs font-medium', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
             {{ schedule.enabled ? 'Активно' : 'Отключено' }}
           </span>
         </div>
