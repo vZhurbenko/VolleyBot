@@ -7,6 +7,7 @@ import sqlite3
 import json
 import logging
 import os
+import sys
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -427,8 +428,8 @@ class Database:
         cursor = self.conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, is_admin, last_login)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, is_admin, is_active, last_login)
+                VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
             ''', (
                 telegram_id,
                 first_name,
@@ -456,6 +457,7 @@ class Database:
         if row:
             user = dict(row)
             user['is_admin'] = bool(user['is_admin'])
+            user['is_active'] = bool(user['is_active']) if 'is_active' in user else True
             return user
         return None
 
@@ -518,6 +520,7 @@ class Database:
         for row in rows:
             user = dict(row)
             user['is_admin'] = bool(user['is_admin'])
+            user['is_active'] = bool(user['is_active']) if 'is_active' in user else True
             users.append(user)
 
         return users
@@ -718,17 +721,30 @@ class Database:
         if not self.conn:
             return []
 
+        print("DEBUG: get_all_web_users called!", file=sys.stderr)
+        self.conn.row_factory = sqlite3.Row
         cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM users WHERE is_active = 1 ORDER BY created_at DESC')
+        cursor.execute('SELECT id, telegram_id, first_name, last_name, username, photo_url, is_admin, is_active, last_login, created_at, updated_at FROM users ORDER BY created_at DESC')
         rows = cursor.fetchall()
 
         users = []
         for row in rows:
-            user = dict(row)
-            user['is_admin'] = bool(user['is_admin'])
-            user['is_active'] = bool(user['is_active'])
+            user = {
+                'id': row['id'],
+                'telegram_id': row['telegram_id'],
+                'first_name': row['first_name'],
+                'last_name': row['last_name'],
+                'username': row['username'],
+                'photo_url': row['photo_url'],
+                'is_admin': bool(row['is_admin']),
+                'is_active': bool(row['is_active']),
+                'last_login': row['last_login']
+            }
+            print(f"DEBUG: user {user['telegram_id']} is_active={user['is_active']}", file=sys.stderr)
             users.append(user)
 
+        print(f"DEBUG: returning {len(users)} users", file=sys.stderr)
+        self.conn.row_factory = None
         return users
 
     def add_web_user_by_telegram_id(self, telegram_id: int) -> Dict[str, Any]:
@@ -773,13 +789,169 @@ class Database:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
-        
+
         try:
             # Деактивируем пользователя
             cursor.execute('UPDATE users SET is_active = 0 WHERE telegram_id = ?', (telegram_id,))
             self.conn.commit()
-            
+
             return {"success": True, "message": "Пользователь деактивирован"}
         except Exception as e:
             logger.error(f"Ошибка удаления пользователя: {e}")
+            return {"success": False, "error": str(e)}
+
+    def delete_web_user(self, telegram_id: int) -> Dict[str, Any]:
+        """Полное удаление пользователя из БД"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Удаляем пользователя
+            cursor.execute('DELETE FROM users WHERE telegram_id = ?', (telegram_id,))
+            self.conn.commit()
+
+            return {"success": True, "message": "Пользователь удалён"}
+        except Exception as e:
+            logger.error(f"Ошибка полного удаления пользователя: {e}")
+            return {"success": False, "error": str(e)}
+
+    # ==================== Методы для работы с приглашениями ====================
+
+    def create_invite_code(
+        self,
+        code: str,
+        created_by: int,
+        expires_at: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Создание кода приглашения"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                INSERT INTO invite_codes (code, created_by, expires_at, enabled)
+                VALUES (?, ?, ?, 1)
+            ''', (code, created_by, expires_at))
+            self.conn.commit()
+
+            return {"success": True, "code": code, "expires_at": expires_at}
+        except Exception as e:
+            logger.error(f"Ошибка создания кода приглашения: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_invite_code(self, code: str) -> Optional[Dict[str, Any]]:
+        """Получение информации о коде приглашения"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT ic.*, u.first_name, u.last_name, u.username
+            FROM invite_codes ic
+            LEFT JOIN users u ON ic.used_by = u.telegram_id
+            WHERE ic.code = ?
+        ''', (code,))
+
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+    def use_invite_code(self, code: str, telegram_id: int) -> bool:
+        """Использование кода приглашения"""
+        if not self.conn:
+            return False
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE invite_codes
+                SET used_by = ?, used_at = CURRENT_TIMESTAMP, enabled = 0
+                WHERE code = ? AND used_by IS NULL AND enabled = 1
+                AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+            ''', (telegram_id, code))
+            self.conn.commit()
+
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Ошибка использования кода: {e}")
+            return False
+
+    def get_all_invite_codes(self) -> List[Dict[str, Any]]:
+        """Получение всех кодов приглашений"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT ic.*, 
+                   creator.first_name as creator_first_name,
+                   creator.last_name as creator_last_name,
+                   creator.username as creator_username
+            FROM invite_codes ic
+            LEFT JOIN users creator ON ic.created_by = creator.telegram_id
+            ORDER BY ic.created_at DESC
+        ''')
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def deactivate_invite_code(self, code: str) -> bool:
+        """Деактивация кода приглашения"""
+        if not self.conn:
+            return False
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE invite_codes SET enabled = 0 WHERE code = ?
+            ''', (code,))
+            self.conn.commit()
+
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Ошибка деактивации кода: {e}")
+            return False
+
+    def update_user_admin_status(self, telegram_id: int, is_admin: bool) -> bool:
+        """Обновление статуса администратора пользователя"""
+        if not self.conn:
+            return False
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE users SET is_admin = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE telegram_id = ?
+            ''', (1 if is_admin else 0, telegram_id))
+            self.conn.commit()
+
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Ошибка обновления статуса администратора: {e}")
+            return False
+
+    def toggle_user_active_status(self, telegram_id: int, is_active: bool) -> Dict[str, Any]:
+        """Переключение статуса активности пользователя"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE telegram_id = ?
+            ''', (1 if is_active else 0, telegram_id))
+            self.conn.commit()
+
+            return {"success": True, "is_active": is_active}
+        except Exception as e:
+            logger.error(f"Ошибка переключения статуса: {e}")
             return {"success": False, "error": str(e)}

@@ -28,6 +28,7 @@ if __name__ == "__main__":
         "app:app",
         host=host,
         port=port,
-        reload=False,
+        reload=True,  # Авто-перезагрузка при изменении кода
+        reload_dirs=[".."],  # Следить также за родительской папкой
         log_level="info"
     )

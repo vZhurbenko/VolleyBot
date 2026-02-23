@@ -34,13 +34,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+print("DEBUG: app.py загружен!", file=sys.stderr, flush=True)
+
 # Инициализация приложения
 app = FastAPI(title="VolleyBot Auth API")
 
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://volleybot.zhurbenko.dev"],  # Только наш домен
+    allow_origins=["https://volleyteam.ru", "https://www.volleyteam.ru"],  # Только наш домен
     allow_credentials=True,  # Разрешить cookie
     allow_methods=["*"],
     allow_headers=["*"],
@@ -90,6 +92,7 @@ class UserInfo(BaseModel):
     username: Optional[str] = None
     photo_url: Optional[str] = None
     is_admin: bool
+    is_active: bool
     last_login: Optional[str] = None
 
 
@@ -540,6 +543,10 @@ async def add_admin_id(request: Request, user: dict = Depends(get_current_user_f
     if not admin_id:
         raise HTTPException(status_code=400, detail="admin_id required")
     db.add_admin_id(int(admin_id))
+    
+    # Обновляем поле is_admin в таблице users
+    db.update_user_admin_status(int(admin_id), True)
+    
     return {"success": True, "message": "Администратор добавлен"}
 
 
@@ -553,6 +560,10 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
     if admin_id in admin_ids:
         admin_ids.remove(admin_id)
         db.set_admin_ids(admin_ids)
+    
+    # Обновляем поле is_admin в таблице users
+    db.update_user_admin_status(int(admin_id), False)
+    
     return {"success": True, "message": "Администратор удалён"}
 
 
@@ -719,16 +730,6 @@ async def get_my_trainings(user: dict = Depends(get_current_user_from_access_coo
 
 # ==================== API для админов (Users & Trainings) ====================
 
-@app.get("/api/admin/users")
-async def get_users(user: dict = Depends(get_current_user_from_access_cookie)):
-    """
-    Получение списка всех пользователей (только админы)
-    """
-    require_admin(user)
-    users = db.get_all_web_users()
-    return {"users": users}
-
-
 @app.post("/api/admin/users")
 async def add_user(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
     """
@@ -753,16 +754,40 @@ async def add_user(request: Request, user: dict = Depends(get_current_user_from_
 @app.delete("/api/admin/users/{telegram_id}")
 async def remove_user(telegram_id: int, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Удаление пользователя (только админы)
+    Полное удаление пользователя (только админы)
     """
     require_admin(user)
-    
-    result = db.remove_web_user(telegram_id)
-    
+
+    result = db.delete_web_user(telegram_id)
+
     if result.get('success'):
         return result
     else:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove user'))
+
+
+@app.post("/api/admin/users/{telegram_id}/toggle-active")
+async def toggle_user_active(
+    telegram_id: int,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Переключение статуса активности пользователя (только админы)
+    """
+    require_admin(user)
+    
+    # Получаем текущий статус
+    user_data = db.get_user_by_telegram_id(telegram_id)
+    if not user_data:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    new_status = not user_data.get('is_active', True)
+    result = db.toggle_user_active_status(telegram_id, new_status)
+    
+    if result.get('success'):
+        return {"success": True, "message": f"Пользователь {'активирован' if new_status else 'деактивирован'}"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to toggle status'))
 
 
 @app.post("/api/admin/calendar/add-training")
@@ -817,9 +842,154 @@ async def get_all_trainings(start_date: str, end_date: str, user: dict = Depends
     trainings = db.get_all_trainings(start_date, end_date)
     return {"trainings": trainings}
 
+
+# ==================== API для приглашений ====================
+
+class InviteCodeCreate(BaseModel):
+    """Модель создания кода приглашения"""
+    expires_in_days: Optional[int] = None  # 1, 7, 30, None (бессрочно)
+
+
+@app.post("/api/admin/invite")
+async def create_invite_code(
+    request: InviteCodeCreate,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Создание кода приглашения (только админы)
+    """
+    require_admin(user)
+
+    import uuid
+    from datetime import datetime, timedelta
+
+    code = str(uuid.uuid4())[:8]  # Короткий код из 8 символов
+    created_by = user.get('telegram_id')
+
+    # Вычисляем срок действия
+    expires_at = None
+    if request.expires_in_days:
+        expires_at = (datetime.now() + timedelta(days=request.expires_in_days)).isoformat()
+
+    result = db.create_invite_code(code, created_by, expires_at)
+
+    if result.get('success'):
+        return {
+            "success": True,
+            "code": code,
+            "expires_at": expires_at,
+            "url": f"/invite/{code}"
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to create invite code'))
+
+
+@app.get("/api/admin/invite")
+async def get_invite_codes(user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение всех кодов приглашений (только админы)
+    """
+    require_admin(user)
+
+    codes = db.get_all_invite_codes()
+    return {"codes": codes}
+
+
+@app.delete("/api/admin/invite/{code}")
+async def deactivate_invite_code(
+    code: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Отзыв кода приглашения (только админы)
+    """
+    require_admin(user)
+
+    result = db.deactivate_invite_code(code)
+
+    if result:
+        return {"success": True, "message": "Код отозван"}
+    else:
+        raise HTTPException(status_code=404, detail="Код не найден")
+
+
+@app.get("/api/invite/{code}")
+async def get_invite_code_info(code: str):
+    """
+    Проверка кода приглашения (публичный эндпоинт)
+    """
+    invite = db.get_invite_code(code)
+
+    if not invite:
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+
+    # Проверяем, не истёк ли срок
+    if invite.get('expires_at'):
+        from datetime import datetime
+        expires_at = datetime.fromisoformat(invite['expires_at'])
+        if expires_at < datetime.now():
+            raise HTTPException(status_code=410, detail="Срок действия приглашения истёк")
+
+    # Проверяем, не использован ли
+    if invite.get('used_by'):
+        raise HTTPException(status_code=410, detail="Приглашение уже использовано")
+
+    # Проверяем, активен ли
+    if not invite.get('enabled'):
+        raise HTTPException(status_code=410, detail="Приглашение отозвано")
+
+    return {
+        "success": True,
+        "code": code,
+        "expires_at": invite.get('expires_at')
+    }
+
+
+@app.post("/api/invite/{code}/accept")
+async def accept_invite_code(
+    code: str,
+    request: Request,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Использование кода приглашения
+    """
+    require_auth(user)
+
+    # Проверяем код
+    invite = db.get_invite_code(code)
+
+    if not invite:
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+
+    # Проверяем, не истёк ли срок
+    if invite.get('expires_at'):
+        from datetime import datetime
+        expires_at = datetime.fromisoformat(invite['expires_at'])
+        if expires_at < datetime.now():
+            raise HTTPException(status_code=410, detail="Срок действия приглашения истёк")
+
+    # Проверяем, не использован ли
+    if invite.get('used_by'):
+        raise HTTPException(status_code=410, detail="Приглашение уже использовано")
+
+    # Проверяем, активен ли
+    if not invite.get('enabled'):
+        raise HTTPException(status_code=410, detail="Приглашение отозвано")
+
+    # Используем код
+    telegram_id = user.get('telegram_id')
+    result = db.use_invite_code(code, telegram_id)
+
+    if result:
+        return {"success": True, "message": "Вы успешно присоединились!"}
+    else:
+        raise HTTPException(status_code=500, detail="Не удалось использовать приглашение")
+
+
 # ==================== Статика ====================
 
-static_path = Path(__file__).parent / "static" / "dist"
+static_path = Path("/var/www/volleyteam.ru")
 assets_path = static_path / "assets"
 
 # Монтируем директорию ассетов для CSS/JS файлов
@@ -852,7 +1022,7 @@ async def root(full_path: str):
         raise HTTPException(status_code=404)
 
     # Иначе отдаём index.html для Vue Router
-    index_path = Path(__file__).parent / "static" / "dist" / "index.html"
+    index_path = Path("/var/www/volleyteam.ru") / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
     return {"message": "VolleyBot Auth API - build not found"}

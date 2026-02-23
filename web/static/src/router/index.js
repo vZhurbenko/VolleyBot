@@ -45,6 +45,11 @@ const router = createRouter({
           component: () => import('@/views/AdminsView.vue')
         },
         {
+          path: 'invites',
+          name: 'invites',
+          component: () => import('@/views/InviteView.vue')
+        },
+        {
           path: 'trainings',
           name: 'trainings',
           component: () => import('@/views/TrainingsView.vue')
@@ -58,6 +63,12 @@ const router = createRouter({
     {
       path: '/admin',
       redirect: '/dashboard'
+    },
+    {
+      path: '/invite/:code',
+      name: 'invite-accept',
+      component: () => import('@/views/InviteAcceptView.vue'),
+      meta: { requiresAuth: false }  // Публичный доступ
     },
   ]
 })
