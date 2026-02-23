@@ -2,7 +2,7 @@
   <div
     class="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4"
   >
-    <div class="bg-white rounded shadow p-10 w-full max-w-md">
+    <div class="bg-white rounded shadow p-6 lg:p-10 w-full max-w-md">
       <img :src="logo" alt="Team R Logo" class="w-20 h-20 mx-auto mb-4" />
       <h1 class="text-2xl font-bold text-gray-900 mb-2 text-center">Team R</h1>
       <p class="text-gray-500 mb-6 text-center">Система управления тренировками</p>
@@ -11,7 +11,7 @@
         <p class="text-green-600 font-medium mb-4 text-center">✓ Вы уже авторизованы</p>
         <button
           @click="goToAdmin"
-          class="w-full px-4 py-3 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
+          class="w-full h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
         >
           Перейти в админ-панель
         </button>

@@ -1,16 +1,16 @@
 <template>
-  <div class="bg-white rounded shadow p-6">
+  <div class="bg-white rounded shadow p-4 lg:p-6">
     <div class="flex flex-col gap-6">
       <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Добавить администратора</label>
-        <div class="flex gap-2">
+        <div class="flex flex-col sm:flex-row gap-2">
           <input
             v-model="newAdminId"
             type="number"
-            class="flex-1 px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            class="flex-1 h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
             placeholder="Telegram ID"
           />
-          <button @click="handleAdd" class="px-6 py-3 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
+          <button @click="handleAdd" class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700 whitespace-nowrap">
             Добавить
           </button>
         </div>

@@ -1,12 +1,12 @@
 <template>
-  <div class="bg-white rounded shadow p-6">
-    <div class="flex flex-col gap-6">
+  <div class="bg-white rounded shadow p-4 lg:p-6">
+    <div class="flex flex-col gap-4 lg:gap-6">
       <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Название</label>
         <input
           v-model="form.name"
           type="text"
-          class="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          class="w-full h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
           placeholder="Название шаблона"
         />
       </div>
@@ -16,7 +16,7 @@
         <textarea
           v-model="form.description"
           rows="3"
-          class="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          class="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
           placeholder="Описание тренировки"
         ></textarea>
       </div>
@@ -26,7 +26,7 @@
           <label class="block text-sm font-medium text-gray-700">День тренировки</label>
           <select
             v-model="form.training_day"
-            class="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            class="w-full h-11 px-4 border border-gray-300 rounded appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
           >
             <option value="monday">Понедельник</option>
             <option value="tuesday">Вторник</option>
@@ -42,7 +42,7 @@
           <label class="block text-sm font-medium text-gray-700">День опроса</label>
           <select
             v-model="form.poll_day"
-            class="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            class="w-full h-11 px-4 border border-gray-300 rounded appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
           >
             <option value="monday">Понедельник</option>
             <option value="tuesday">Вторник</option>
@@ -59,7 +59,7 @@
           <input
             v-model="form.training_time"
             type="text"
-            class="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            class="w-full h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
             placeholder="18:00 - 20:00"
           />
         </div>
@@ -71,7 +71,7 @@
           <input
             v-model="form.default_chat_id"
             type="text"
-            class="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            class="w-full h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
             placeholder="-1002588984009"
           />
         </div>
@@ -81,14 +81,14 @@
           <input
             v-model.number="form.default_topic_id"
             type="number"
-            class="w-full px-4 py-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            class="w-full h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
             placeholder="Оставьте пустым если не используется"
           />
         </div>
       </div>
 
       <div class="pt-6 border-t border-gray-200">
-        <button @click="handleSave" class="px-6 py-3 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
+        <button @click="handleSave" class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
           Сохранить
         </button>
       </div>

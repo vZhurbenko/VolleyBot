@@ -7,10 +7,10 @@
           <input 
             v-model="newAdminId" 
             type="number" 
-            class="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            class="flex-1 h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
             placeholder="Telegram ID"
           />
-          <button @click="handleAdd" class="px-4 py-2 rounded font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800">
+          <button @click="handleAdd" class="h-11 px-6 rounded font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800 whitespace-nowrap">
             Добавить
           </button>
         </div>
@@ -22,7 +22,7 @@
         <span class="font-mono text-sm text-gray-700">ID: {{ id }}</span>
         <div class="flex items-center gap-2">
           <span class="px-3 py-1 rounded text-xs font-medium bg-green-100 text-green-700">Админ</span>
-          <button @click="$emit('remove', id)" class="px-2 py-1 text-sm rounded font-medium transition-colors bg-red-500 text-white hover:bg-red-600">
+          <button @click="$emit('remove', id)" class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors">
             ✕
           </button>
         </div>
