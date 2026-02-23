@@ -1,8 +1,8 @@
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex flex-col gap-4 lg:gap-6">
     <!-- Краткая статистика -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="bg-white rounded shadow p-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+      <div class="bg-white rounded shadow p-4 lg:p-6">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded bg-teal-100 flex items-center justify-center text-2xl">
             📅
@@ -14,7 +14,7 @@
         </div>
       </div>
 
-      <div class="bg-white rounded shadow p-6">
+      <div class="bg-white rounded shadow p-4 lg:p-6">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded bg-blue-100 flex items-center justify-center text-2xl">
             📊
@@ -26,7 +26,7 @@
         </div>
       </div>
 
-      <div class="bg-white rounded shadow p-6">
+      <div class="bg-white rounded shadow p-4 lg:p-6">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded bg-purple-100 flex items-center justify-center text-2xl">
             👥
@@ -40,7 +40,7 @@
     </div>
 
     <!-- Быстрые действия -->
-    <div class="bg-white rounded shadow p-6">
+    <div class="bg-white rounded shadow p-4 lg:p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <router-link to="/admin/schedules" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
@@ -86,7 +86,7 @@
     </div>
 
     <!-- Последние расписания -->
-    <div class="bg-white rounded shadow p-6">
+    <div class="bg-white rounded shadow p-4 lg:p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-gray-900">Расписания</h2>
         <router-link to="/admin/schedules" class="text-sm text-teal-600 hover:underline">Все →</router-link>

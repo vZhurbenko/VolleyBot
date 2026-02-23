@@ -2,8 +2,8 @@
   <div class="flex min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
     <Sidebar />
 
-    <div class="flex-1 flex flex-col">
-      <main class="flex-1 p-6 overflow-auto">
+    <div class="flex-1 flex flex-col min-w-0">
+      <main class="flex-1 p-4 lg:p-6 overflow-auto">
         <div class="max-w-7xl mx-auto">
           <Topbar>
             <template #title>{{ pageTitle }}</template>
