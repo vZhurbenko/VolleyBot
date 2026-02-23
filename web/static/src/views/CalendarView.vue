@@ -1,6 +1,15 @@
 <template>
   <div class="bg-white rounded shadow p-4 lg:p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Календарь тренировок</h1>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Календарь тренировок</h1>
+      <button
+        v-if="authStore.isAdmin"
+        @click="openAddTrainingModal"
+        class="px-4 py-2 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
+      >
+        + Добавить тренировку
+      </button>
+    </div>
 
     <div v-if="loading" class="text-center py-8 text-gray-500">
       Загрузка...
@@ -25,6 +34,14 @@
       @unregister="unregisterFromTraining"
       @remove-training="removeOneTimeTraining"
     />
+
+    <!-- Модалка добавления тренировки -->
+    <AddTrainingModal
+      v-if="showAddModal"
+      :date="selectedDate"
+      @close="closeAddTrainingModal"
+      @add="addOneTimeTraining"
+    />
   </div>
 </template>
 
@@ -34,6 +51,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Calendar from '@/components/Calendar.vue'
 import TrainingModal from '@/components/TrainingModal.vue'
+import AddTrainingModal from '@/components/AddTrainingModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,6 +60,10 @@ const authStore = useAuthStore()
 const trainings = ref([])
 const selectedTraining = ref(null)
 const loading = ref(false)
+
+// Для добавления тренировки
+const showAddModal = ref(false)
+const selectedDate = ref('')
 
 const now = new Date()
 const currentYear = ref(parseInt(route.query.year) || now.getFullYear())
@@ -89,6 +111,43 @@ const openTrainingModal = (training) => {
 const closeTrainingModal = () => {
   selectedTraining.value = null
   loadCalendar()
+}
+
+// Добавление тренировки
+const openAddTrainingModal = () => {
+  selectedDate.value = ''
+  showAddModal.value = true
+}
+
+const closeAddTrainingModal = () => {
+  showAddModal.value = false
+  selectedDate.value = ''
+}
+
+const addOneTimeTraining = async (formData) => {
+  try {
+    const response = await fetch('/api/admin/calendar/add-training', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(formData)
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      closeAddTrainingModal()
+      loadCalendar()
+      alert('Тренировка добавлена')
+    } else {
+      alert(result.detail || 'Ошибка добавления')
+    }
+  } catch (error) {
+    console.error('Error adding training:', error)
+    alert('Ошибка добавления тренировки')
+  }
 }
 
 const registerForTraining = async () => {
