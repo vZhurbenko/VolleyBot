@@ -86,20 +86,29 @@ onMounted(() => {
 
 const loadUsers = async () => {
   loading.value = true
-  
+
   try {
     const response = await fetch('/api/admin/users', {
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
     })
-    
+
     if (!response.ok) {
-      throw new Error('Failed to load users')
+      const error = await response.json().catch(() => ({ detail: 'Ошибка загрузки' }))
+      console.error('Ошибка API:', error)
+      alert('Ошибка загрузки пользователей: ' + error.detail)
+      return
     }
-    
+
     const data = await response.json()
-    users.value = data.users || []
+    console.log('Пользователи:', data)
+    // API возвращает массив напрямую, а не объект {users: [...]}
+    users.value = Array.isArray(data) ? data : (data.users || [])
   } catch (error) {
     console.error('Error loading users:', error)
+    alert('Ошибка сети: ' + error.message)
   } finally {
     loading.value = false
   }
