@@ -98,6 +98,15 @@ onUnmounted(() => {
           <span class="font-medium">Пользователи</span>
         </router-link>
         <router-link
+          to="/dashboard/invites"
+          class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'invites' }"
+          @click="isOpen = false"
+        >
+          <span class="text-xl">🔗</span>
+          <span class="font-medium">Приглашения</span>
+        </router-link>
+        <router-link
           to="/dashboard/trainings"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'trainings' }"

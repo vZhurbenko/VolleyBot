@@ -817,6 +817,151 @@ async def get_all_trainings(start_date: str, end_date: str, user: dict = Depends
     trainings = db.get_all_trainings(start_date, end_date)
     return {"trainings": trainings}
 
+
+# ==================== API для приглашений ====================
+
+class InviteCodeCreate(BaseModel):
+    """Модель создания кода приглашения"""
+    expires_in_days: Optional[int] = None  # 1, 7, 30, None (бессрочно)
+
+
+@app.post("/api/admin/invite")
+async def create_invite_code(
+    request: InviteCodeCreate,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Создание кода приглашения (только админы)
+    """
+    require_admin(user)
+
+    import uuid
+    from datetime import datetime, timedelta
+
+    code = str(uuid.uuid4())[:8]  # Короткий код из 8 символов
+    created_by = user.get('telegram_id')
+
+    # Вычисляем срок действия
+    expires_at = None
+    if request.expires_in_days:
+        expires_at = (datetime.now() + timedelta(days=request.expires_in_days)).isoformat()
+
+    result = db.create_invite_code(code, created_by, expires_at)
+
+    if result.get('success'):
+        return {
+            "success": True,
+            "code": code,
+            "expires_at": expires_at,
+            "url": f"/invite/{code}"
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to create invite code'))
+
+
+@app.get("/api/admin/invite")
+async def get_invite_codes(user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение всех кодов приглашений (только админы)
+    """
+    require_admin(user)
+
+    codes = db.get_all_invite_codes()
+    return {"codes": codes}
+
+
+@app.delete("/api/admin/invite/{code}")
+async def deactivate_invite_code(
+    code: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Отзыв кода приглашения (только админы)
+    """
+    require_admin(user)
+
+    result = db.deactivate_invite_code(code)
+
+    if result:
+        return {"success": True, "message": "Код отозван"}
+    else:
+        raise HTTPException(status_code=404, detail="Код не найден")
+
+
+@app.get("/api/invite/{code}")
+async def get_invite_code_info(code: str):
+    """
+    Проверка кода приглашения (публичный эндпоинт)
+    """
+    invite = db.get_invite_code(code)
+
+    if not invite:
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+
+    # Проверяем, не истёк ли срок
+    if invite.get('expires_at'):
+        from datetime import datetime
+        expires_at = datetime.fromisoformat(invite['expires_at'])
+        if expires_at < datetime.now():
+            raise HTTPException(status_code=410, detail="Срок действия приглашения истёк")
+
+    # Проверяем, не использован ли
+    if invite.get('used_by'):
+        raise HTTPException(status_code=410, detail="Приглашение уже использовано")
+
+    # Проверяем, активен ли
+    if not invite.get('enabled'):
+        raise HTTPException(status_code=410, detail="Приглашение отозвано")
+
+    return {
+        "success": True,
+        "code": code,
+        "expires_at": invite.get('expires_at')
+    }
+
+
+@app.post("/api/invite/{code}/accept")
+async def accept_invite_code(
+    code: str,
+    request: Request,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Использование кода приглашения
+    """
+    require_auth(user)
+
+    # Проверяем код
+    invite = db.get_invite_code(code)
+
+    if not invite:
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+
+    # Проверяем, не истёк ли срок
+    if invite.get('expires_at'):
+        from datetime import datetime
+        expires_at = datetime.fromisoformat(invite['expires_at'])
+        if expires_at < datetime.now():
+            raise HTTPException(status_code=410, detail="Срок действия приглашения истёк")
+
+    # Проверяем, не использован ли
+    if invite.get('used_by'):
+        raise HTTPException(status_code=410, detail="Приглашение уже использовано")
+
+    # Проверяем, активен ли
+    if not invite.get('enabled'):
+        raise HTTPException(status_code=410, detail="Приглашение отозвано")
+
+    # Используем код
+    telegram_id = user.get('telegram_id')
+    result = db.use_invite_code(code, telegram_id)
+
+    if result:
+        return {"success": True, "message": "Вы успешно присоединились!"}
+    else:
+        raise HTTPException(status_code=500, detail="Не удалось использовать приглашение")
+
+
 # ==================== Статика ====================
 
 static_path = Path(__file__).parent / "static" / "dist"

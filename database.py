@@ -773,13 +773,114 @@ class Database:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
-        
+
         try:
             # Деактивируем пользователя
             cursor.execute('UPDATE users SET is_active = 0 WHERE telegram_id = ?', (telegram_id,))
             self.conn.commit()
-            
+
             return {"success": True, "message": "Пользователь деактивирован"}
         except Exception as e:
             logger.error(f"Ошибка удаления пользователя: {e}")
             return {"success": False, "error": str(e)}
+
+    # ==================== Методы для работы с приглашениями ====================
+
+    def create_invite_code(
+        self,
+        code: str,
+        created_by: int,
+        expires_at: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Создание кода приглашения"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                INSERT INTO invite_codes (code, created_by, expires_at, enabled)
+                VALUES (?, ?, ?, 1)
+            ''', (code, created_by, expires_at))
+            self.conn.commit()
+
+            return {"success": True, "code": code, "expires_at": expires_at}
+        except Exception as e:
+            logger.error(f"Ошибка создания кода приглашения: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_invite_code(self, code: str) -> Optional[Dict[str, Any]]:
+        """Получение информации о коде приглашения"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT ic.*, u.first_name, u.last_name, u.username
+            FROM invite_codes ic
+            LEFT JOIN users u ON ic.used_by = u.telegram_id
+            WHERE ic.code = ?
+        ''', (code,))
+
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+    def use_invite_code(self, code: str, telegram_id: int) -> bool:
+        """Использование кода приглашения"""
+        if not self.conn:
+            return False
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE invite_codes
+                SET used_by = ?, used_at = CURRENT_TIMESTAMP, enabled = 0
+                WHERE code = ? AND used_by IS NULL AND enabled = 1
+                AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+            ''', (telegram_id, code))
+            self.conn.commit()
+
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Ошибка использования кода: {e}")
+            return False
+
+    def get_all_invite_codes(self) -> List[Dict[str, Any]]:
+        """Получение всех кодов приглашений"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT ic.*, 
+                   creator.first_name as creator_first_name,
+                   creator.last_name as creator_last_name,
+                   creator.username as creator_username
+            FROM invite_codes ic
+            LEFT JOIN users creator ON ic.created_by = creator.telegram_id
+            ORDER BY ic.created_at DESC
+        ''')
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def deactivate_invite_code(self, code: str) -> bool:
+        """Деактивация кода приглашения"""
+        if not self.conn:
+            return False
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE invite_codes SET enabled = 0 WHERE code = ?
+            ''', (code,))
+            self.conn.commit()
+
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Ошибка деактивации кода: {e}")
+            return False
