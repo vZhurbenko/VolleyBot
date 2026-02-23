@@ -35,7 +35,7 @@
 
         <button
           @click="unregister(training)"
-          class="px-4 py-2 rounded font-medium transition-colors bg-red-500 text-white hover:bg-red-600"
+          class="px-4 py-2 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
         >
           Выписаться
         </button>
