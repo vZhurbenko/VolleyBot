@@ -46,7 +46,7 @@
         class="min-h-[100px] border-r border-b border-gray-100 last:border-r-0 p-2 relative group"
         :class="{ 'bg-gray-50': isWeekend(day) }"
       >
-        <div class="flex items-center justify-between mb-1">
+        <div class="flex items-center justify-between mb-1 min-h-[20px]">
           <div class="text-sm font-medium text-gray-700">
             {{ day }}
           </div>
@@ -62,7 +62,7 @@
         </div>
 
         <!-- Тренировки в этот день -->
-        <div class="space-y-1">
+        <div class="space-y-1 overflow-y-auto max-h-[120px]">
           <div
             v-for="training in getTrainingsForDay(day)"
             :key="training.key"
