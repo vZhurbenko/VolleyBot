@@ -213,6 +213,16 @@ async def get_current_user_from_access_cookie(request: Request) -> dict:
     return user
 
 
+def require_auth(user: dict) -> dict:
+    """Проверка что пользователь авторизован"""
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется авторизация",
+        )
+    return user
+
+
 def require_admin(user: dict) -> dict:
     """Проверка что пользователь является администратором"""
     if not user.get("is_admin"):

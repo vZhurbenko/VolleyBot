@@ -53,7 +53,7 @@ onUnmounted(() => {
       <!-- Меню для администраторов -->
       <template v-if="authStore.isAdmin">
         <router-link
-          to="/admin"
+          to="/dashboard"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'dashboard' }"
           @click="isOpen = false"
@@ -62,25 +62,25 @@ onUnmounted(() => {
           <span class="font-medium">Дашборд</span>
         </router-link>
         <router-link
-          to="/admin/calendar"
+          to="/dashboard/calendar"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-calendar' }"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'calendar' }"
           @click="isOpen = false"
         >
           <span class="text-xl">📅</span>
           <span class="font-medium">Календарь</span>
         </router-link>
         <router-link
-          to="/admin/my-trainings"
+          to="/dashboard/my-trainings"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-my-trainings' }"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'my-trainings' }"
           @click="isOpen = false"
         >
           <span class="text-xl">📝</span>
           <span class="font-medium">Мои тренировки</span>
         </router-link>
         <router-link
-          to="/admin/schedules"
+          to="/dashboard/schedules"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'schedules' }"
           @click="isOpen = false"
@@ -89,25 +89,25 @@ onUnmounted(() => {
           <span class="font-medium">Расписания</span>
         </router-link>
         <router-link
-          to="/admin/users"
+          to="/dashboard/users"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-users' }"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'users' }"
           @click="isOpen = false"
         >
           <span class="text-xl">👥</span>
           <span class="font-medium">Пользователи</span>
         </router-link>
         <router-link
-          to="/admin/trainings"
+          to="/dashboard/trainings"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'admin-trainings' }"
+          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'trainings' }"
           @click="isOpen = false"
         >
           <span class="text-xl">📝</span>
           <span class="font-medium">Записи</span>
         </router-link>
         <router-link
-          to="/admin/template"
+          to="/dashboard/template"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'template' }"
           @click="isOpen = false"
@@ -120,16 +120,7 @@ onUnmounted(() => {
       <!-- Меню для обычных пользователей -->
       <template v-else>
         <router-link
-          to="/user"
-          class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'user-dashboard' }"
-          @click="isOpen = false"
-        >
-          <span class="text-xl">🏠</span>
-          <span class="font-medium">Главная</span>
-        </router-link>
-        <router-link
-          to="/user/calendar"
+          to="/dashboard/calendar"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'calendar' }"
           @click="isOpen = false"
@@ -138,7 +129,7 @@ onUnmounted(() => {
           <span class="font-medium">Календарь</span>
         </router-link>
         <router-link
-          to="/user/my-trainings"
+          to="/dashboard/my-trainings"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'my-trainings' }"
           @click="isOpen = false"

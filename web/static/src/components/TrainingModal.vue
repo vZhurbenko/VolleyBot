@@ -204,7 +204,8 @@ const handleAction = () => {
 }
 
 const shareTraining = () => {
-  const url = `${window.location.origin}/user/calendar?date=${props.training.date}&chat_id=${props.training.chat_id}&time=${encodeURIComponent(props.training.time)}`
+  // Генерируем ссылку на общий календарь (/dashboard)
+  const url = `${window.location.origin}/dashboard/calendar?date=${props.training.date}&chat_id=${props.training.chat_id}&time=${encodeURIComponent(props.training.time)}`
   navigator.clipboard.writeText(url).then(() => {
     alert('Ссылка скопирована в буфер обмена!')
   }).catch(() => {

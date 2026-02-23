@@ -77,6 +77,17 @@ if (route.query.month) {
 }
 
 onMounted(async () => {
+  // Ждём загрузки auth store
+  if (authStore.isLoading) {
+    await authStore.checkAuth()
+  }
+  
+  // Проверяем авторизацию
+  if (!authStore.isAuthenticated) {
+    router.push('/login?redirect=' + encodeURIComponent(route.fullPath))
+    return
+  }
+  
   await Promise.all([
     loadCalendar(),
     settingsStore.loadTemplate()
@@ -222,8 +233,21 @@ const registerForTraining = async () => {
     const result = await response.json()
 
     if (response.ok && result.success) {
+      // Обновляем статус в модалке
       selectedTraining.value.user_status = result.status
-      loadCalendar()
+      
+      // Перезагружаем календарь для обновления списка записавшихся
+      await loadCalendar()
+      
+      // Находим обновлённую тренировку и обновляем selectedTraining
+      const updatedTraining = trainings.value.find(t => 
+        t.date === selectedTraining.value.date &&
+        t.time === selectedTraining.value.time &&
+        t.chat_id === selectedTraining.value.chat_id
+      )
+      if (updatedTraining) {
+        selectedTraining.value = { ...updatedTraining }
+      }
     } else {
       alert(result.detail || 'Ошибка записи')
     }
