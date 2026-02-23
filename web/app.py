@@ -40,7 +40,7 @@ app = FastAPI(title="VolleyBot Auth API")
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://volleybot.zhurbenko.dev"],  # Только наш домен
+    allow_origins=["https://volleyteam.ru", "https://www.volleyteam.ru"],  # Только наш домен
     allow_credentials=True,  # Разрешить cookie
     allow_methods=["*"],
     allow_headers=["*"],
@@ -999,7 +999,7 @@ async def accept_invite_code(
 
 # ==================== Статика ====================
 
-static_path = Path(__file__).parent / "static" / "dist"
+static_path = Path("/var/www/volleyteam.ru")
 assets_path = static_path / "assets"
 
 # Монтируем директорию ассетов для CSS/JS файлов
@@ -1032,7 +1032,7 @@ async def root(full_path: str):
         raise HTTPException(status_code=404)
 
     # Иначе отдаём index.html для Vue Router
-    index_path = Path(__file__).parent / "static" / "dist" / "index.html"
+    index_path = Path("/var/www/volleyteam.ru") / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
     return {"message": "VolleyBot Auth API - build not found"}
