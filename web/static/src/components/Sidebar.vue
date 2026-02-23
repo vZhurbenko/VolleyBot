@@ -61,6 +61,22 @@ onUnmounted(() => {
           <span class="text-xl">📊</span>
           <span class="font-medium">Дашборд</span>
         </router-link>
+        <a
+          href="#calendar"
+          class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+          @click="isOpen = false"
+        >
+          <span class="text-xl">📅</span>
+          <span class="font-medium">Календарь</span>
+        </a>
+        <a
+          href="#my-trainings"
+          class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+          @click="isOpen = false"
+        >
+          <span class="text-xl">📝</span>
+          <span class="font-medium">Мои тренировки</span>
+        </a>
         <router-link
           to="/admin/schedules"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
@@ -119,15 +135,14 @@ onUnmounted(() => {
           <span class="text-xl">🏠</span>
           <span class="font-medium">Главная</span>
         </router-link>
-        <router-link
-          to="/user/calendar"
+        <a
+          href="#calendar"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'user-calendar' }"
           @click="isOpen = false"
         >
           <span class="text-xl">📅</span>
           <span class="font-medium">Календарь</span>
-        </router-link>
+        </a>
         <router-link
           to="/user/my-trainings"
           class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
