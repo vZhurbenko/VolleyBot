@@ -26,6 +26,7 @@
       @register="registerForTraining"
       @unregister="unregisterFromTraining"
       @remove-training="removeOneTimeTraining"
+      @remove-user="removeUserFromTraining"
     />
 
     <!-- Модалка добавления тренировки -->
@@ -310,6 +311,41 @@ const removeOneTimeTraining = async () => {
   } catch (error) {
     console.error('Error removing training:', error)
     alert('Ошибка удаления тренировки')
+  }
+}
+
+const removeUserFromTraining = async (reg) => {
+  if (!selectedTraining.value || !authStore.isAdmin) return
+
+  try {
+    const response = await fetch(
+      `/api/admin/calendar/remove-user/${selectedTraining.value.date}/${encodeURIComponent(selectedTraining.value.time)}/${selectedTraining.value.chat_id}/${reg.user_telegram_id}`,
+      {
+        method: 'DELETE',
+        credentials: 'include'
+      }
+    )
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      // Перезагружаем календарь для обновления данных
+      await loadCalendar()
+      // Находим обновлённую тренировку
+      const updatedTraining = trainings.value.find(t =>
+        t.date === selectedTraining.value.date &&
+        t.time === selectedTraining.value.time &&
+        t.chat_id === selectedTraining.value.chat_id
+      )
+      if (updatedTraining) {
+        selectedTraining.value = { ...updatedTraining }
+      }
+    } else {
+      alert(result.detail || 'Ошибка удаления участника')
+    }
+  } catch (error) {
+    console.error('Error removing user:', error)
+    alert('Ошибка удаления участника')
   }
 }
 </script>

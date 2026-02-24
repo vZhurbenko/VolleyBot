@@ -44,7 +44,7 @@
           <h4 class="text-sm font-semibold text-gray-700 mb-2">
             Записались ({{ training.registered_count }}/12)
           </h4>
-          
+
           <!-- Основные участники -->
           <div class="space-y-2 mb-4">
             <div
@@ -64,10 +64,19 @@
               >
                 {{ getInitials(reg) }}
               </div>
-              <span class="text-sm text-gray-700">
+              <span class="text-sm text-gray-700 flex-1">
                 {{ reg.first_name }} {{ reg.last_name || '' }}
                 <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
               </span>
+              <!-- Кнопка удаления для админа -->
+              <button
+                v-if="isAdmin"
+                @click="removeUser(reg)"
+                class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
+                title="Удалить участника"
+              >
+                ✕
+              </button>
             </div>
           </div>
 
@@ -94,10 +103,19 @@
                 >
                   {{ getInitials(reg) }}
                 </div>
-                <span class="text-sm text-gray-700">
+                <span class="text-sm text-gray-700 flex-1">
                   {{ reg.first_name }} {{ reg.last_name || '' }}
                   <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
                 </span>
+                <!-- Кнопка удаления для админа -->
+                <button
+                  v-if="isAdmin"
+                  @click="removeUser(reg)"
+                  class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
+                  title="Удалить участника"
+                >
+                  ✕
+                </button>
               </div>
             </div>
           </div>
@@ -111,7 +129,7 @@
         <div v-if="isAdmin && training.is_one_time" class="mt-4 pt-4 border-t border-gray-200">
           <button
             @click="$emit('remove-training')"
-            class="w-full h-11 px-6 rounded font-medium transition-colors bg-red-500 text-white hover:bg-red-600"
+            class="w-full h-11 px-6 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
           >
             Удалить тренировку
           </button>
@@ -132,7 +150,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'register', 'unregister', 'remove-training'])
+const emit = defineEmits(['close', 'register', 'unregister', 'remove-training', 'remove-user'])
 
 const authStore = useAuthStore()
 
@@ -219,5 +237,12 @@ const getInitials = (reg) => {
   const first = reg.first_name?.[0] || ''
   const last = reg.last_name?.[0] || ''
   return (first + last).toUpperCase() || '?'
+}
+
+const removeUser = (reg) => {
+  const name = reg.first_name + (reg.last_name ? ' ' + reg.last_name : '')
+  if (confirm(`Удалить ${name} из тренировки?`)) {
+    emit('remove-user', reg)
+  }
 }
 </script>
