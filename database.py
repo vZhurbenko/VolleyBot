@@ -798,13 +798,18 @@ class Database:
 
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT tr.*, u.first_name, u.last_name, u.username, ot.name as training_name
+            SELECT tr.*, u.first_name, u.last_name, u.username, 
+                   ot.name as training_name,
+                   ps.name as schedule_name
             FROM training_registrations tr
             LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
             LEFT JOIN one_time_trainings ot 
                 ON tr.training_date = ot.training_date 
                 AND tr.training_time = ot.training_time 
                 AND tr.chat_id = ot.chat_id
+            LEFT JOIN poll_schedules ps
+                ON tr.chat_id = ps.chat_id
+                AND tr.training_time = ps.training_time
             WHERE tr.training_date BETWEEN ? AND ?
             ORDER BY tr.training_date ASC, tr.training_time ASC, tr.registered_at ASC
         ''', (start_date, end_date))
