@@ -49,8 +49,12 @@
             class="px-4 py-3 flex items-center justify-between"
           >
             <div>
-              <div class="flex items-center gap-2">
-                <span class="font-medium text-gray-900">{{ training.time }}</span>
+              <!-- Название тренировки (разовая или расписание) -->
+              <p v-if="training.training_name || training.schedule_name" class="text-sm font-medium text-gray-900">
+                {{ training.training_name || training.schedule_name }}
+              </p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-sm text-gray-500">{{ training.time }}</span>
                 <span
                   class="px-2 py-0.5 rounded text-xs font-medium"
                   :class="training.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
@@ -58,7 +62,7 @@
                   {{ training.status === 'registered' ? 'Записан' : 'Резерв' }}
                 </span>
               </div>
-              <p class="text-sm text-gray-500">
+              <p class="text-sm text-gray-500 mt-1">
                 {{ training.first_name }} {{ training.last_name || '' }}
                 <span v-if="training.username" class="text-gray-400">@{{ training.username }}</span>
               </p>
