@@ -17,6 +17,10 @@
         class="flex items-center justify-between p-4 bg-gray-50 rounded"
       >
         <div class="flex-1">
+          <!-- Название тренировки -->
+          <p v-if="training.training_name || training.schedule_name" class="text-base font-semibold text-gray-900 mb-1">
+            {{ training.training_name || training.schedule_name }}
+          </p>
           <div class="flex items-center gap-2 mb-1">
             <span class="text-lg font-semibold text-gray-900">
               {{ formatDate(training.training_date) }}
