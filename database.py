@@ -655,6 +655,55 @@ class Database:
             logger.error(f"Ошибка отписки от тренировки: {e}")
             return {"success": False, "error": str(e)}
 
+    def admin_remove_user_from_training(self, training_date: str, training_time: str,
+                                        chat_id: str, user_telegram_id: int) -> Dict[str, Any]:
+        """Удаление участника из тренировки администратором с автоматическим зачислением из waitlist"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Проверяем существование записи
+            cursor.execute('''
+                SELECT id, status FROM training_registrations
+                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
+            ''', (training_date, training_time, chat_id, user_telegram_id))
+
+            existing = cursor.fetchone()
+            if not existing:
+                return {"success": False, "error": "Запись не найдена"}
+
+            # Удаляем запись
+            cursor.execute('''
+                DELETE FROM training_registrations
+                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
+            ''', (training_date, training_time, chat_id, user_telegram_id))
+
+            self.conn.commit()
+
+            # Находим первого в waitlist и переводим в registered
+            cursor.execute('''
+                SELECT id FROM training_registrations
+                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND status = 'waitlist'
+                ORDER BY registered_at ASC
+                LIMIT 1
+            ''', (training_date, training_time, chat_id))
+
+            waitlist_user = cursor.fetchone()
+            if waitlist_user:
+                cursor.execute('''
+                    UPDATE training_registrations
+                    SET status = 'registered'
+                    WHERE id = ?
+                ''', (waitlist_user['id'],))
+                self.conn.commit()
+
+            return {"success": True, "removed_status": existing['status']}
+        except Exception as e:
+            logger.error(f"Ошибка удаления участника из тренировки: {e}")
+            return {"success": False, "error": str(e)}
+
     def get_user_trainings(self, user_telegram_id: int) -> List[Dict[str, Any]]:
         """Получение всех записей пользователя"""
         if not self.conn:
@@ -666,7 +715,7 @@ class Database:
             WHERE user_telegram_id = ?
             ORDER BY training_date ASC, training_time ASC
         ''', (user_telegram_id,))
-        
+
         return [dict(row) for row in cursor.fetchall()]
 
     def add_one_time_training(self, training_id: str, training_date: str, training_time: str,
@@ -695,15 +744,23 @@ class Database:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
-        
+
         try:
+            # Разбираем training_id: date_time_chat_id
+            parts = training_id.split('_')
+            training_date = parts[0]
+            training_time = parts[1] if len(parts) > 1 else ''
+            chat_id = parts[2] if len(parts) > 2 else ''
+
             # Сначала удаляем все записи на эту тренировку
-            cursor.execute('DELETE FROM training_registrations WHERE training_date = ? AND chat_id = ?',
-                          (training_id.split('_')[0], training_id.split('_')[1] if '_' in training_id else None))
-            
+            cursor.execute('''
+                DELETE FROM training_registrations
+                WHERE training_date = ? AND training_time = ? AND chat_id = ?
+            ''', (training_date, training_time, chat_id))
+
             # Удаляем саму тренировку
             cursor.execute('DELETE FROM one_time_trainings WHERE id = ?', (training_id,))
-            
+
             self.conn.commit()
             return {"success": True}
         except Exception as e:

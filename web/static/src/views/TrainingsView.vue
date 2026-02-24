@@ -63,6 +63,14 @@
                 <span v-if="training.username" class="text-gray-400">@{{ training.username }}</span>
               </p>
             </div>
+            <!-- Кнопка удаления для админа -->
+            <button
+              @click="removeUser(training)"
+              class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
+              title="Удалить участника"
+            >
+              ✕
+            </button>
           </div>
         </div>
       </div>
@@ -137,5 +145,32 @@ const formatDate = (dateKey) => {
   const d = new Date(date)
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
   return d.toLocaleDateString('ru-RU', options)
+}
+
+const removeUser = async (training) => {
+  const name = training.first_name + (training.last_name ? ' ' + training.last_name : '')
+  if (!confirm(`Удалить ${name} из тренировки ${training.training_date}?`)) return
+
+  try {
+    const response = await fetch(
+      `/api/admin/calendar/remove-user/${training.training_date}/${encodeURIComponent(training.training_time)}/${training.chat_id}/${training.user_telegram_id}`,
+      {
+        method: 'DELETE',
+        credentials: 'include'
+      }
+    )
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      // Перезагружаем список
+      await loadTrainings()
+    } else {
+      alert(result.detail || 'Ошибка удаления участника')
+    }
+  } catch (error) {
+    console.error('Error removing user:', error)
+    alert('Ошибка удаления участника')
+  }
 }
 </script>

@@ -737,6 +737,29 @@ async def unregister_from_training(request: Request, user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail=result.get('error', 'Unregistration failed'))
 
 
+@app.delete("/api/admin/calendar/remove-user/{training_date}/{training_time}/{chat_id}/{user_telegram_id}")
+async def admin_remove_user_from_training(
+    training_date: str,
+    training_time: str,
+    chat_id: str,
+    user_telegram_id: int,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Удаление участника из тренировки администратором
+    """
+    require_admin(user)
+
+    result = db.admin_remove_user_from_training(
+        training_date, training_time, chat_id, user_telegram_id
+    )
+
+    if result.get('success'):
+        return {"success": True, "removed_status": result.get('removed_status')}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove user'))
+
+
 @app.get("/api/user/my-trainings")
 async def get_my_trainings(user: dict = Depends(get_current_user_from_access_cookie)):
     """
