@@ -6,7 +6,7 @@
         @click="previousMonth"
         class="p-2 rounded hover:bg-gray-200 transition-colors font-medium"
       >
-        ←
+        <ChevronLeft class="w-5 h-5" />
       </button>
       <h2 class="text-lg font-semibold text-gray-900">
         {{ monthName }} {{ currentYear }}
@@ -15,7 +15,7 @@
         @click="nextMonth"
         class="p-2 rounded hover:bg-gray-200 transition-colors font-medium"
       >
-        →
+        <ChevronRight class="w-5 h-5" />
       </button>
     </div>
 
@@ -58,7 +58,7 @@
             title="Добавить тренировку"
             :disabled="isPastDate(day)"
           >
-            +
+            <Plus class="w-4 h-4" />
           </button>
         </div>
 
@@ -82,6 +82,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 const props = defineProps({
   trainings: {

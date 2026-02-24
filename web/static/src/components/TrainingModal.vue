@@ -13,10 +13,10 @@
             class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
             title="Поделиться"
           >
-            🔗
+            <Link class="w-4 h-4 text-gray-600" />
           </button>
           <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
-            ✕
+            <X class="w-4 h-4 text-gray-600" />
           </button>
         </div>
       </div>
@@ -75,7 +75,7 @@
                 class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
                 title="Удалить участника"
               >
-                ✕
+                <X class="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -114,7 +114,7 @@
                   class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
                   title="Удалить участника"
                 >
-                  ✕
+                  <X class="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -142,6 +142,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { Link, X } from 'lucide-vue-next'
 
 const props = defineProps({
   training: {

@@ -1,6 +1,15 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import {
+  LayoutDashboard,
+  Calendar,
+  FileText,
+  ClipboardList,
+  Users,
+  Link,
+  X
+} from 'lucide-vue-next'
 import logo from '@/img/logo.svg'
 
 const authStore = useAuthStore()
@@ -45,7 +54,7 @@ onUnmounted(() => {
         @click="isOpen = false"
         class="lg:hidden p-2 rounded hover:bg-gray-100"
       >
-        ✕
+        <X class="w-5 h-5" />
       </button>
     </div>
 
@@ -58,7 +67,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'dashboard' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📊</span>
+          <LayoutDashboard class="w-5 h-5" />
           <span class="font-medium">Дашборд</span>
         </router-link>
         <router-link
@@ -67,7 +76,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'calendar' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📅</span>
+          <Calendar class="w-5 h-5" />
           <span class="font-medium">Календарь</span>
         </router-link>
         <router-link
@@ -76,7 +85,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'my-trainings' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📝</span>
+          <FileText class="w-5 h-5" />
           <span class="font-medium">Мои тренировки</span>
         </router-link>
         <router-link
@@ -85,7 +94,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'schedules' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📋</span>
+          <ClipboardList class="w-5 h-5" />
           <span class="font-medium">Расписания</span>
         </router-link>
         <router-link
@@ -94,7 +103,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'users' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">👥</span>
+          <Users class="w-5 h-5" />
           <span class="font-medium">Пользователи</span>
         </router-link>
         <router-link
@@ -103,7 +112,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'invites' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">🔗</span>
+          <Link class="w-5 h-5" />
           <span class="font-medium">Приглашения</span>
         </router-link>
         <router-link
@@ -112,7 +121,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'trainings' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📝</span>
+          <FileText class="w-5 h-5" />
           <span class="font-medium">Записи</span>
         </router-link>
         <router-link
@@ -121,7 +130,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'template' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📄</span>
+          <FileText class="w-5 h-5" />
           <span class="font-medium">Шаблон</span>
         </router-link>
       </template>
@@ -134,7 +143,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'calendar' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📅</span>
+          <Calendar class="w-5 h-5" />
           <span class="font-medium">Календарь</span>
         </router-link>
         <router-link
@@ -143,7 +152,7 @@ onUnmounted(() => {
           :class="{ 'bg-teal-50 text-teal-700': $route.name === 'my-trainings' }"
           @click="isOpen = false"
         >
-          <span class="text-xl">📝</span>
+          <FileText class="w-5 h-5" />
           <span class="font-medium">Мои тренировки</span>
         </router-link>
       </template>

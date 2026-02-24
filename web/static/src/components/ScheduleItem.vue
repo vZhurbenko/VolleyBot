@@ -21,16 +21,18 @@
       </span>
 
       <button @click="$emit('edit', schedule)" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors flex-shrink-0" title="Редактировать">
-        ✎
+        <Edit2 class="w-4 h-4 text-gray-600" />
       </button>
       <button @click="$emit('delete', schedule.id)" class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors flex-shrink-0" title="Удалить">
-        ✕
+        <X class="w-4 h-4" />
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
+import { X, Edit2 } from 'lucide-vue-next'
+
 defineProps({
   schedule: {
     type: Object,

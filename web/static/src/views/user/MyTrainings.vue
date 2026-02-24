@@ -32,8 +32,8 @@
               {{ training.status === 'registered' ? 'Записан' : 'Резерв' }}
             </span>
           </div>
-          <p class="text-sm text-gray-500">
-            ⏰ {{ training.training_time }}
+          <p class="text-sm text-gray-500 flex items-center gap-1">
+            <Clock class="w-4 h-4" /> {{ training.training_time }}
           </p>
         </div>
 
@@ -51,6 +51,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { Clock } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 
