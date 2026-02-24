@@ -6,9 +6,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 flex items-center justify-center text-3xl">
-              📅
-            </div>
+            <Calendar class="w-12 h-12 text-teal-600" />
             <div>
               <p class="text-sm text-gray-500">Расписаний</p>
               <p class="text-2xl font-bold text-gray-900">{{ settingsStore.schedules.length }}</p>
@@ -18,9 +16,7 @@
 
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 flex items-center justify-center text-3xl">
-              📊
-            </div>
+            <BarChart3 class="w-12 h-12 text-blue-600" />
             <div>
               <p class="text-sm text-gray-500">Активных опросов</p>
               <p class="text-2xl font-bold text-gray-900">{{ settingsStore.activePolls.length }}</p>
@@ -30,9 +26,7 @@
 
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 flex items-center justify-center text-3xl">
-              👥
-            </div>
+            <Users class="w-12 h-12 text-purple-600" />
             <div>
               <p class="text-sm text-gray-500">Администраторов</p>
               <p class="text-2xl font-bold text-gray-900">{{ settingsStore.adminIds.length }}</p>
@@ -46,9 +40,7 @@
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <router-link to="/dashboard/schedules" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-            <div class="w-10 h-10 flex items-center justify-center text-2xl">
-              📅
-            </div>
+            <Calendar class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Добавить расписание</p>
               <p class="text-sm text-gray-500">Создать новое расписание опросов</p>
@@ -56,9 +48,7 @@
           </router-link>
 
           <router-link to="/dashboard/template" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-            <div class="w-10 h-10 flex items-center justify-center text-2xl">
-              📋
-            </div>
+            <ClipboardList class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Изменить шаблон</p>
               <p class="text-sm text-gray-500">Редактировать шаблон опроса</p>
@@ -66,9 +56,7 @@
           </router-link>
 
           <router-link to="/dashboard/users" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-            <div class="w-10 h-10 flex items-center justify-center text-2xl">
-              👥
-            </div>
+            <Users class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Управление админами</p>
               <p class="text-sm text-gray-500">Добавить или удалить администратора</p>
@@ -76,9 +64,7 @@
           </router-link>
 
           <router-link to="/dashboard/invites" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-            <div class="w-10 h-10 flex items-center justify-center text-2xl">
-              🔗
-            </div>
+            <Link class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Приглашения</p>
               <p class="text-sm text-gray-500">Создать коды приглашений</p>
@@ -145,9 +131,7 @@
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <router-link to="/dashboard/calendar" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-            <div class="w-10 h-10 flex items-center justify-center text-2xl">
-              📅
-            </div>
+            <Calendar class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Календарь тренировок</p>
               <p class="text-sm text-gray-500">Посмотреть расписание</p>
@@ -155,9 +139,7 @@
           </router-link>
 
           <router-link to="/dashboard/my-trainings" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-            <div class="w-10 h-10 flex items-center justify-center text-2xl">
-              📝
-            </div>
+            <FileText class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Мои записи</p>
               <p class="text-sm text-gray-500">Управление записями</p>
@@ -173,6 +155,14 @@
 import { onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
+import {
+  Calendar,
+  BarChart3,
+  Users,
+  ClipboardList,
+  FileText,
+  Link
+} from 'lucide-vue-next'
 
 const settingsStore = useSettingsStore()
 const authStore = useAuthStore()

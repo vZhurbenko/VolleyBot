@@ -6,7 +6,7 @@
         @click="showCreateModal = true"
         class="px-4 py-2 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
       >
-        + Создать приглашение
+        Создать приглашение
       </button>
     </div>
 

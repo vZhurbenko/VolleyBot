@@ -73,7 +73,7 @@
               class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
               title="Удалить участника"
             >
-              ✕
+              <X class="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -84,6 +84,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { X } from 'lucide-vue-next'
 
 const startDate = ref('')
 const endDate = ref('')
