@@ -82,6 +82,7 @@
       @close="closeEditModal"
       @save="handleSaveUser"
       @delete="handleDeleteFromModal"
+      @update:user="editingUser = $event"
     />
   </div>
 </template>
@@ -120,7 +121,22 @@ const loadUsers = async () => {
     }
 
     const data = await response.json()
-    users.value = data
+    // Сортировка:
+    // 1. Админы активные
+    // 2. Админы неактивные
+    // 3. Обычные пользователи активные
+    // 4. Обычные пользователи неактивные
+    // Внутри групп — по имени
+    users.value = data.sort((a, b) => {
+      // Сначала админы
+      if (a.is_admin && !b.is_admin) return -1
+      if (!a.is_admin && b.is_admin) return 1
+      // Потом активные
+      if (a.is_active && !b.is_active) return -1
+      if (!a.is_active && b.is_active) return 1
+      // Потом по имени
+      return (a.first_name || '').localeCompare(b.first_name || '')
+    })
   } catch (error) {
     console.error('Error loading users:', error)
     alert('Ошибка сети: ' + error.message)
@@ -275,34 +291,46 @@ const closeEditModal = () => {
 }
 
 const handleSaveUser = async (updatedUser) => {
+  const changes = []
+  
   try {
-    // Обновляем статус администратора если изменился
-    if (updatedUser.is_admin && !editingUser.value.is_admin) {
-      const response = await fetch('/api/admin/settings/admin_ids', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({ admin_id: updatedUser.telegram_id })
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Ошибка назначения администратором')
-      }
-    } else if (!updatedUser.is_admin && editingUser.value.is_admin) {
-      const response = await fetch(`/api/admin/settings/admin_ids/${updatedUser.telegram_id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Ошибка снятия администраторских прав')
+    // Сравниваем с оригинальным пользователем из списка
+    const originalUser = users.value.find(u => u.telegram_id === updatedUser.telegram_id)
+    if (!originalUser) {
+      throw new Error('Пользователь не найден')
+    }
+    
+    // Проверяем изменения
+    if (updatedUser.is_admin !== originalUser.is_admin) {
+      if (updatedUser.is_admin) {
+        changes.push('назначение администратором')
+        const response = await fetch('/api/admin/settings/admin_ids', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({ admin_id: updatedUser.telegram_id })
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.detail || 'Ошибка назначения администратором')
+        }
+      } else {
+        changes.push('снятие администраторских прав')
+        const response = await fetch(`/api/admin/settings/admin_ids/${updatedUser.telegram_id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.detail || 'Ошибка снятия администраторских прав')
+        }
       }
     }
 
-    // Обновляем активный статус если изменился
-    if (updatedUser.is_active !== editingUser.value.is_active) {
+    if (updatedUser.is_active !== originalUser.is_active) {
+      changes.push(updatedUser.is_active ? 'активация' : 'деактивация')
       const response = await fetch(`/api/admin/users/${updatedUser.telegram_id}/toggle-active`, {
         method: 'POST',
         headers: {
@@ -318,7 +346,6 @@ const handleSaveUser = async (updatedUser) => {
 
     closeEditModal()
     await loadUsers()
-    alert('Пользователь обновлён')
   } catch (error) {
     console.error('Error saving user:', error)
     alert('Ошибка сохранения: ' + error.message)

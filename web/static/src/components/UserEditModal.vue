@@ -40,16 +40,10 @@
             <p class="font-medium text-gray-900">Администратор</p>
             <p class="text-sm text-gray-500">Права администратора</p>
           </div>
-          <button
-            @click="toggleAdmin"
-            class="relative w-12 h-6 rounded-full transition-colors"
-            :class="user.is_admin ? 'bg-teal-600' : 'bg-gray-300'"
-          >
-            <span
-              class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform"
-              :class="user.is_admin ? 'translate-x-6' : 'translate-x-0'"
-            />
-          </button>
+          <Toggle
+            :model-value="user.is_admin"
+            @toggle="toggleAdmin"
+          />
         </div>
 
         <!-- Переключатель Активен -->
@@ -58,16 +52,10 @@
             <p class="font-medium text-gray-900">Активен</p>
             <p class="text-sm text-gray-500">Доступ к системе</p>
           </div>
-          <button
-            @click="toggleActive"
-            class="relative w-12 h-6 rounded-full transition-colors"
-            :class="user.is_active ? 'bg-teal-600' : 'bg-gray-300'"
-          >
-            <span
-              class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform"
-              :class="user.is_active ? 'translate-x-6' : 'translate-x-0'"
-            />
-          </button>
+          <Toggle
+            :model-value="user.is_active"
+            @toggle="toggleActive"
+          />
         </div>
 
         <!-- Кнопка удаления -->
@@ -101,8 +89,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import { X } from 'lucide-vue-next'
+import Toggle from '@/components/Toggle.vue'
 
 const props = defineProps({
   user: {
@@ -111,21 +99,18 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'save', 'delete'])
-
-// Локальные копии для редактирования
-const localUser = ref({ ...props.user })
+const emit = defineEmits(['close', 'save', 'delete', 'update:user'])
 
 const toggleAdmin = () => {
-  localUser.value.is_admin = !localUser.value.is_admin
+  emit('update:user', { ...props.user, is_admin: !props.user.is_admin })
 }
 
 const toggleActive = () => {
-  localUser.value.is_active = !localUser.value.is_active
+  emit('update:user', { ...props.user, is_active: !props.user.is_active })
 }
 
 const handleSave = () => {
-  emit('save', localUser.value)
+  emit('save', props.user)
 }
 
 const getInitials = (user) => {
