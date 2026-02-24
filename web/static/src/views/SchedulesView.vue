@@ -24,7 +24,7 @@
     <div
       v-if="showForm"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      @click="closeModal"
+      @click.stop="closeModal"
     >
       <div
         class="bg-white rounded shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto"

@@ -71,17 +71,23 @@
     </div>
 
     <div class="pt-4 border-t border-gray-200">
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input v-model="form.enabled" type="checkbox" class="w-4 h-4 accent-teal-600 rounded focus:ring-teal-500" />
-        <span class="text-sm text-gray-700">Включено</span>
-      </label>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-700">Включено</p>
+          <p class="text-xs text-gray-500">Активное расписание</p>
+        </div>
+        <Toggle
+          :model-value="form.enabled"
+          @toggle="form.enabled = !form.enabled"
+        />
+      </div>
     </div>
 
     <div class="flex flex-wrap gap-3 pt-6 border-t border-gray-200">
       <button type="submit" class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
         {{ isEdit ? 'Сохранить' : 'Добавить' }}
       </button>
-      <button type="button" @click="$emit('cancel')" class="h-11 px-6 rounded font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+      <button type="button" @click.stop="$emit('cancel')" class="h-11 px-6 rounded font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
         Отмена
       </button>
     </div>
@@ -90,6 +96,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import Toggle from '@/components/Toggle.vue'
 
 const props = defineProps({
   schedule: {

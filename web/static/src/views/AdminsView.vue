@@ -35,7 +35,7 @@
           class="flex items-center justify-between py-3 px-4 rounded"
           :class="user.is_active ? 'bg-gray-50' : 'bg-gray-100 opacity-60'"
         >
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
             <img
               v-if="user.photo_url"
               :src="user.photo_url"
@@ -48,59 +48,55 @@
             >
               {{ getInitials(user) }}
             </div>
-            <div>
-              <p class="font-medium text-gray-900">
-                {{ user.first_name }} {{ user.last_name || '' }}
-                <span v-if="user.username" class="text-gray-400 font-normal">@{{ user.username }}</span>
-              </p>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <p class="font-medium text-gray-900 truncate">
+                  {{ user.first_name }} {{ user.last_name || '' }}
+                  <span v-if="user.username" class="text-gray-400 font-normal">@{{ user.username }}</span>
+                </p>
+                <Shield
+                  v-if="user.is_admin"
+                  class="w-4 h-4 text-purple-600 flex-shrink-0"
+                  title="Администратор"
+                />
+              </div>
               <p class="text-sm text-gray-500">ID: {{ user.telegram_id }}</p>
               <p v-if="!user.is_active" class="text-xs text-red-500 font-medium">Деактивирован</p>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span v-if="user.is_admin" class="px-3 py-1 rounded text-xs font-medium bg-purple-100 text-purple-700">
-              Админ
-            </span>
-            <button
-              v-if="!user.is_admin && user.is_active"
-              @click="handleMakeAdmin(user.telegram_id)"
-              class="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-purple-100 text-purple-700 hover:bg-purple-200"
-            >
-              Сделать админом
-            </button>
-            <button
-              v-if="user.is_admin && user.is_active"
-              @click="handleRemoveAdmin(user.telegram_id)"
-              class="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
-            >
-              Снять права
-            </button>
-            <button
-              @click="handleToggleActive(user.telegram_id, user.is_active)"
-              class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
-              :class="user.is_active ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-green-100 text-green-700 hover:bg-green-200'"
-            >
-              {{ user.is_active ? 'Деактивировать' : 'Активировать' }}
-            </button>
-            <button
-              @click="handleDelete(user.telegram_id, user.first_name)"
-              class="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-red-100 text-red-700 hover:bg-red-200"
-            >
-              Удалить
-            </button>
-          </div>
+          <button
+            @click="openEditModal(user)"
+            class="w-9 h-9 flex items-center justify-center rounded hover:bg-gray-200 transition-colors flex-shrink-0 ml-2"
+            title="Редактировать"
+          >
+            <Edit2 class="w-4 h-4 text-gray-600" />
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- Модалка редактирования -->
+    <UserEditModal
+      v-if="showEditModal && editingUser"
+      :user="editingUser"
+      @close="closeEditModal"
+      @save="handleSaveUser"
+      @delete="handleDeleteFromModal"
+      @update:user="editingUser = $event"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { Shield, Edit2 } from 'lucide-vue-next'
+import UserEditModal from '@/components/UserEditModal.vue'
 
 const users = ref([])
 const newTelegramId = ref('')
 const loading = ref(false)
+const editingUser = ref(null)
+const showEditModal = ref(false)
 
 onMounted(() => {
   loadUsers()
@@ -125,7 +121,22 @@ const loadUsers = async () => {
     }
 
     const data = await response.json()
-    users.value = data
+    // Сортировка:
+    // 1. Админы активные
+    // 2. Админы неактивные
+    // 3. Обычные пользователи активные
+    // 4. Обычные пользователи неактивные
+    // Внутри групп — по имени
+    users.value = data.sort((a, b) => {
+      // Сначала админы
+      if (a.is_admin && !b.is_admin) return -1
+      if (!a.is_admin && b.is_admin) return 1
+      // Потом активные
+      if (a.is_active && !b.is_active) return -1
+      if (!a.is_active && b.is_active) return 1
+      // Потом по имени
+      return (a.first_name || '').localeCompare(b.first_name || '')
+    })
   } catch (error) {
     console.error('Error loading users:', error)
     alert('Ошибка сети: ' + error.message)
@@ -258,6 +269,103 @@ const handleDelete = async (telegramId, firstName) => {
 
     if (response.ok && result.success) {
       loadUsers()
+      alert(result.message || 'Пользователь удалён')
+    } else {
+      alert(result.detail || 'Ошибка удаления')
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    alert('Ошибка удаления пользователя')
+  }
+}
+
+// Функции для модалки редактирования
+const openEditModal = (user) => {
+  editingUser.value = user
+  showEditModal.value = true
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingUser.value = null
+}
+
+const handleSaveUser = async (updatedUser) => {
+  const changes = []
+  
+  try {
+    // Сравниваем с оригинальным пользователем из списка
+    const originalUser = users.value.find(u => u.telegram_id === updatedUser.telegram_id)
+    if (!originalUser) {
+      throw new Error('Пользователь не найден')
+    }
+    
+    // Проверяем изменения
+    if (updatedUser.is_admin !== originalUser.is_admin) {
+      if (updatedUser.is_admin) {
+        changes.push('назначение администратором')
+        const response = await fetch('/api/admin/settings/admin_ids', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({ admin_id: updatedUser.telegram_id })
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.detail || 'Ошибка назначения администратором')
+        }
+      } else {
+        changes.push('снятие администраторских прав')
+        const response = await fetch(`/api/admin/settings/admin_ids/${updatedUser.telegram_id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.detail || 'Ошибка снятия администраторских прав')
+        }
+      }
+    }
+
+    if (updatedUser.is_active !== originalUser.is_active) {
+      changes.push(updatedUser.is_active ? 'активация' : 'деактивация')
+      const response = await fetch(`/api/admin/users/${updatedUser.telegram_id}/toggle-active`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Ошибка изменения статуса')
+      }
+    }
+
+    closeEditModal()
+    await loadUsers()
+  } catch (error) {
+    console.error('Error saving user:', error)
+    alert('Ошибка сохранения: ' + error.message)
+  }
+}
+
+const handleDeleteFromModal = async (user) => {
+  if (!confirm(`Полностью удалить пользователя "${user.first_name}"? Это действие необратимо.`)) return
+
+  try {
+    const response = await fetch(`/api/admin/users/${user.telegram_id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      closeEditModal()
+      await loadUsers()
       alert(result.message || 'Пользователь удалён')
     } else {
       alert(result.detail || 'Ошибка удаления')
