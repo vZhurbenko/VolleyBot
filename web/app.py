@@ -688,19 +688,20 @@ async def register_for_training(request: Request, user: dict = Depends(get_curre
     Запись на тренировку
     """
     require_auth(user)
-    
+
     body = await request.json()
     training_date = body.get('training_date')
     training_time = body.get('training_time')
     chat_id = body.get('chat_id')
     topic_id = body.get('topic_id')
-    
+
     if not all([training_date, training_time, chat_id]):
         raise HTTPException(status_code=400, detail="Missing required fields")
-    
+
     user_telegram_id = user.get('telegram_id')
-    training_id = f"{training_date}_{training_time}_{chat_id}"
-    
+    # Уникальный ID для каждой записи (тренировка + пользователь)
+    training_id = f"{training_date}_{training_time}_{chat_id}_{user_telegram_id}"
+
     result = db.register_for_training(
         training_id, training_date, training_time, chat_id, topic_id, user_telegram_id
     )
