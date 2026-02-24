@@ -6,13 +6,11 @@
         @click="showCreateModal = true"
         class="px-4 py-2 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
       >
-        ➕ Создать приглашение
+        + Создать приглашение
       </button>
     </div>
 
-    <div v-if="loading" class="text-center py-8 text-gray-500">
-      Загрузка...
-    </div>
+    <div v-if="loading" class="text-center py-8 text-gray-500">Загрузка...</div>
 
     <div v-else-if="codes.length === 0" class="text-gray-500 text-center py-8">
       Нет активных приглашений
@@ -38,13 +36,10 @@
               {{ formatDate(code.created_at) }}
             </td>
             <td class="py-3 px-4 text-sm text-gray-700">
-              {{ code.expires_at ? formatDate(code.expires_at) : '∞' }}
+              {{ code.expires_at ? formatDate(code.expires_at) : "∞" }}
             </td>
             <td class="py-3 px-4">
-              <span
-                class="px-2 py-1 rounded text-xs font-medium"
-                :class="getStatusClass(code)"
-              >
+              <span class="px-2 py-1 rounded text-xs font-medium" :class="getStatusClass(code)">
                 {{ getStatusText(code) }}
               </span>
             </td>
@@ -82,9 +77,7 @@
 
         <div class="p-6 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Срок действия
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-2"> Срок действия </label>
             <select
               v-model="selectedExpiresIn"
               class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -117,153 +110,153 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted } from "vue";
 
-const codes = ref([])
-const loading = ref(false)
-const showCreateModal = ref(false)
-const selectedExpiresIn = ref(null)
+const codes = ref([]);
+const loading = ref(false);
+const showCreateModal = ref(false);
+const selectedExpiresIn = ref(null);
 
 onMounted(() => {
-  loadCodes()
-})
+  loadCodes();
+});
 
 const loadCodes = async () => {
-  loading.value = true
+  loading.value = true;
 
   try {
-    const response = await fetch('/api/admin/invite', {
-      credentials: 'include'
-    })
+    const response = await fetch("/api/admin/invite", {
+      credentials: "include",
+    });
 
     if (!response.ok) {
-      throw new Error('Failed to load codes')
+      throw new Error("Failed to load codes");
     }
 
-    const data = await response.json()
-    codes.value = data.codes || []
+    const data = await response.json();
+    codes.value = data.codes || [];
   } catch (error) {
-    console.error('Error loading codes:', error)
+    console.error("Error loading codes:", error);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const createInviteCode = async () => {
   try {
-    const response = await fetch('/api/admin/invite', {
-      method: 'POST',
+    const response = await fetch("/api/admin/invite", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
-      credentials: 'include',
+      credentials: "include",
       body: JSON.stringify({
-        expires_in_days: selectedExpiresIn.value
-      })
-    })
+        expires_in_days: selectedExpiresIn.value,
+      }),
+    });
 
-    const result = await response.json()
+    const result = await response.json();
 
     if (response.ok && result.success) {
       // Сначала показываем ссылку, потом пробуем копировать
-      const url = `${window.location.origin}/invite/${result.code}`
-      
+      const url = `${window.location.origin}/invite/${result.code}`;
+
       // Пробуем скопировать
       try {
-        await navigator.clipboard.writeText(url)
-        alert(`Приглашение создано!\n\nСсылка: ${url}\n\nСкопировано в буфер обмена.`)
+        await navigator.clipboard.writeText(url);
+        alert(`Приглашение создано!\n\nСсылка: ${url}\n\nСкопировано в буфер обмена.`);
       } catch (copyError) {
         // Если не удалось скопировать, просто показываем ссылку
-        alert(`Приглашение создано!\n\nСсылка:\n${url}\n\nСкопируйте её вручную.`)
+        alert(`Приглашение создано!\n\nСсылка:\n${url}\n\nСкопируйте её вручную.`);
       }
-      
-      showCreateModal.value = false
-      selectedExpiresIn.value = null
-      loadCodes()
+
+      showCreateModal.value = false;
+      selectedExpiresIn.value = null;
+      loadCodes();
     } else {
-      alert(result.detail || 'Ошибка создания')
+      alert(result.detail || "Ошибка создания");
     }
   } catch (error) {
-    console.error('Error creating code:', error)
-    alert('Ошибка создания приглашения')
+    console.error("Error creating code:", error);
+    alert("Ошибка создания приглашения");
   }
-}
+};
 
 const deactivateCode = async (code) => {
-  if (!confirm('Отозвать это приглашение?')) return
+  if (!confirm("Отозвать это приглашение?")) return;
 
   try {
     const response = await fetch(`/api/admin/invite/${code}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    })
+      method: "DELETE",
+      credentials: "include",
+    });
 
-    const result = await response.json()
+    const result = await response.json();
 
     if (response.ok && result.success) {
-      loadCodes()
-      alert('Приглашение отозвано')
+      loadCodes();
+      alert("Приглашение отозвано");
     } else {
-      alert(result.detail || 'Ошибка отзыва')
+      alert(result.detail || "Ошибка отзыва");
     }
   } catch (error) {
-    console.error('Error deactivating code:', error)
-    alert('Ошибка отзыва приглашения')
+    console.error("Error deactivating code:", error);
+    alert("Ошибка отзыва приглашения");
   }
-}
+};
 
 const copyLink = async (code) => {
-  const url = `${window.location.origin}/invite/${code}`
+  const url = `${window.location.origin}/invite/${code}`;
   try {
-    await navigator.clipboard.writeText(url)
-    alert('Ссылка скопирована в буфер обмена!')
+    await navigator.clipboard.writeText(url);
+    alert("Ссылка скопирована в буфер обмена!");
   } catch (error) {
-    console.error('Error copying link:', error)
-    alert('Не удалось скопировать ссылку')
+    console.error("Error copying link:", error);
+    alert("Не удалось скопировать ссылку");
   }
-}
+};
 
 const formatDate = (dateStr) => {
-  if (!dateStr) return '—'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+  if (!dateStr) return "—";
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 const getStatusClass = (code) => {
   if (!code.enabled) {
-    return 'bg-gray-100 text-gray-700'
+    return "bg-gray-100 text-gray-700";
   }
   if (code.used_by) {
-    return 'bg-gray-100 text-gray-700'
+    return "bg-gray-100 text-gray-700";
   }
   if (code.expires_at) {
-    const expires = new Date(code.expires_at)
+    const expires = new Date(code.expires_at);
     if (expires < new Date()) {
-      return 'bg-red-100 text-red-700'
+      return "bg-red-100 text-red-700";
     }
   }
-  return 'bg-green-100 text-green-700'
-}
+  return "bg-green-100 text-green-700";
+};
 
 const getStatusText = (code) => {
   if (!code.enabled) {
-    return 'Отозван'
+    return "Отозван";
   }
   if (code.used_by) {
-    return 'Использован'
+    return "Использован";
   }
   if (code.expires_at) {
-    const expires = new Date(code.expires_at)
+    const expires = new Date(code.expires_at);
     if (expires < new Date()) {
-      return 'Истёк'
+      return "Истёк";
     }
   }
-  return 'Активен'
-}
+  return "Активен";
+};
 </script>
