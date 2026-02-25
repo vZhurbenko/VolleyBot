@@ -42,15 +42,15 @@
           <router-link to="/dashboard/schedules" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
             <Calendar class="w-10 h-10 text-teal-600" />
             <div>
-              <p class="font-medium text-gray-900">Добавить расписание</p>
-              <p class="text-sm text-gray-500">Создать новое расписание опросов</p>
+              <p class="font-medium text-gray-900">Расписания</p>
+              <p class="text-sm text-gray-500">Управление расписаниями опросов</p>
             </div>
           </router-link>
 
           <router-link to="/dashboard/template" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
             <ClipboardList class="w-10 h-10 text-teal-600" />
             <div>
-              <p class="font-medium text-gray-900">Изменить шаблон</p>
+              <p class="font-medium text-gray-900">Шаблон</p>
               <p class="text-sm text-gray-500">Редактировать шаблон опроса</p>
             </div>
           </router-link>
@@ -58,8 +58,8 @@
           <router-link to="/dashboard/users" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
             <Users class="w-10 h-10 text-teal-600" />
             <div>
-              <p class="font-medium text-gray-900">Управление админами</p>
-              <p class="text-sm text-gray-500">Добавить или удалить администратора</p>
+              <p class="font-medium text-gray-900">Пользователи</p>
+              <p class="text-sm text-gray-500">Управление пользователями</p>
             </div>
           </router-link>
 
