@@ -51,9 +51,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
 import { Clock } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
 const trainings = ref([])
 const loading = ref(false)
@@ -84,8 +88,9 @@ const loadMyTrainings = async () => {
 }
 
 const unregister = async (training) => {
-  if (!confirm('Выписаться с тренировки?')) return
-  
+  const confirmed = await confirmStore.info('Выписаться с тренировки?')
+  if (!confirmed) return
+
   try {
     const response = await fetch('/api/user/calendar/unregister', {
       method: 'POST',
@@ -99,17 +104,18 @@ const unregister = async (training) => {
         chat_id: training.chat_id
       })
     })
-    
+
     const result = await response.json()
-    
+
     if (response.ok && result.success) {
       loadMyTrainings()
+      notificationsStore.success('Вы успешно выписались с тренировки')
     } else {
-      alert(result.detail || 'Ошибка отписки')
+      notificationsStore.error(result.detail || 'Ошибка отписки')
     }
   } catch (error) {
     console.error('Error unregistering:', error)
-    alert('Ошибка отписки от тренировки')
+    notificationsStore.error('Ошибка отписки от тренировки')
   }
 }
 

@@ -46,6 +46,8 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
 import Calendar from '@/components/Calendar.vue'
 import TrainingModal from '@/components/TrainingModal.vue'
 import AddTrainingModal from '@/components/AddTrainingModal.vue'
@@ -54,6 +56,8 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
 const trainings = ref([])
 const selectedTraining = ref(null)
@@ -140,7 +144,7 @@ const openTrainingByParams = () => {
   if (training) {
     selectedTraining.value = { ...training }
   } else {
-    alert('Тренировка не найдена')
+    notificationsStore.error('Тренировка не найдена')
   }
 }
 
@@ -203,13 +207,13 @@ const addOneTimeTraining = async (formData) => {
     if (response.ok && result.success) {
       closeAddTrainingModal()
       loadCalendar()
-      alert('Тренировка добавлена')
+      notificationsStore.success('Тренировка добавлена')
     } else {
-      alert(result.detail || 'Ошибка добавления')
+      notificationsStore.error(result.detail || 'Ошибка добавления')
     }
   } catch (error) {
     console.error('Error adding training:', error)
-    alert('Ошибка добавления тренировки')
+    notificationsStore.error('Ошибка добавления тренировки')
   }
 }
 
@@ -236,12 +240,12 @@ const registerForTraining = async () => {
     if (response.ok && result.success) {
       // Обновляем статус в модалке
       selectedTraining.value.user_status = result.status
-      
+
       // Перезагружаем календарь для обновления списка записавшихся
       await loadCalendar()
-      
+
       // Находим обновлённую тренировку и обновляем selectedTraining
-      const updatedTraining = trainings.value.find(t => 
+      const updatedTraining = trainings.value.find(t =>
         t.date === selectedTraining.value.date &&
         t.time === selectedTraining.value.time &&
         t.chat_id === selectedTraining.value.chat_id
@@ -249,12 +253,13 @@ const registerForTraining = async () => {
       if (updatedTraining) {
         selectedTraining.value = { ...updatedTraining }
       }
+      notificationsStore.success('Вы записаны на тренировку')
     } else {
-      alert(result.detail || 'Ошибка записи')
+      notificationsStore.error(result.detail || 'Ошибка записи')
     }
   } catch (error) {
     console.error('Error registering:', error)
-    alert('Ошибка записи на тренировку')
+    notificationsStore.error('Ошибка записи на тренировку')
   }
 }
 
@@ -281,18 +286,19 @@ const unregisterFromTraining = async () => {
       selectedTraining.value.user_status = null
       loadCalendar()
     } else {
-      alert(result.detail || 'Ошибка отписки')
+      notificationsStore.error(result.detail || 'Ошибка отписки')
     }
   } catch (error) {
     console.error('Error unregistering:', error)
-    alert('Ошибка отписки от тренировки')
+    notificationsStore.error('Ошибка отписки от тренировки')
   }
 }
 
 const removeOneTimeTraining = async () => {
   if (!selectedTraining.value || !authStore.isAdmin) return
 
-  if (!confirm('Удалить эту тренировку?')) return
+  const confirmed = await confirmStore.danger('Удалить эту тренировку?')
+  if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/calendar/remove-training/${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`, {
@@ -304,13 +310,13 @@ const removeOneTimeTraining = async () => {
 
     if (response.ok && result.success) {
       closeTrainingModal()
-      alert('Тренировка удалена')
+      notificationsStore.success('Тренировка удалена')
     } else {
-      alert(result.detail || 'Ошибка удаления')
+      notificationsStore.error(result.detail || 'Ошибка удаления')
     }
   } catch (error) {
     console.error('Error removing training:', error)
-    alert('Ошибка удаления тренировки')
+    notificationsStore.error('Ошибка удаления тренировки')
   }
 }
 
@@ -341,11 +347,11 @@ const removeUserFromTraining = async (reg) => {
         selectedTraining.value = { ...updatedTraining }
       }
     } else {
-      alert(result.detail || 'Ошибка удаления участника')
+      notificationsStore.error(result.detail || 'Ошибка удаления участника')
     }
   } catch (error) {
     console.error('Error removing user:', error)
-    alert('Ошибка удаления участника')
+    notificationsStore.error('Ошибка удаления участника')
   }
 }
 </script>

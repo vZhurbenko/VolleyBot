@@ -62,10 +62,14 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useSettingsStore } from "@/stores/settings";
+import { useNotificationsStore } from "@/stores/notifications";
+import { useConfirmStore } from "@/stores/confirm";
 import ScheduleItem from "@/components/ScheduleItem.vue";
 import ScheduleForm from "@/components/ScheduleForm.vue";
 
 const settingsStore = useSettingsStore();
+const notificationsStore = useNotificationsStore();
+const confirmStore = useConfirmStore();
 
 const showForm = ref(false);
 const editingSchedule = ref(null);
@@ -90,10 +94,13 @@ const handleEdit = (schedule) => {
 };
 
 const handleDelete = async (id) => {
-  if (!confirm("Удалить это расписание?")) return;
+  const confirmed = await confirmStore.danger("Удалить это расписание?");
+  if (!confirmed) return;
   const success = await settingsStore.deleteSchedule(id);
-  if (!success) {
-    alert("Ошибка удаления");
+  if (success) {
+    notificationsStore.success("Расписание удалено");
+  } else {
+    notificationsStore.error("Ошибка удаления");
   }
 };
 
@@ -107,8 +114,9 @@ const handleSubmit = async (scheduleData) => {
 
   if (success) {
     closeModal();
+    notificationsStore.success(editingSchedule.value ? "Расписание обновлено" : "Расписание создано");
   } else {
-    alert("Ошибка сохранения");
+    notificationsStore.error("Ошибка сохранения");
   }
 };
 

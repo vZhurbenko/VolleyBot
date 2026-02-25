@@ -54,11 +54,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
 import logo from '@/img/logo.svg'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
 
 const loading = ref(true)
 const error = ref('')
@@ -161,7 +163,7 @@ const acceptInvite = async () => {
     const result = await response.json()
 
     if (response.ok && result.success) {
-      alert('Вы успешно присоединились к команде!')
+      notificationsStore.success('Вы успешно присоединились к команде!')
       router.push('/dashboard/calendar')
     } else {
       error.value = result.detail || 'Ошибка принятия приглашения'

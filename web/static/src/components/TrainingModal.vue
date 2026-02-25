@@ -142,6 +142,8 @@
 <script setup>
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
 import { Link, X } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -154,6 +156,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'register', 'unregister', 'remove-training', 'remove-user'])
 
 const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
 const isAdmin = computed(() => authStore.isAdmin)
 
@@ -228,9 +232,9 @@ const shareTraining = () => {
   // Генерируем ссылку на общий календарь (/dashboard)
   const url = `${window.location.origin}/dashboard/calendar?date=${props.training.date}&chat_id=${props.training.chat_id}&time=${encodeURIComponent(props.training.time)}`
   navigator.clipboard.writeText(url).then(() => {
-    alert('Ссылка скопирована в буфер обмена!')
+    notificationsStore.success('Ссылка скопирована в буфер обмена')
   }).catch(() => {
-    alert('Не удалось скопировать ссылку')
+    notificationsStore.error('Не удалось скопировать ссылку')
   })
 }
 
@@ -240,9 +244,10 @@ const getInitials = (reg) => {
   return (first + last).toUpperCase() || '?'
 }
 
-const removeUser = (reg) => {
+const removeUser = async (reg) => {
   const name = reg.first_name + (reg.last_name ? ' ' + reg.last_name : '')
-  if (confirm(`Удалить ${name} из тренировки?`)) {
+  const confirmed = await confirmStore.danger(`Удалить ${name} из тренировки?`)
+  if (confirmed) {
     emit('remove-user', reg)
   }
 }
