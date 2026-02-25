@@ -16,7 +16,7 @@
     </div>
 
     <div class="flex items-center gap-2 flex-shrink-0">
-      <span :class="['px-3 py-1 rounded text-xs font-medium whitespace-nowrap', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+      <span :class="['px-3 py-1 rounded text-xs font-medium whitespace-nowrap', schedule.enabled ? 'bg-teal-100 text-teal-700' : 'bg-red-100 text-red-700']">
         {{ schedule.enabled ? 'Активно' : 'Отключено' }}
       </span>
 

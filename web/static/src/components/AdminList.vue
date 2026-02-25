@@ -21,7 +21,7 @@
       <div v-for="id in adminIds" :key="id" class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded">
         <span class="font-mono text-sm text-gray-700">ID: {{ id }}</span>
         <div class="flex items-center gap-2">
-          <span class="px-3 py-1 rounded text-xs font-medium bg-green-100 text-green-700">Админ</span>
+          <span class="px-3 py-1 rounded text-xs font-medium bg-teal-100 text-teal-700">Админ</span>
           <button @click="$emit('remove', id)" class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors">
             ✕
           </button>

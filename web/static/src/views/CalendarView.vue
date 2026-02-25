@@ -284,7 +284,18 @@ const unregisterFromTraining = async () => {
 
     if (response.ok && result.success) {
       selectedTraining.value.user_status = null
-      loadCalendar()
+      // Перезагружаем календарь для обновления списка записавшихся
+      await loadCalendar()
+      // Находим обновлённую тренировку и обновляем selectedTraining
+      const updatedTraining = trainings.value.find(t =>
+        t.date === selectedTraining.value.date &&
+        t.time === selectedTraining.value.time &&
+        t.chat_id === selectedTraining.value.chat_id
+      )
+      if (updatedTraining) {
+        selectedTraining.value = { ...updatedTraining }
+      }
+      notificationsStore.success('Вы успешно выписались с тренировки')
     } else {
       notificationsStore.error(result.detail || 'Ошибка отписки')
     }

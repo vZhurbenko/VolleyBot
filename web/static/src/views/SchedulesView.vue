@@ -106,6 +106,8 @@ const handleDelete = async (id) => {
 
 const handleSubmit = async (scheduleData) => {
   let success;
+  const isEdit = !!editingSchedule.value;
+  
   if (editingSchedule.value) {
     success = await settingsStore.updateSchedule(editingSchedule.value.id, scheduleData);
   } else {
@@ -114,7 +116,7 @@ const handleSubmit = async (scheduleData) => {
 
   if (success) {
     closeModal();
-    notificationsStore.success(editingSchedule.value ? "Расписание обновлено" : "Расписание создано");
+    notificationsStore.success(isEdit ? "Расписание обновлено" : "Расписание создано");
   } else {
     notificationsStore.error("Ошибка сохранения");
   }

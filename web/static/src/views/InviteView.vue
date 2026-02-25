@@ -177,7 +177,7 @@ const createInviteCode = async () => {
 };
 
 const deactivateCode = async (code) => {
-  const confirmed = await confirmStore.danger("Отозвать это приглашение?");
+  const confirmed = await confirmStore.danger("Отозвать это приглашение?", { confirmText: 'Отозвать' });
   if (!confirmed) return;
 
   try {
@@ -236,7 +236,7 @@ const getStatusClass = (code) => {
       return "bg-red-100 text-red-700";
     }
   }
-  return "bg-green-100 text-green-700";
+  return "bg-teal-100 text-teal-700";
 };
 
 const getStatusText = (code) => {

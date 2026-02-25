@@ -90,7 +90,7 @@
                 <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(schedule.poll_day) }}
               </p>
             </div>
-            <span :class="['px-3 py-1 rounded text-xs font-medium', schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+            <span :class="['px-3 py-1 rounded text-xs font-medium', schedule.enabled ? 'bg-teal-100 text-teal-700' : 'bg-red-100 text-red-700']">
               {{ schedule.enabled ? 'Активно' : 'Отключено' }}
             </span>
           </div>
