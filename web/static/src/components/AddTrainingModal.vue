@@ -85,6 +85,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useNotificationsStore } from '@/stores/notifications'
 
 const props = defineProps({
   date: {
@@ -103,6 +104,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'add'])
 
+const notificationsStore = useNotificationsStore()
+
 // Сегодняшняя дата для минимальной даты
 const today = new Date().toISOString().split('T')[0]
 
@@ -116,7 +119,7 @@ const formData = ref({
 
 const handleSubmit = () => {
   if (!formData.value.training_date || !formData.value.training_time || !formData.value.name || !formData.value.chat_id) {
-    alert('Заполните обязательные поля')
+    notificationsStore.error('Заполните обязательные поля')
     return
   }
 

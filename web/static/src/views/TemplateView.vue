@@ -15,9 +15,11 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useNotificationsStore } from '@/stores/notifications'
 import TemplateForm from '@/components/TemplateForm.vue'
 
 const settingsStore = useSettingsStore()
+const notificationsStore = useNotificationsStore()
 
 onMounted(async () => {
   await settingsStore.loadTemplate()
@@ -25,10 +27,10 @@ onMounted(async () => {
 
 const handleSave = async (templateData) => {
   const success = await settingsStore.saveTemplate(templateData)
-  if (success) {
-    alert('Шаблон сохранён!')
+  if (!success) {
+    notificationsStore.error('Ошибка сохранения')
   } else {
-    alert('Ошибка сохранения')
+    notificationsStore.success('Шаблон сохранён')
   }
 }
 </script>

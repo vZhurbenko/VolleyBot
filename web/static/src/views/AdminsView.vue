@@ -91,12 +91,17 @@
 import { ref, onMounted } from 'vue'
 import { Shield, Edit2 } from 'lucide-vue-next'
 import UserEditModal from '@/components/UserEditModal.vue'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
 
 const users = ref([])
 const newTelegramId = ref('')
 const loading = ref(false)
 const editingUser = ref(null)
 const showEditModal = ref(false)
+
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
 onMounted(() => {
   loadUsers()
@@ -116,7 +121,7 @@ const loadUsers = async () => {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Ошибка загрузки' }))
       console.error('Ошибка API:', error)
-      alert('Ошибка загрузки пользователей: ' + error.detail)
+      notificationsStore.error('Ошибка загрузки пользователей: ' + error.detail)
       return
     }
 
@@ -139,7 +144,7 @@ const loadUsers = async () => {
     })
   } catch (error) {
     console.error('Error loading users:', error)
-    alert('Ошибка сети: ' + error.message)
+    notificationsStore.error('Ошибка сети: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -147,7 +152,7 @@ const loadUsers = async () => {
 
 const handleAdd = async () => {
   if (!newTelegramId.value) return
-  
+
   try {
     const response = await fetch('/api/admin/users', {
       method: 'POST',
@@ -159,25 +164,26 @@ const handleAdd = async () => {
         telegram_id: parseInt(newTelegramId.value)
       })
     })
-    
+
     const result = await response.json()
-    
+
     if (response.ok && result.success) {
       newTelegramId.value = ''
       loadUsers()
-      alert(result.message || 'Пользователь добавлен')
+      notificationsStore.success('Пользователь добавлен')
     } else {
-      alert(result.detail || 'Ошибка добавления')
+      notificationsStore.error(result.detail || 'Ошибка добавления')
     }
   } catch (error) {
     console.error('Error adding user:', error)
-    alert('Ошибка добавления пользователя')
+    notificationsStore.error('Ошибка добавления пользователя')
   }
 }
 
 const handleToggleActive = async (telegramId, isActive) => {
   const actionText = isActive ? 'Деактивировать' : 'Активировать'
-  if (!confirm(`${actionText} пользователя ID: ${telegramId}?`)) return
+  const confirmed = await confirmStore.info(`${actionText} пользователя ID: ${telegramId}?`)
+  if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/users/${telegramId}/toggle-active`, {
@@ -192,18 +198,19 @@ const handleToggleActive = async (telegramId, isActive) => {
 
     if (response.ok && result.success) {
       loadUsers()
-      alert(result.message || `Пользователь ${isActive ? 'деактивирован' : 'активирован'}`)
+      notificationsStore.success(isActive ? 'Пользователь деактивирован' : 'Пользователь активирован')
     } else {
-      alert(result.detail || 'Ошибка')
+      notificationsStore.error(result.detail || 'Ошибка')
     }
   } catch (error) {
     console.error('Error toggling active status:', error)
-    alert('Ошибка изменения статуса')
+    notificationsStore.error('Ошибка изменения статуса')
   }
 }
 
 const handleMakeAdmin = async (telegramId) => {
-  if (!confirm(`Сделать пользователя администратором?`)) return
+  const confirmed = await confirmStore.info('Сделать пользователя администратором?')
+  if (!confirmed) return
 
   try {
     const response = await fetch('/api/admin/settings/admin_ids', {
@@ -221,18 +228,19 @@ const handleMakeAdmin = async (telegramId) => {
 
     if (response.ok && result.success) {
       loadUsers()
-      alert(result.message || 'Пользователь стал администратором')
+      notificationsStore.success('Пользователь стал администратором')
     } else {
-      alert(result.detail || 'Ошибка назначения администратором')
+      notificationsStore.error(result.detail || 'Ошибка назначения администратором')
     }
   } catch (error) {
     console.error('Error making admin:', error)
-    alert('Ошибка назначения администратором')
+    notificationsStore.error('Ошибка назначения администратором')
   }
 }
 
 const handleRemoveAdmin = async (telegramId) => {
-  if (!confirm(`Снять админские права у пользователя?`)) return
+  const confirmed = await confirmStore.info('Снять админские права у пользователя?')
+  if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/settings/admin_ids/${telegramId}`, {
@@ -243,21 +251,20 @@ const handleRemoveAdmin = async (telegramId) => {
     const result = await response.json()
 
     if (response.ok && result.success) {
-      // Принудительно перезагружаем список
       await loadUsers()
-      console.log('Пользователи после снятия прав:', users.value)
-      alert(result.message || 'Администратор удалён')
+      notificationsStore.success('Администратор удалён')
     } else {
-      alert(result.detail || 'Ошибка снятия админских прав')
+      notificationsStore.error(result.detail || 'Ошибка снятия админских прав')
     }
   } catch (error) {
     console.error('Error removing admin:', error)
-    alert('Ошибка снятия админских прав')
+    notificationsStore.error('Ошибка снятия админских прав')
   }
 }
 
 const handleDelete = async (telegramId, firstName) => {
-  if (!confirm(`Полностью удалить пользователя "${firstName}"? Это действие необратимо.`)) return
+  const confirmed = await confirmStore.danger(`Полностью удалить пользователя "${firstName}"? Это действие необратимо.`)
+  if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/users/${telegramId}`, {
@@ -269,13 +276,13 @@ const handleDelete = async (telegramId, firstName) => {
 
     if (response.ok && result.success) {
       loadUsers()
-      alert(result.message || 'Пользователь удалён')
+      notificationsStore.success('Пользователь удалён')
     } else {
-      alert(result.detail || 'Ошибка удаления')
+      notificationsStore.error(result.detail || 'Ошибка удаления')
     }
   } catch (error) {
     console.error('Error deleting user:', error)
-    alert('Ошибка удаления пользователя')
+    notificationsStore.error('Ошибка удаления пользователя')
   }
 }
 
@@ -292,14 +299,14 @@ const closeEditModal = () => {
 
 const handleSaveUser = async (updatedUser) => {
   const changes = []
-  
+
   try {
     // Сравниваем с оригинальным пользователем из списка
     const originalUser = users.value.find(u => u.telegram_id === updatedUser.telegram_id)
     if (!originalUser) {
       throw new Error('Пользователь не найден')
     }
-    
+
     // Проверяем изменения
     if (updatedUser.is_admin !== originalUser.is_admin) {
       if (updatedUser.is_admin) {
@@ -346,14 +353,16 @@ const handleSaveUser = async (updatedUser) => {
 
     closeEditModal()
     await loadUsers()
+    notificationsStore.success('Пользователь сохранён')
   } catch (error) {
     console.error('Error saving user:', error)
-    alert('Ошибка сохранения: ' + error.message)
+    notificationsStore.error('Ошибка сохранения: ' + error.message)
   }
 }
 
 const handleDeleteFromModal = async (user) => {
-  if (!confirm(`Полностью удалить пользователя "${user.first_name}"? Это действие необратимо.`)) return
+  const confirmed = await confirmStore.danger(`Полностью удалить пользователя "${user.first_name}"? Это действие необратимо.`)
+  if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/users/${user.telegram_id}`, {
@@ -366,13 +375,13 @@ const handleDeleteFromModal = async (user) => {
     if (response.ok && result.success) {
       closeEditModal()
       await loadUsers()
-      alert(result.message || 'Пользователь удалён')
+      notificationsStore.success('Пользователь удалён')
     } else {
-      alert(result.detail || 'Ошибка удаления')
+      notificationsStore.error(result.detail || 'Ошибка удаления')
     }
   } catch (error) {
     console.error('Error deleting user:', error)
-    alert('Ошибка удаления пользователя')
+    notificationsStore.error('Ошибка удаления пользователя')
   }
 }
 

@@ -85,11 +85,16 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { X } from 'lucide-vue-next'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
 
 const startDate = ref('')
 const endDate = ref('')
 const trainings = ref([])
 const loading = ref(false)
+
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
 onMounted(() => {
   // Устанавливаем даты по умолчанию (текущий месяц)
@@ -97,7 +102,7 @@ onMounted(() => {
   startDate.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   endDate.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  
+
   loadTrainings()
 })
 
@@ -154,7 +159,8 @@ const formatDate = (dateKey) => {
 
 const removeUser = async (training) => {
   const name = training.first_name + (training.last_name ? ' ' + training.last_name : '')
-  if (!confirm(`Удалить ${name} из тренировки ${training.training_date}?`)) return
+  const confirmed = await confirmStore.danger(`Удалить ${name} из тренировки ${training.training_date}?`)
+  if (!confirmed) return
 
   try {
     const response = await fetch(
@@ -170,12 +176,13 @@ const removeUser = async (training) => {
     if (response.ok && result.success) {
       // Перезагружаем список
       await loadTrainings()
+      notificationsStore.success('Пользователь удалён из тренировки')
     } else {
-      alert(result.detail || 'Ошибка удаления участника')
+      notificationsStore.error(result.detail || 'Ошибка удаления участника')
     }
   } catch (error) {
     console.error('Error removing user:', error)
-    alert('Ошибка удаления участника')
+    notificationsStore.error('Ошибка удаления участника')
   }
 }
 </script>

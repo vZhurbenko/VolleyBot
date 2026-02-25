@@ -29,9 +29,13 @@ import { useRoute } from 'vue-router'
 import Calendar from '@/components/Calendar.vue'
 import TrainingModal from '@/components/TrainingModal.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
 const trainings = ref([])
 const selectedTraining = ref(null)
@@ -98,25 +102,25 @@ const registerForTraining = async () => {
     })
     
     const result = await response.json()
-    
+
     if (response.ok && result.success) {
       selectedTraining.value.user_status = result.status
-      selectedTraining.value.registered_count = result.status === 'registered' 
-        ? selectedTraining.value.registered_count + 1 
+      selectedTraining.value.registered_count = result.status === 'registered'
+        ? selectedTraining.value.registered_count + 1
         : selectedTraining.value.registered_count
       loadCalendar()
     } else {
-      alert(result.detail || 'Ошибка записи')
+      notificationsStore.error(result.detail || 'Ошибка записи')
     }
   } catch (error) {
     console.error('Error registering:', error)
-    alert('Ошибка записи на тренировку')
+    notificationsStore.error('Ошибка записи на тренировку')
   }
 }
 
 const unregisterFromTraining = async () => {
   if (!selectedTraining.value) return
-  
+
   try {
     const response = await fetch('/api/user/calendar/unregister', {
       method: 'POST',
@@ -130,44 +134,56 @@ const unregisterFromTraining = async () => {
         chat_id: selectedTraining.value.chat_id
       })
     })
-    
+
     const result = await response.json()
-    
+
     if (response.ok && result.success) {
       selectedTraining.value.user_status = null
       selectedTraining.value.registered_count = Math.max(0, selectedTraining.value.registered_count - 1)
-      loadCalendar()
+      // Перезагружаем календарь для обновления списка записавшихся
+      await loadCalendar()
+      // Находим обновлённую тренировку и обновляем selectedTraining
+      const updatedTraining = trainings.value.find(t =>
+        t.date === selectedTraining.value.date &&
+        t.time === selectedTraining.value.time &&
+        t.chat_id === selectedTraining.value.chat_id
+      )
+      if (updatedTraining) {
+        selectedTraining.value = { ...updatedTraining }
+      }
+      notificationsStore.success('Вы успешно выписались с тренировки')
     } else {
-      alert(result.detail || 'Ошибка отписки')
+      notificationsStore.error(result.detail || 'Ошибка отписки')
     }
   } catch (error) {
     console.error('Error unregistering:', error)
-    alert('Ошибка отписки от тренировки')
+    notificationsStore.error('Ошибка отписки от тренировки')
   }
 }
 
 const removeOneTimeTraining = async () => {
   if (!selectedTraining.value || !authStore.isAdmin) return
-  
-  if (!confirm('Удалить эту тренировку?')) return
-  
+
+  const confirmed = await confirmStore.danger('Удалить эту тренировку?')
+  if (!confirmed) return
+
   try {
     const response = await fetch(`/api/admin/calendar/remove-training/${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`, {
       method: 'DELETE',
       credentials: 'include'
     })
-    
+
     const result = await response.json()
-    
+
     if (response.ok && result.success) {
       closeTrainingModal()
-      alert('Тренировка удалена')
+      notificationsStore.success('Тренировка удалена')
     } else {
-      alert(result.detail || 'Ошибка удаления')
+      notificationsStore.error(result.detail || 'Ошибка удаления')
     }
   } catch (error) {
     console.error('Error removing training:', error)
-    alert('Ошибка удаления тренировки')
+    notificationsStore.error('Ошибка удаления тренировки')
   }
 }
 </script>

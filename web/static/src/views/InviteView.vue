@@ -111,11 +111,16 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
+import { useNotificationsStore } from "@/stores/notifications";
+import { useConfirmStore } from "@/stores/confirm";
 
 const codes = ref([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
 const selectedExpiresIn = ref(null);
+
+const notificationsStore = useNotificationsStore();
+const confirmStore = useConfirmStore();
 
 onMounted(() => {
   loadCodes();
@@ -158,32 +163,22 @@ const createInviteCode = async () => {
     const result = await response.json();
 
     if (response.ok && result.success) {
-      // Сначала показываем ссылку, потом пробуем копировать
-      const url = `${window.location.origin}/invite/${result.code}`;
-
-      // Пробуем скопировать
-      try {
-        await navigator.clipboard.writeText(url);
-        alert(`Приглашение создано!\n\nСсылка: ${url}\n\nСкопировано в буфер обмена.`);
-      } catch (copyError) {
-        // Если не удалось скопировать, просто показываем ссылку
-        alert(`Приглашение создано!\n\nСсылка:\n${url}\n\nСкопируйте её вручную.`);
-      }
-
       showCreateModal.value = false;
       selectedExpiresIn.value = null;
       loadCodes();
+      notificationsStore.success("Приглашение создано");
     } else {
-      alert(result.detail || "Ошибка создания");
+      notificationsStore.error(result.detail || "Ошибка создания");
     }
   } catch (error) {
     console.error("Error creating code:", error);
-    alert("Ошибка создания приглашения");
+    notificationsStore.error("Ошибка создания приглашения");
   }
 };
 
 const deactivateCode = async (code) => {
-  if (!confirm("Отозвать это приглашение?")) return;
+  const confirmed = await confirmStore.danger("Отозвать это приглашение?", { confirmText: 'Отозвать' });
+  if (!confirmed) return;
 
   try {
     const response = await fetch(`/api/admin/invite/${code}`, {
@@ -195,13 +190,13 @@ const deactivateCode = async (code) => {
 
     if (response.ok && result.success) {
       loadCodes();
-      alert("Приглашение отозвано");
+      notificationsStore.success("Приглашение отозвано");
     } else {
-      alert(result.detail || "Ошибка отзыва");
+      notificationsStore.error(result.detail || "Ошибка отзыва");
     }
   } catch (error) {
     console.error("Error deactivating code:", error);
-    alert("Ошибка отзыва приглашения");
+    notificationsStore.error("Ошибка отзыва приглашения");
   }
 };
 
@@ -209,10 +204,10 @@ const copyLink = async (code) => {
   const url = `${window.location.origin}/invite/${code}`;
   try {
     await navigator.clipboard.writeText(url);
-    alert("Ссылка скопирована в буфер обмена!");
+    notificationsStore.success("Ссылка скопирована в буфер обмена");
   } catch (error) {
     console.error("Error copying link:", error);
-    alert("Не удалось скопировать ссылку");
+    notificationsStore.error("Не удалось скопировать ссылку");
   }
 };
 
@@ -241,7 +236,7 @@ const getStatusClass = (code) => {
       return "bg-red-100 text-red-700";
     }
   }
-  return "bg-green-100 text-green-700";
+  return "bg-teal-100 text-teal-700";
 };
 
 const getStatusText = (code) => {
