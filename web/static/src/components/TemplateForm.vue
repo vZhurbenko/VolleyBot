@@ -87,7 +87,7 @@
         </div>
       </div>
 
-      <div class="pt-6 border-t border-gray-200">
+      <div class="pt-6 border-t border-gray-200 flex justify-end gap-2">
         <button @click="handleSave" class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
           Сохранить
         </button>

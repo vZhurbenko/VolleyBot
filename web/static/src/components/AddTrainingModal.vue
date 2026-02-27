@@ -67,16 +67,16 @@
       <!-- Кнопки -->
       <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
         <button
-          @click="$emit('close')"
-          class="px-4 py-2 rounded font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
-        >
-          Отмена
-        </button>
-        <button
           @click="handleSubmit"
-          class="px-4 py-2 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
+          class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
         >
           Добавить
+        </button>
+        <button
+          @click="$emit('close')"
+          class="h-11 px-6 rounded font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+        >
+          Отмена
         </button>
       </div>
     </div>
