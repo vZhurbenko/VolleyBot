@@ -78,7 +78,7 @@
         </div>
         <Toggle
           :model-value="form.enabled"
-          @toggle="form.enabled = !form.enabled"
+          @toggle.stop="form.enabled = !form.enabled"
         />
       </div>
     </div>
