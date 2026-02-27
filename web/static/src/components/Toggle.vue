@@ -1,5 +1,6 @@
 <template>
   <button
+    type="button"
     @click="handleClick"
     class="relative w-12 h-6 rounded-full transition-colors"
     :class="modelValue ? 'bg-teal-600' : 'bg-gray-300'"
@@ -14,8 +15,6 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-
 const props = defineProps({
   modelValue: {
     type: Boolean,
@@ -29,7 +28,8 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle'])
 
-const handleClick = () => {
+const handleClick = (event) => {
+  event.stopPropagation()
   if (!props.disabled) {
     emit('toggle')
   }
