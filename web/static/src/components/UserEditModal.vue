@@ -70,18 +70,18 @@
       </div>
 
       <!-- Кнопки действий -->
-      <div class="px-6 py-4 bg-gray-50 rounded-b-lg flex flex-col sm:flex-row gap-2">
-        <button
-          @click="$emit('close')"
-          class="flex-1 h-11 px-6 rounded font-medium transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300"
-        >
-          Отмена
-        </button>
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
         <button
           @click="handleSave"
-          class="flex-1 h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
+          class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
         >
           Сохранить
+        </button>
+        <button
+          @click="$emit('close')"
+          class="h-11 px-6 rounded font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+        >
+          Отмена
         </button>
       </div>
     </div>
