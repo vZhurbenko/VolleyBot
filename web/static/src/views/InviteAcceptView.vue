@@ -30,14 +30,9 @@
           <div id="telegram-login" class="flex justify-center"></div>
         </div>
 
-        <div v-else class="mb-6">
-          <p class="text-green-600 font-medium mb-4">✓ Вы авторизованы</p>
-          <button
-            @click="acceptInvite"
-            class="w-full h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
-          >
-            Принять приглашение
-          </button>
+        <div v-else-if="inviteAccepted" class="mb-6">
+          <p class="text-green-600 font-medium mb-4">✓ Вы в команде!</p>
+          <p class="text-gray-500">Перенаправление...</p>
         </div>
 
         <div class="mt-8 border-t border-gray-200 pt-8">
@@ -51,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
@@ -66,21 +61,25 @@ const loading = ref(true)
 const error = ref('')
 const inviteCode = ref('')
 const inviteInfo = ref(null)
+const inviteAccepted = ref(false)
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 onMounted(async () => {
   inviteCode.value = route.params.code
-  
+
   // Проверяем приглашение
   await checkInvite()
+
+  loading.value = false
   
-  // Загружаем конфиг Telegram
-  if (!error.value) {
+  // Ждём рендера DOM
+  await nextTick()
+  
+  // Загружаем конфиг Telegram только если нет ошибки и не авторизован
+  if (!error.value && !isAuthenticated.value) {
     await loadTelegramConfig()
   }
-  
-  loading.value = false
 })
 
 const checkInvite = async () => {
@@ -112,6 +111,7 @@ const loadTelegramConfig = async () => {
 }
 
 const initTelegramWidget = (botUsername) => {
+  console.log('Инициализация Telegram виджета для:', botUsername)
   const script = document.createElement('script')
   script.src = 'https://telegram.org/js/telegram-widget.js?22'
   script.setAttribute('data-telegram-login', botUsername)
@@ -123,19 +123,29 @@ const initTelegramWidget = (botUsername) => {
   script.async = true
 
   const container = document.getElementById('telegram-login')
+  console.log('Контейнер для виджета:', container)
   if (container) {
     container.appendChild(script)
+    console.log('Скрипт Telegram добавлен')
+  } else {
+    console.error('Контейнер #telegram-login не найден!')
   }
 }
 
 const onTelegramAuth = async (user) => {
   try {
+    // Добавляем invite_code к данным пользователя
+    const authData = {
+      ...user,
+      invite_code: inviteCode.value
+    }
+    
     const response = await fetch('/api/auth/telegram', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(user),
+      body: JSON.stringify(authData),
       credentials: 'include'
     })
 
@@ -143,7 +153,10 @@ const onTelegramAuth = async (user) => {
 
     if (response.ok && result.success) {
       authStore.setUser(result.user)
-      // После авторизации показываем кнопку принятия
+      notificationsStore.success('Вы успешно авторизовались!')
+      
+      // Автоматически принимаем приглашение после авторизации
+      await acceptInvite()
     } else {
       error.value = result.detail || 'Ошибка авторизации'
     }
@@ -155,18 +168,48 @@ const onTelegramAuth = async (user) => {
 
 const acceptInvite = async () => {
   try {
+    const user = authStore.user
+    if (!user) {
+      error.value = 'Пользователь не авторизован'
+      return
+    }
+    
     const response = await fetch(`/api/invite/${inviteCode.value}/accept`, {
       method: 'POST',
-      credentials: 'include'
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        id: user.telegram_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        username: user.username,
+        photo_url: user.photo_url,
+        auth_date: Math.floor(Date.now() / 1000),
+        hash: '' // Хеш не нужен для этого эндпоинта
+      })
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
+      inviteAccepted.value = true
       notificationsStore.success('Вы успешно присоединились к команде!')
-      router.push('/dashboard/calendar')
+      setTimeout(() => {
+        router.push('/dashboard/calendar')
+      }, 1500)
     } else {
-      error.value = result.detail || 'Ошибка принятия приглашения'
+      // Если приглашение уже использовано - это тоже успех
+      if (response.status === 410 && result.detail === 'Приглашение уже использовано') {
+        inviteAccepted.value = true
+        notificationsStore.info('Вы уже в команде!')
+        setTimeout(() => {
+          router.push('/dashboard/calendar')
+        }, 1500)
+      } else {
+        error.value = result.detail || 'Ошибка принятия приглашения'
+      }
     }
   } catch (error) {
     console.error('Error accepting invite:', error)
