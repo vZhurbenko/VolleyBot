@@ -29,7 +29,7 @@
             <Users class="w-12 h-12 text-purple-600" />
             <div>
               <p class="text-sm text-gray-500">Администраторов</p>
-              <p class="text-2xl font-bold text-gray-900">{{ settingsStore.adminIds.length }}</p>
+              <p class="text-2xl font-bold text-gray-900">{{ settingsStore.adminCount }}</p>
             </div>
           </div>
         </div>
@@ -190,7 +190,7 @@ onMounted(async () => {
   await Promise.all([
     settingsStore.loadSchedules(),
     settingsStore.loadActivePolls(),
-    settingsStore.loadAdminIds()
+    settingsStore.loadAdminCount()
   ])
 })
 </script>

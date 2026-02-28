@@ -544,6 +544,15 @@ class Database:
 
         return users
 
+    def get_admin_count(self) -> int:
+        """Получение количества администраторов"""
+        if not self.conn:
+            return 0
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users WHERE is_admin = 1')
+        return cursor.fetchone()[0]
+
     # ==================== Методы для работы с тренировками ====================
 
     def get_training_registrations(self, training_date: str, training_time: str, chat_id: str) -> List[Dict[str, Any]]:

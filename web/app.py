@@ -553,6 +553,17 @@ async def get_admin_ids(user: dict = Depends(get_current_user_from_access_cookie
     return {"admin_ids": admin_ids}
 
 
+@app.get("/api/admin/stats")
+async def get_stats(user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение статистики для дашборда (только для администраторов)
+    """
+    require_admin(user)
+    return {
+        "admin_count": db.get_admin_count()
+    }
+
+
 @app.post("/api/admin/settings/admin_ids")
 async def add_admin_id(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
     """
