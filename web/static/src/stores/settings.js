@@ -6,6 +6,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const schedules = ref([])
   const activePolls = ref([])
   const adminIds = ref([])
+  const adminCount = ref(0)
   const isLoading = ref(false)
 
   // Template
@@ -145,11 +146,27 @@ export const useSettingsStore = defineStore('settings', () => {
     return false
   }
 
+  // Stats
+  async function loadAdminCount() {
+    try {
+      const response = await fetch('/api/admin/stats', {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        const data = await response.json()
+        adminCount.value = data.admin_count || 0
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки статистики администраторов:', error)
+    }
+  }
+
   return {
     template,
     schedules,
     activePolls,
     adminIds,
+    adminCount,
     isLoading,
     loadTemplate,
     saveTemplate,
@@ -160,6 +177,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loadActivePolls,
     loadAdminIds,
     addAdminId,
-    removeAdminId
+    removeAdminId,
+    loadAdminCount
   }
 })
