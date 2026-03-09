@@ -17,7 +17,8 @@ const router = createRouter({
         {
           path: '',
           name: 'dashboard',
-          component: () => import('@/views/DashboardView.vue')
+          component: () => import('@/views/DashboardView.vue'),
+          meta: { requiresAdmin: true }
         },
         {
           path: 'calendar',
@@ -32,33 +33,38 @@ const router = createRouter({
         {
           path: 'template',
           name: 'template',
-          component: () => import('@/views/TemplateView.vue')
+          component: () => import('@/views/TemplateView.vue'),
+          meta: { requiresAdmin: true }
         },
         {
           path: 'schedules',
           name: 'schedules',
-          component: () => import('@/views/SchedulesView.vue')
+          component: () => import('@/views/SchedulesView.vue'),
+          meta: { requiresAdmin: true }
         },
         {
           path: 'users',
           name: 'users',
-          component: () => import('@/views/AdminsView.vue')
+          component: () => import('@/views/AdminsView.vue'),
+          meta: { requiresAdmin: true }
         },
         {
           path: 'invites',
           name: 'invites',
-          component: () => import('@/views/InviteView.vue')
+          component: () => import('@/views/InviteView.vue'),
+          meta: { requiresAdmin: true }
         },
         {
           path: 'trainings',
           name: 'trainings',
-          component: () => import('@/views/TrainingsView.vue')
+          component: () => import('@/views/TrainingsView.vue'),
+          meta: { requiresAdmin: true }
         }
       ]
     },
     {
       path: '/user',
-      redirect: '/dashboard'
+      redirect: '/dashboard/calendar'
     },
     {
       path: '/admin',
@@ -83,6 +89,12 @@ router.beforeEach(async (to, from, next) => {
 
     if (!authStore.isAuthenticated) {
       return next('/')
+    }
+
+    // Проверка прав администратора для защищенных маршрутов
+    if (to.meta.requiresAdmin && !authStore.isAdmin) {
+      // Обычные пользователи перенаправляются на календарь
+      return next('/dashboard/calendar')
     }
   }
 
