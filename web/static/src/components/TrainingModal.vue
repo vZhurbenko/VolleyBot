@@ -4,8 +4,9 @@
       <!-- Заголовок -->
       <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
         <div>
-          <h3 class="text-lg font-semibold text-gray-900">Тренировка</h3>
-          <p class="text-sm text-gray-500">{{ training.date }} • {{ training.time }}</p>
+          <h3 class="text-lg font-semibold text-gray-900">{{ training.name || 'Тренировка' }}</h3>
+          <p class="text-sm text-gray-500">{{ formatDate(training.date) }} • {{ training.time }}</p>
+          <p v-if="training.location" class="text-sm text-gray-600 mt-1">{{ training.location }}</p>
         </div>
         <div class="flex items-center gap-2">
           <button
@@ -236,6 +237,12 @@ const shareTraining = () => {
   }).catch(() => {
     notificationsStore.error('Не удалось скопировать ссылку')
   })
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const [year, month, day] = dateStr.split('-')
+  return `${day}.${month}.${year}`
 }
 
 const getInitials = (reg) => {

@@ -324,7 +324,8 @@ const removeOneTimeTraining = async () => {
   if (!confirmed) return
 
   try {
-    const response = await fetch(`/api/admin/calendar/remove-training/${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`, {
+    const trainingId = selectedTraining.value.id || `${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`
+    const response = await fetch(`/api/admin/calendar/remove-training/${trainingId}`, {
       method: 'DELETE',
       credentials: 'include'
     })

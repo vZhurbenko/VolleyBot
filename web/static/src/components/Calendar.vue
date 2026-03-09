@@ -71,7 +71,7 @@
             class="text-xs p-1.5 rounded cursor-pointer transition-colors border"
             :class="getTrainingClass(training, day)"
           >
-            <div class="font-medium truncate">{{ training.time }}</div>
+            <div class="font-medium truncate">{{ training.name || training.time }}</div>
             <div class="truncate opacity-75">{{ training.registered_count }}/12</div>
           </div>
         </div>

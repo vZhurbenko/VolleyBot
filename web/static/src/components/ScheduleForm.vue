@@ -80,6 +80,17 @@
           required
         />
       </div>
+
+      <div class="flex flex-col gap-2">
+        <label class="block text-sm font-medium text-gray-700">Место проведения</label>
+        <input
+          v-model="form.location"
+          type="text"
+          class="w-full h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+          placeholder="ВГАФК"
+          required
+        />
+      </div>
     </div>
 
     <div class="pt-4 border-t border-gray-200">
@@ -139,6 +150,7 @@ const defaultForm = {
   poll_day: 'friday',
   start_time: '',
   end_time: '',
+  location: 'ВГАФК',
   enabled: true
 }
 
@@ -154,6 +166,7 @@ watch(() => props.schedule, (newSchedule) => {
       poll_day: newSchedule.poll_day || 'friday',
       start_time: newSchedule.start_time || '',
       end_time: newSchedule.end_time || '',
+      location: newSchedule.location || 'ВГАФК',
       enabled: newSchedule.enabled !== false
     }
   } else if (!props.isEdit) {
@@ -166,6 +179,7 @@ watch(() => props.schedule, (newSchedule) => {
       poll_day: 'friday',
       start_time: '',
       end_time: '',
+      location: 'ВГАФК',
       enabled: true
     }
   }

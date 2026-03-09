@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 import jwt
 import logging
 
@@ -503,6 +503,7 @@ class PollSchedule(BaseModel):
     poll_day: str
     start_time: str
     end_time: str
+    location: str = "ВГАФК"
     enabled: bool = True
     
     @validator('start_time', 'end_time')
@@ -691,31 +692,40 @@ async def get_calendar(year: int, month: int, user: dict = Depends(get_current_u
     for schedule in schedules:
         if not schedule.get('enabled', True):
             continue
-            
+
         training_day = schedule.get('training_day', 'monday')
-        training_time = schedule.get('training_time', '')
+        start_time = schedule.get('start_time', '')
+        end_time = schedule.get('end_time', '')
+        # training_time может быть None, поэтому формируем из start_time и end_time
+        training_time = schedule.get('training_time') or f"{start_time} - {end_time}"
         chat_id = schedule.get('chat_id', '')
         topic_id = schedule.get('message_thread_id')
-        
+        name = schedule.get('name', 'Тренировка')
+        location = schedule.get('location', '')
+
         weekday = day_map.get(training_day.lower(), 0)
-        
+
         # Находим все дни этого weekday в месяце
         cal = calendar.monthcalendar(year, month)
         for week in cal:
             day = week[weekday]
             if day == 0:
                 continue
-            
+
             date_str = f"{year}-{month:02d}-{day:02d}"
             key = f"{date_str}_{training_time}_{chat_id}"
-            
+
             if key not in trainings:
                 trainings[key] = {
                     'date': date_str,
                     'time': training_time,
+                    'start_time': start_time,
+                    'end_time': end_time,
                     'chat_id': chat_id,
                     'topic_id': topic_id,
                     'is_one_time': False,
+                    'name': name,
+                    'location': location,
                     'registrations': []
                 }
     
@@ -723,19 +733,28 @@ async def get_calendar(year: int, month: int, user: dict = Depends(get_current_u
     for training in one_time_trainings:
         date_str = training.get('training_date', '')
         time = training.get('training_time', '')
+        start_time = training.get('start_time', '')
+        end_time = training.get('end_time', '')
         chat_id = training.get('chat_id', '')
         topic_id = training.get('topic_id')
         name = training.get('name', '')
-        
-        key = f"{date_str}_{time}_{chat_id}"
+        location = training.get('location', '')
+        training_id = training.get('id', '')
+
+        # Используем id как key для уникальности
+        key = training_id or f"{date_str}_{time}_{chat_id}"
         if key not in trainings:
             trainings[key] = {
+                'id': training_id,
                 'date': date_str,
                 'time': time,
+                'start_time': start_time,
+                'end_time': end_time,
                 'chat_id': chat_id,
                 'topic_id': topic_id,
                 'is_one_time': True,
                 'name': name,
+                'location': location,
                 'registrations': []
             }
     
@@ -923,6 +942,7 @@ async def add_one_time_training(request: Request, user: dict = Depends(get_curre
     chat_id = body.get('chat_id')
     topic_id = body.get('topic_id')
     name = body.get('name', 'Тренировка')
+    location = body.get('location', 'ВГАФК')
     
     # Формируем training_time из start_time и end_time
     training_time = f"{start_time} - {end_time}" if start_time and end_time else ''
@@ -959,9 +979,11 @@ async def add_one_time_training(request: Request, user: dict = Depends(get_curre
     if topic_id and not chat_id:
         raise HTTPException(status_code=400, detail="Topic ID доступен только при наличии Chat ID")
 
-    training_id = f"{training_date}_{start_time}_{chat_id}"
+    # Формируем уникальный training_id с UUID для избежания коллизий
+    import uuid
+    training_id = f"{training_date}_{start_time}_{chat_id}_{str(uuid.uuid4())[:8]}"
 
-    result = db.add_one_time_training(training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time)
+    result = db.add_one_time_training(training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location)
 
     if result.get('success'):
         return result

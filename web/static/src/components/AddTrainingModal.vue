@@ -56,6 +56,17 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Место проведения</label>
+          <input
+            v-model="formData.location"
+            type="text"
+            placeholder="ВГАФК"
+            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+            required
+          />
+        </div>
+
+        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Chat ID</label>
           <input
             v-model="formData.chat_id"
@@ -126,7 +137,8 @@ const formData = ref({
   chat_id: props.defaultChatId || '',
   topic_id: props.defaultTopicId !== undefined ? props.defaultTopicId : null,
   start_time: '',
-  end_time: ''
+  end_time: '',
+  location: 'ВГАФК'
 })
 
 const handleSubmit = () => {
@@ -141,6 +153,7 @@ const handleSubmit = () => {
   emit('add', {
     ...formData.value,
     training_time,
+    location: formData.value.location || 'ВГАФК',
     topic_id: formData.value.topic_id ? parseInt(formData.value.topic_id) : null
   })
 }

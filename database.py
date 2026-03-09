@@ -191,8 +191,7 @@ class Database:
         schedule_id = schedule.get('id', str(datetime.now().timestamp()))
         cursor.execute('''
             INSERT INTO poll_schedules (id, name, chat_id, message_thread_id,
-                                        training_day, poll_day, training_time,
-                                        start_time, end_time, enabled)
+                                        training_day, poll_day, start_time, end_time, location, enabled)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             schedule_id,
@@ -201,9 +200,9 @@ class Database:
             schedule.get('message_thread_id'),
             schedule['training_day'],
             schedule['poll_day'],
-            schedule['training_time'],
             schedule.get('start_time'),
             schedule.get('end_time'),
+            schedule.get('location', 'ВГАФК'),
             1 if schedule.get('enabled', True) else 0
         ))
         self.conn.commit()
@@ -744,7 +743,8 @@ class Database:
 
     def add_one_time_training(self, training_id: str, training_date: str, training_time: str,
                               chat_id: str, topic_id: Optional[int], name: str,
-                              start_time: Optional[str] = None, end_time: Optional[str] = None) -> Dict[str, Any]:
+                              start_time: Optional[str] = None, end_time: Optional[str] = None,
+                              location: Optional[str] = None) -> Dict[str, Any]:
         """Добавление разовой тренировки"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
@@ -753,9 +753,9 @@ class Database:
 
         try:
             cursor.execute('''
-                INSERT INTO one_time_trainings (id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time))
+                INSERT INTO one_time_trainings (id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location))
 
             self.conn.commit()
             return {"success": True}
@@ -771,11 +771,18 @@ class Database:
         cursor = self.conn.cursor()
 
         try:
-            # Разбираем training_id: date_time_chat_id
-            parts = training_id.split('_')
-            training_date = parts[0]
-            training_time = parts[1] if len(parts) > 1 else ''
-            chat_id = parts[2] if len(parts) > 2 else ''
+            # Сначала находим тренировку по ID чтобы получить training_time
+            cursor.execute('''
+                SELECT training_date, training_time, chat_id FROM one_time_trainings WHERE id = ?
+            ''', (training_id,))
+            training = cursor.fetchone()
+            
+            if not training:
+                return {"success": False, "error": "Тренировка не найдена"}
+            
+            training_date = training['training_date']
+            training_time = training['training_time']
+            chat_id = training['chat_id']
 
             # Сначала удаляем все записи на эту тренировку
             cursor.execute('''
