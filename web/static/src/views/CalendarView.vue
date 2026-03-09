@@ -7,14 +7,14 @@
     </div>
 
     <Calendar
-      v-else
-      v-model:year="currentYear"
-      v-model:month="currentMonth"
+      v-if="!loading"
+      :key="`calendar-${currentYear}-${currentMonth}`"
+      :year="currentYear"
+      :month="currentMonth"
       :trainings="trainings"
       :is-admin="authStore.isAdmin"
       @click-training="openTrainingModal"
-      @update:year="updateMonth"
-      @update:month="updateMonth"
+      @update-month="updateMonth"
       @add-training="openAddTrainingModal"
     />
 
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
@@ -80,6 +80,19 @@ if (route.query.year) {
 if (route.query.month) {
   currentMonth.value = parseInt(route.query.month) || now.getMonth() + 1
 }
+
+// Следим за изменениями query параметров и обновляем календарь
+watch(() => [route.query.year, route.query.month], ([year, month]) => {
+  const newYear = parseInt(year) || now.getFullYear()
+  const newMonth = parseInt(month) || now.getMonth() + 1
+  
+  // Обновляем только если значения изменились
+  if (newYear !== currentYear.value || newMonth !== currentMonth.value) {
+    currentYear.value = newYear
+    currentMonth.value = newMonth
+    loadCalendar()
+  }
+}, { immediate: false })
 
 onMounted(async () => {
   // Ждём загрузки auth store
@@ -148,8 +161,8 @@ const openTrainingByParams = () => {
   }
 }
 
-// Обновляем query параметры и загружаем данные
-const updateMonth = (year, month) => {
+// Обновляем query параметры (watch загрузит календарь)
+const updateMonth = ({ year, month }) => {
   router.push({
     query: {
       ...route.query,
@@ -157,7 +170,6 @@ const updateMonth = (year, month) => {
       month
     }
   })
-  loadCalendar()
 }
 
 const openTrainingModal = (training) => {
