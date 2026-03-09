@@ -507,6 +507,7 @@ class BotAPIHandler(BaseHTTPRequestHandler):
             try:
                 chat_id = data.get('chat_id')
                 message_id = data.get('message_id')
+                action = data.get('action', 'stop')  # 'stop' или 'delete'
 
                 if not all([chat_id, message_id]):
                     raise ValueError("Missing required fields")
@@ -517,7 +518,8 @@ class BotAPIHandler(BaseHTTPRequestHandler):
                     result = loop.run_until_complete(
                         delete_poll_via_bot(
                             chat_id=chat_id,
-                            message_id=message_id
+                            message_id=message_id,
+                            action=action
                         )
                     )
                     loop.close()
@@ -594,14 +596,18 @@ async def create_poll_via_bot(chat_id: str, training_date: str, start_time: str,
             if result.get('ok'):
                 message_id = result['result']['message_id']
 
-                # Сохраняем опрос в БД
+                # Сохраняем опрос в БД с полной информацией
                 poll_id = str(uuid.uuid4())
                 volley_bot.db.add_active_poll(
                     poll_id=poll_id,
                     chat_id=chat_id,
                     message_id=message_id,
                     message_thread_id=topic_id,
-                    template_id='scheduled'
+                    template_id='scheduled',
+                    name=name,
+                    training_date=training_date,
+                    training_time=f'{start_time} - {end_time}',
+                    location=location
                 )
 
                 logger.info(f"Создан опрос в чате {chat_id}{' (топик ' + str(topic_id) + ')' if topic_id else ''}")
@@ -612,28 +618,51 @@ async def create_poll_via_bot(chat_id: str, training_date: str, start_time: str,
         await bot.close()
 
 
-async def delete_poll_via_bot(chat_id: str, message_id: int):
-    """Удаление опроса в Telegram (вызывается из веб-сервера)"""
+async def delete_poll_via_bot(chat_id: str, message_id: int, action: str = 'stop'):
+    """
+    Удаление/остановка опроса в Telegram (вызывается из веб-сервера)
+    
+    Args:
+        chat_id: ID чата
+        message_id: ID сообщения с опросом
+        action: 'stop' - остановить голосование, 'delete' - удалить сообщение
+    """
     from telegram import Bot
     bot = Bot(token=volley_bot.bot_token)
 
     try:
         async with httpx.AsyncClient() as client:
-            # Останавливаем опрос
-            response = await client.post(
-                f'https://api.telegram.org/bot{volley_bot.bot_token}/stopPoll',
-                json={
-                    'chat_id': chat_id,
-                    'message_id': message_id
-                },
-                timeout=30
-            )
+            if action == 'delete':
+                # Полное удаление сообщения
+                response = await client.post(
+                    f'https://api.telegram.org/bot{volley_bot.bot_token}/deleteMessage',
+                    json={
+                        'chat_id': chat_id,
+                        'message_id': message_id
+                    },
+                    timeout=30
+                )
+            else:
+                # Остановка голосования
+                response = await client.post(
+                    f'https://api.telegram.org/bot{volley_bot.bot_token}/stopPoll',
+                    json={
+                        'chat_id': chat_id,
+                        'message_id': message_id
+                    },
+                    timeout=30
+                )
+            
             response.raise_for_status()
             result = response.json()
 
             if result.get('ok'):
-                logger.info(f"Опрос остановлен в чате {chat_id}")
-                return {'success': True, 'message': 'Poll stopped'}
+                if action == 'delete':
+                    logger.info(f"Опрос удалён из чата {chat_id}")
+                    return {'success': True, 'message': 'Poll deleted'}
+                else:
+                    logger.info(f"Опрос остановлен в чате {chat_id}")
+                    return {'success': True, 'message': 'Poll stopped'}
             else:
                 raise Exception(f"Telegram API error: {result}")
     finally:

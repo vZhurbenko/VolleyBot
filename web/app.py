@@ -730,42 +730,43 @@ async def get_active_polls(user: dict = Depends(get_current_user_from_access_coo
 @app.delete("/api/admin/settings/active_polls/{poll_id}")
 async def remove_active_poll(poll_id: str, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Удаление активного опроса
+    Удаление активного опроса (останавливает в Telegram + удаляет из БД)
     """
     require_admin(user)
-    
+
     # Получаем опрос из БД
     poll = db.get_active_poll(poll_id)
     if not poll:
         raise HTTPException(status_code=404, detail="Опрос не найден")
-    
-    # Вызываем API бота для остановки опроса в Telegram
+
+    # Вызываем API бота для удаления опроса из Telegram
     bot_api_key = os.getenv('BOT_API_KEY', 'volleybot_secret_key')
     bot_api_url = 'http://127.0.0.1:8001/api/delete_poll'
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 bot_api_url,
                 json={
                     'chat_id': poll['chat_id'],
-                    'message_id': poll['message_id']
+                    'message_id': poll['message_id'],
+                    'action': 'delete'  # Полное удаление сообщения
                 },
                 headers={'X-API-Key': bot_api_key},
                 timeout=30
             )
             api_result = response.json()
-            
+
             if response.status_code != 200 or not api_result.get('success'):
                 logger.warning(f"API бота вернуло ошибку: {api_result}")
                 # Не прерываем удаление из БД, даже если бот не ответил
     except Exception as e:
         logger.error(f"Ошибка вызова API бота: {e}")
         # Продолжаем удаление из БД
-    
+
     # Удаляем опрос из БД
     db.remove_active_poll(poll_id)
-    
+
     return {"success": True, "message": "Опрос удалён"}
 
 
@@ -775,35 +776,45 @@ async def stop_active_poll(poll_id: str, user: dict = Depends(get_current_user_f
     Остановка активного опроса (без удаления из БД)
     """
     require_admin(user)
-    
+
     # Получаем опрос из БД
     poll = db.get_active_poll(poll_id)
     if not poll:
         raise HTTPException(status_code=404, detail="Опрос не найден")
-    
+
     # Вызываем API бота для остановки опроса в Telegram
     bot_api_key = os.getenv('BOT_API_KEY', 'volleybot_secret_key')
     bot_api_url = 'http://127.0.0.1:8001/api/delete_poll'
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 bot_api_url,
                 json={
                     'chat_id': poll['chat_id'],
-                    'message_id': poll['message_id']
+                    'message_id': poll['message_id'],
+                    'action': 'stop'  # Остановка голосования
                 },
                 headers={'X-API-Key': bot_api_key},
                 timeout=30
             )
             api_result = response.json()
-            
-            if response.status_code != 200 or not api_result.get('success'):
-                raise HTTPException(status_code=500, detail=f"Ошибка API бота: {api_result}")
+
+            # Если flood control или другая ошибка — всё равно считаем успехом
+            if response.status_code != 200:
+                logger.warning(f"API бота вернуло ошибку: {api_result}")
+            elif not api_result.get('success'):
+                logger.warning(f"API бота вернуло ошибку: {api_result}")
     except httpx.RequestError as e:
         logger.error(f"Ошибка вызова API бота: {e}")
-        raise HTTPException(status_code=500, detail="Не удалось соединиться с ботом")
-    
+
+    # Обновляем статус опроса в БД
+    cursor = db.conn.cursor()
+    cursor.execute('''
+        UPDATE active_polls SET status = 'stopped' WHERE id = ?
+    ''', (poll_id,))
+    db.conn.commit()
+
     return {"success": True, "message": "Опрос остановлен"}
 
 
@@ -823,13 +834,13 @@ async def get_stats(user: dict = Depends(get_current_user_from_access_cookie)):
     Получение статистики для дашборда (только для администраторов)
     """
     require_admin(user)
-    
-    # Получаем количество записей за 30 дней
-    registrations_count = db.get_training_registrations_count(days=30)
-    
-    # Получаем последние активности
+
+    # Получаем количество записей за 30 дней (тренировки + игры)
+    registrations_count = db.get_registrations_count(days=30)
+
+    # Получаем последние активности (тренировки + игры)
     recent_activities = db.get_recent_activities(limit=10)
-    
+
     return {
         "admin_count": db.get_admin_count(),
         "users_count": db.get_users_count(),
@@ -1073,31 +1084,31 @@ async def get_my_trainings(user: dict = Depends(get_current_user_from_access_coo
     require_auth(user)
 
     user_telegram_id = user.get('telegram_id')
-    
+
     # Получаем тренировки
     trainings = db.get_user_trainings(user_telegram_id)
-    
+
     # Получаем игры
-    games = db.get_user_games_list(user_telegram_id)
-    
+    games = db.get_user_games(user_telegram_id)
+
     # Объединяем в один список с указанием типа
     all_items = []
-    
+
     for training in trainings:
         all_items.append({
             **training,
             'type': 'training'
         })
-    
+
     for game in games:
         all_items.append({
             **game,
             'type': 'game'
         })
-    
+
     # Сортируем по дате
     all_items.sort(key=lambda x: x.get('training_date') or x.get('date') or '')
-    
+
     return {"items": all_items}
 
 
@@ -1247,9 +1258,20 @@ async def get_all_trainings(start_date: str, end_date: str, user: dict = Depends
     Получение всех записей на тренировки за период (только админы)
     """
     require_admin(user)
-    
+
     trainings = db.get_all_trainings(start_date, end_date)
     return {"trainings": trainings}
+
+
+@app.get("/api/admin/games/signups")
+async def get_all_game_signups(start_date: str, end_date: str, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение всех записей на игры за период (только админы)
+    """
+    require_admin(user)
+
+    signups = db.get_all_game_signups(start_date, end_date)
+    return {"signups": signups}
 
 
 # ==================== API для игр ====================

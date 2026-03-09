@@ -307,16 +307,22 @@ class Database:
 
     def add_active_poll(self, poll_id: str, chat_id: str, message_id: int,
                         message_thread_id: Optional[int] = None,
-                        template_id: Optional[str] = None):
+                        template_id: Optional[str] = None,
+                        name: Optional[str] = None,
+                        training_date: Optional[str] = None,
+                        training_time: Optional[str] = None,
+                        location: Optional[str] = None):
         """Добавление активного опроса"""
         if not self.conn:
             logger.error("Нельзя добавить активный опрос: база данных не подключена")
             return
         cursor = self.conn.cursor()
         cursor.execute('''
-            INSERT INTO active_polls (id, chat_id, message_id, message_thread_id, template_id)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (poll_id, chat_id, message_id, message_thread_id, template_id))
+            INSERT INTO active_polls (id, chat_id, message_id, message_thread_id, template_id,
+                                       name, training_date, training_time, location)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (poll_id, chat_id, message_id, message_thread_id, template_id,
+              name, training_date, training_time, location))
         self.conn.commit()
 
     def get_active_polls(self) -> List[Dict[str, Any]]:
@@ -785,7 +791,9 @@ class Database:
         cursor = self.conn.cursor()
         cursor.execute('''
             SELECT tr.*,
+                   tr.training_date,
                    ot.name as training_name,
+                   ot.location,
                    ps.name as schedule_name
             FROM training_registrations tr
             LEFT JOIN one_time_trainings ot
@@ -965,6 +973,7 @@ class Database:
         cursor.execute('''
             SELECT tr.*, u.first_name, u.last_name, u.username,
                    ot.name as training_name,
+                   ot.location as location,
                    ps.name as schedule_name
             FROM training_registrations tr
             LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
@@ -977,6 +986,24 @@ class Database:
                 AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
             WHERE tr.training_date BETWEEN ? AND ?
             ORDER BY tr.training_date ASC, tr.training_time ASC, tr.registered_at ASC
+        ''', (start_date, end_date))
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_all_game_signups(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """Получение всех записей на игры за период (для админа)"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT gs.*, u.first_name, u.last_name, u.username,
+                   g.name as game_name, g.date, g.location, g.start_time, g.opponent
+            FROM game_signups gs
+            LEFT JOIN users u ON gs.user_telegram_id = u.telegram_id
+            LEFT JOIN games g ON gs.game_id = g.id
+            WHERE g.date BETWEEN ? AND ?
+            ORDER BY g.date ASC, g.start_time ASC, gs.created_at ASC
         ''', (start_date, end_date))
 
         return [dict(row) for row in cursor.fetchall()]
@@ -1296,38 +1323,80 @@ class Database:
         cursor.execute('SELECT COUNT(*) FROM users')
         return cursor.fetchone()[0]
 
-    def get_training_registrations_count(self, days: int = 30) -> int:
-        """Получение количества записей на тренировки за период"""
+    def get_registrations_count(self, days: int = 30) -> int:
+        """Получение количества записей (тренировки + игры) за период"""
         if not self.conn:
             return 0
 
         cursor = self.conn.cursor()
+        
+        # Считаем записи на тренировки
         cursor.execute('''
             SELECT COUNT(*) FROM training_registrations
             WHERE registered_at >= datetime('now', '-' || ? || ' days')
         ''', (days,))
-        return cursor.fetchone()[0]
+        training_count = cursor.fetchone()[0]
+        
+        # Считаем записи на игры
+        cursor.execute('''
+            SELECT COUNT(*) FROM game_signups gs
+            INNER JOIN games g ON gs.game_id = g.id
+            WHERE gs.created_at >= datetime('now', '-' || ? || ' days')
+        ''', (days,))
+        game_count = cursor.fetchone()[0]
+        
+        return training_count + game_count
 
     def get_recent_activities(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Получение последних активностей (записей на тренировки)"""
+        """Получение последних активностей (записи на тренировки и игры)"""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
+        
+        # Получаем последние записи на тренировки и игры
         cursor.execute('''
-            SELECT 
-                tr.training_date,
-                tr.training_time,
+            SELECT
+                tr.training_date as activity_date,
+                tr.training_time as activity_time,
                 tr.chat_id,
                 tr.status,
                 tr.registered_at,
                 u.telegram_id,
                 u.first_name,
                 u.last_name,
-                u.username
+                u.username,
+                'training' as activity_type,
+                COALESCE(ot.name, ps.name, 'Тренировка') as event_name
             FROM training_registrations tr
             LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
-            ORDER BY tr.registered_at DESC
+            LEFT JOIN one_time_trainings ot
+                ON tr.training_date = ot.training_date
+                AND tr.training_time = ot.training_time
+                AND tr.chat_id = ot.chat_id
+            LEFT JOIN poll_schedules ps
+                ON tr.chat_id = ps.chat_id
+                AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
+            
+            UNION ALL
+            
+            SELECT
+                g.date as activity_date,
+                g.start_time as activity_time,
+                g.chat_id,
+                gs.status,
+                gs.created_at as registered_at,
+                u.telegram_id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                'game' as activity_type,
+                g.name as event_name
+            FROM game_signups gs
+            INNER JOIN games g ON gs.game_id = g.id
+            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
+            
+            ORDER BY registered_at DESC
             LIMIT ?
         ''', (limit,))
 

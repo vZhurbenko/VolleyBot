@@ -11,65 +11,63 @@
     </div>
 
     <div v-else class="space-y-4">
+      <!-- Группировка по типу события -->
       <div
         v-for="item in items"
         :key="item.id"
-        class="flex items-center justify-between p-4 bg-gray-50 rounded"
+        class="border border-gray-200 rounded-lg overflow-hidden"
       >
-        <div class="flex-1">
-          <!-- Тип и название -->
-          <div class="flex items-center gap-2 mb-1">
-            <span
-              class="px-2 py-0.5 rounded text-xs font-medium"
-              :class="item.type === 'game' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'"
-            >
+        <!-- Заголовок карточки -->
+        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+          <div class="flex items-center gap-2">
+            <span :class="['px-2 py-0.5 rounded text-xs font-medium', item.type === 'game' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700']">
               {{ item.type === 'game' ? 'Игра' : 'Тренировка' }}
             </span>
-            <p v-if="item.training_name || item.schedule_name || item.name" class="text-base font-semibold text-gray-900">
-              {{ item.training_name || item.schedule_name || item.name }}
-            </p>
+            <h3 class="font-semibold text-gray-900">
+              <template v-if="item.type === 'game'">
+                {{ item.name }}
+                <span class="text-gray-500 font-normal">
+                  {{ formatShortDate(item.date) }}, {{ item.start_time }}
+                  <span v-if="item.location">, {{ item.location }}</span>
+                  <span v-if="item.opponent">, vs {{ item.opponent }}</span>
+                </span>
+              </template>
+              <template v-else>
+                {{ item.training_name || item.schedule_name }}
+                <span class="text-gray-500 font-normal">
+                  {{ item.training_date ? formatShortDate(item.training_date) + ', ' : '' }}
+                  {{ item.training_time }}
+                  <span v-if="item.location">, {{ item.location }}</span>
+                </span>
+              </template>
+            </h3>
           </div>
-          
-          <!-- Дата и статус -->
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-lg font-semibold text-gray-900">
-              {{ formatDate(item.training_date || item.date) }}
-            </span>
-            <span
-              v-if="item.status || item.signup_status"
-              class="px-2 py-0.5 rounded text-xs font-medium"
-              :class="(item.status || item.signup_status) === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
-            >
-              {{ (item.status || item.signup_status) === 'registered' ? 'Записан' : 'Резерв' }}
-            </span>
-          </div>
-          
-          <!-- Время и место -->
-          <p v-if="item.training_time" class="text-sm text-gray-500 flex items-center gap-1">
-            <Clock class="w-4 h-4" /> {{ item.training_time }}
-          </p>
-          <p v-else-if="item.start_time && item.end_time" class="text-sm text-gray-500 flex items-center gap-1">
-            <Clock class="w-4 h-4" /> {{ item.start_time }} - {{ item.end_time }}
-          </p>
-          <p v-if="item.location" class="text-sm text-gray-500">
-            📍 {{ item.location }}
-          </p>
         </div>
-
-        <button
-          v-if="item.type === 'training'"
-          @click="unregister(item)"
-          class="px-4 py-2 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
-        >
-          Выписаться
-        </button>
-        <button
-          v-else
-          @click="unregisterFromGame(item)"
-          class="px-4 py-2 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
-        >
-          Выписаться
-        </button>
+        
+        <!-- Тело карточки -->
+        <div class="px-4 py-3 flex items-center justify-between">
+          <div>
+            <p class="font-medium text-gray-900">
+              Вы
+              <span v-if="authStore.user?.username" class="text-gray-400 font-normal">@{{ authStore.user.username }}</span>
+            </p>
+            <div v-if="item.type === 'training' && item.status" class="flex items-center gap-2 mt-1">
+              <span
+                class="px-2 py-0.5 rounded text-xs font-medium"
+                :class="item.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
+              >
+                {{ item.status === 'registered' ? 'Записан' : 'Резерв' }}
+              </span>
+            </div>
+          </div>
+          
+          <button
+            @click="item.type === 'game' ? unregisterFromGame(item) : unregister(item)"
+            class="px-4 py-2 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
+          >
+            Выписаться
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -106,7 +104,15 @@ const loadItems = async () => {
     }
 
     const data = await response.json()
-    items.value = data.items || []
+    
+    // Фильтруем прошедшие тренировки и игры
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    items.value = (data.items || []).filter(item => {
+      const itemDate = new Date(item.training_date || item.date)
+      return itemDate >= today
+    })
   } catch (error) {
     console.error('Error loading items:', error)
   } finally {
@@ -174,5 +180,14 @@ const formatDate = (dateStr) => {
   const date = new Date(dateStr)
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
   return date.toLocaleDateString('ru-RU', options)
+}
+
+const formatShortDate = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}.${month}.${year}`
 }
 </script>

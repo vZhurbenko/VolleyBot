@@ -1,6 +1,6 @@
 <template>
   <div class="bg-white rounded shadow p-4 lg:p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Записи на тренировки</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Записи на тренировки и игры</h1>
 
     <!-- Фильтр по дате -->
     <div class="flex flex-wrap gap-4 mb-6">
@@ -28,48 +28,74 @@
       Загрузка...
     </div>
 
-    <div v-else-if="trainings.length === 0" class="text-center py-8 text-gray-500">
+    <div v-else-if="allItems.length === 0" class="text-center py-8 text-gray-500">
       Нет записей за выбранный период
     </div>
 
     <div v-else class="space-y-6">
       <!-- Группировка по датам -->
       <div
-        v-for="(group, date) in groupedTrainings"
+        v-for="(group, date) in groupedItems"
         :key="date"
         class="border border-gray-200 rounded-lg overflow-hidden"
       >
         <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
-          <h3 class="font-semibold text-gray-900">{{ formatDate(date) }}</h3>
+          <!-- Заголовок для игр -->
+          <div v-if="group[0].type === 'game'" class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+              Игра
+            </span>
+            <h3 class="font-semibold text-gray-900">
+              {{ group[0].game_name }}
+              <span class="text-gray-500 font-normal">
+                {{ formatShortDate(group[0].date) }}, {{ group[0].start_time }}
+                <span v-if="group[0].location">, {{ group[0].location }}</span>
+                <span v-if="group[0].opponent">, vs {{ group[0].opponent }}</span>
+              </span>
+            </h3>
+          </div>
+          
+          <!-- Заголовок для тренировок -->
+          <div v-else class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">
+              Тренировка
+            </span>
+            <h3 class="font-semibold text-gray-900">
+              {{ group[0].training_name || group[0].schedule_name }}
+              <span class="text-gray-500 font-normal">
+                {{ formatShortDate(date.split('_')[0]) }}
+                <span v-if="group[0].time">, {{ group[0].time }}</span>
+                <span v-if="group[0].location">, {{ group[0].location }}</span>
+              </span>
+            </h3>
+          </div>
         </div>
         <div class="divide-y divide-gray-100">
           <div
-            v-for="training in group"
-            :key="training.id"
+            v-for="item in group"
+            :key="item.id"
             class="px-4 py-3 flex items-center justify-between"
           >
             <div>
-              <!-- Название тренировки (разовая или расписание) -->
-              <p v-if="training.training_name || training.schedule_name" class="text-sm font-medium text-gray-900">
-                {{ training.training_name || training.schedule_name }}
+              <!-- Имя участника -->
+              <p class="font-medium text-gray-900">
+                {{ item.first_name }} {{ item.last_name || '' }}
+                <span v-if="item.username" class="text-gray-400 font-normal">@{{ item.username }}</span>
               </p>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-sm text-gray-500">{{ training.time }}</span>
+              
+              <!-- Статус только для тренировок -->
+              <div v-if="item.type === 'training' && item.status" class="flex items-center gap-2 mt-1">
                 <span
                   class="px-2 py-0.5 rounded text-xs font-medium"
-                  :class="training.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
+                  :class="item.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
                 >
-                  {{ training.status === 'registered' ? 'Записан' : 'Резерв' }}
+                  {{ item.status === 'registered' ? 'Записан' : 'Резерв' }}
                 </span>
               </div>
-              <p class="text-sm text-gray-500 mt-1">
-                {{ training.first_name }} {{ training.last_name || '' }}
-                <span v-if="training.username" class="text-gray-400">@{{ training.username }}</span>
-              </p>
             </div>
             <!-- Кнопка удаления для админа -->
             <button
-              @click="removeUser(training)"
+              @click="removeUser(item)"
               class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
               title="Удалить участника"
             >
@@ -90,7 +116,7 @@ import { useConfirmStore } from '@/stores/confirm'
 
 const startDate = ref('')
 const endDate = ref('')
-const trainings = ref([])
+const allItems = ref([])
 const loading = ref(false)
 
 const notificationsStore = useNotificationsStore()
@@ -108,18 +134,46 @@ onMounted(() => {
 
 const loadTrainings = async () => {
   loading.value = true
-  
+
   try {
-    const response = await fetch(`/api/admin/trainings?start_date=${startDate.value}&end_date=${endDate.value}`, {
-      credentials: 'include'
+    // Загружаем тренировки и игры параллельно
+    const [trainingsResponse, gamesResponse] = await Promise.all([
+      fetch(`/api/admin/trainings?start_date=${startDate.value}&end_date=${endDate.value}`, {
+        credentials: 'include'
+      }),
+      fetch(`/api/admin/games/signups?start_date=${startDate.value}&end_date=${endDate.value}`, {
+        credentials: 'include'
+      })
+    ])
+
+    const trainingsData = await trainingsResponse.json()
+    const gamesData = await gamesResponse.json()
+
+    // Объединяем с указанием типа
+    const items = [
+      ...(trainingsData.trainings || []).map(t => ({ ...t, type: 'training' })),
+      ...(gamesData.signups || []).map(g => ({ ...g, type: 'game' }))
+    ]
+
+    // Фильтруем прошедшие
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const filteredItems = items.filter(item => {
+      const itemDate = new Date(item.training_date || item.date)
+      return itemDate >= today
     })
-    
-    if (!response.ok) {
-      throw new Error('Failed to load trainings')
-    }
-    
-    const data = await response.json()
-    trainings.value = data.trainings || []
+
+    // Сортируем по дате и времени
+    filteredItems.sort((a, b) => {
+      const dateA = a.training_date || a.date
+      const dateB = b.training_date || b.date
+      const timeA = a.time || a.start_time
+      const timeB = b.time || b.start_time
+      return (dateA + ' ' + timeA).localeCompare(dateB + ' ' + timeB)
+    })
+
+    allItems.value = filteredItems
   } catch (error) {
     console.error('Error loading trainings:', error)
   } finally {
@@ -127,56 +181,111 @@ const loadTrainings = async () => {
   }
 }
 
-const groupedTrainings = computed(() => {
+const groupedItems = computed(() => {
   const groups = {}
-  
-  trainings.value.forEach(t => {
-    const key = `${t.training_date}_${t.chat_id || ''}`
+
+  allItems.value.forEach(item => {
+    // Для тренировок и игр используем разные поля даты
+    const date = item.training_date || item.date
+    const chatId = item.chat_id || ''
+    const gameId = item.game_id || ''
+    
+    // Для игр группируем по game_id, для тренировок по date+chat_id
+    // Ключ сортировки начинается с даты
+    const key = item.type === 'game' 
+      ? `${date}_game_${gameId}` 
+      : `${date}_${chatId}`
+      
     if (!groups[key]) {
       groups[key] = []
     }
     groups[key].push({
-      ...t,
-      time: t.training_time
+      ...item,
+      time: item.training_time || item.start_time
     })
   })
-  
+
   // Сортируем даты
   const sorted = {}
   Object.keys(groups).sort().forEach(key => {
     sorted[key] = groups[key]
   })
-  
+
   return sorted
 })
 
 const formatDate = (dateKey) => {
-  const [date, chatId] = dateKey.split('_')
+  // Для игр ключ содержит 'game_'
+  if (dateKey.includes('_game_')) {
+    const date = dateKey.split('_game_')[0]
+    const d = new Date(date)
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+    return d.toLocaleDateString('ru-RU', options)
+  }
+
+  // Для тренировок - ключ может быть формата YYYY-MM-DD_chat_id или timestamp_chat_id
+  const parts = dateKey.split('_')
+  let date = parts[0]
+  
+  // Если это timestamp (содержит точку), конвертируем
+  if (date.includes('.')) {
+    const d = new Date(date)
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+    return d.toLocaleDateString('ru-RU', options)
+  }
+  
+  // Иначе это YYYY-MM-DD
   const d = new Date(date)
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
   return d.toLocaleDateString('ru-RU', options)
 }
 
-const removeUser = async (training) => {
-  const name = training.first_name + (training.last_name ? ' ' + training.last_name : '')
-  const confirmed = await confirmStore.danger(`Удалить ${name} из тренировки ${training.training_date}?`)
+const formatShortDate = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}.${month}.${year}`
+}
+
+const removeUser = async (item) => {
+  const name = item.first_name + (item.last_name ? ' ' + item.last_name : '')
+  const date = item.training_date || item.date
+  
+  let confirmed
+  if (item.type === 'game') {
+    confirmed = await confirmStore.danger(`Удалить ${name} из игры ${date}?`)
+  } else {
+    confirmed = await confirmStore.danger(`Удалить ${name} из тренировки ${date}?`)
+  }
   if (!confirmed) return
 
   try {
-    const response = await fetch(
-      `/api/admin/calendar/remove-user/${training.training_date}/${encodeURIComponent(training.training_time)}/${training.chat_id}/${training.user_telegram_id}`,
-      {
-        method: 'DELETE',
+    let response
+    if (item.type === 'game') {
+      // Удаление из игры
+      response = await fetch(`/api/games/${item.game_id}/unregister`, {
+        method: 'POST',
         credentials: 'include'
-      }
-    )
+      })
+    } else {
+      // Удаление из тренировки
+      response = await fetch(
+        `/api/admin/calendar/remove-user/${item.training_date}/${encodeURIComponent(item.training_time)}/${item.chat_id}/${item.user_telegram_id}`,
+        {
+          method: 'DELETE',
+          credentials: 'include'
+        }
+      )
+    }
 
     const result = await response.json()
 
     if (response.ok && result.success) {
       // Перезагружаем список
       await loadTrainings()
-      notificationsStore.success('Пользователь удалён из тренировки')
+      notificationsStore.success('Пользователь удалён')
     } else {
       notificationsStore.error(result.detail || 'Ошибка удаления участника')
     }

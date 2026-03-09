@@ -123,7 +123,7 @@ export const useSettingsStore = defineStore('settings', () => {
       credentials: 'include'
     })
     if (response.ok) {
-      await loadActivePolls()
+      // Не перезагружаем список, опрос остаётся в БД
       return true
     }
     return false

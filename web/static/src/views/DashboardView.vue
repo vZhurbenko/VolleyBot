@@ -84,16 +84,22 @@
 
         <div v-if="stats.recentActivities.length > 0" class="divide-y divide-gray-100">
           <div v-for="activity in stats.recentActivities" :key="activity.registered_at" class="py-3 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-semibold text-sm">
-                {{ getUserInitials(activity) }}
-              </div>
-              <div>
-                <p class="font-medium text-gray-900">{{ getUserName(activity) }}</p>
-                <p class="text-sm text-gray-500">
-                  {{ formatDate(activity.training_date) }}, {{ activity.training_time }}
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <p class="font-medium text-gray-900">
+                  {{ getUserName(activity) }}
+                  <span v-if="activity.username" class="text-gray-400 font-normal">@{{ activity.username }}</span>
                 </p>
+                <span class="px-2 py-0.5 rounded text-xs font-medium"
+                      :class="activity.activity_type === 'game' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'">
+                  {{ activity.activity_type === 'game' ? 'Игра' : 'Тренировка' }}
+                </span>
               </div>
+              <p class="text-sm text-gray-500">
+                <span class="font-medium text-gray-700">{{ activity.event_name }}</span>
+                <span class="mx-2 text-gray-300">|</span>
+                {{ formatDate(activity.activity_date) }}, {{ activity.activity_time }}
+              </p>
             </div>
             <span :class="['px-3 py-1 rounded text-xs font-medium', getStatusClass(activity.status)]">
               {{ getStatusText(activity.status) }}
