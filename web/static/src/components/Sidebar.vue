@@ -155,15 +155,6 @@ onUnmounted(() => {
           <FileText class="w-5 h-5" />
           <span class="font-medium">Записи</span>
         </router-link>
-        <router-link
-          to="/dashboard/template"
-          class="flex items-center gap-3 px-4 py-3 rounded text-gray-600 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-          :class="{ 'bg-teal-50 text-teal-700': $route.name === 'template' }"
-          @click="isOpen = false"
-        >
-          <FileText class="w-5 h-5" />
-          <span class="font-medium">Шаблон</span>
-        </router-link>
       </template>
 
       <!-- Меню для обычных пользователей -->

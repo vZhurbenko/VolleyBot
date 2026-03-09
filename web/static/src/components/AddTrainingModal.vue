@@ -23,22 +23,44 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Время</label>
-          <input
-            v-model="formData.training_time"
-            type="text"
-            placeholder="18:00 - 20:00"
-            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
-            required
-          />
-        </div>
-
-        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Название</label>
           <input
             v-model="formData.name"
             type="text"
             placeholder="Например: Дополнительная тренировка"
+            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+            required
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Время начала</label>
+            <input
+              v-model="formData.start_time"
+              type="time"
+              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Время окончания</label>
+            <input
+              v-model="formData.end_time"
+              type="time"
+              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Место проведения</label>
+          <input
+            v-model="formData.location"
+            type="text"
+            placeholder="ВГАФК"
             class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
             required
           />
@@ -111,20 +133,27 @@ const today = new Date().toISOString().split('T')[0]
 
 const formData = ref({
   training_date: props.date || '',
-  training_time: '',
   name: '',
   chat_id: props.defaultChatId || '',
-  topic_id: props.defaultTopicId !== undefined ? props.defaultTopicId : null
+  topic_id: props.defaultTopicId !== undefined ? props.defaultTopicId : null,
+  start_time: '',
+  end_time: '',
+  location: 'ВГАФК'
 })
 
 const handleSubmit = () => {
-  if (!formData.value.training_date || !formData.value.training_time || !formData.value.name || !formData.value.chat_id) {
+  if (!formData.value.training_date || !formData.value.name || !formData.value.chat_id || !formData.value.start_time || !formData.value.end_time) {
     notificationsStore.error('Заполните обязательные поля')
     return
   }
 
+  // Формируем training_time из start_time и end_time для обратной совместимости
+  const training_time = `${formData.value.start_time} - ${formData.value.end_time}`
+
   emit('add', {
     ...formData.value,
+    training_time,
+    location: formData.value.location || 'ВГАФК',
     topic_id: formData.value.topic_id ? parseInt(formData.value.topic_id) : null
   })
 }

@@ -280,7 +280,10 @@ class VolleyBot:
             return None
 
         training_day = template['training_day']
-        training_time = template['training_time']
+        start_time = template.get('start_time', template.get('training_time', '18:00'))
+        end_time = template.get('end_time', '20:00')
+        location = template.get('location', '')
+        name = template.get('name', 'Тренировка')
 
         target_day = get_day_of_week_number(training_day)
         if target_day == -1:
@@ -295,7 +298,14 @@ class VolleyBot:
         next_training_date = now + timedelta(days=days_ahead)
         formatted_date_with_weekday = format_date_with_weekday(next_training_date)
 
-        description = template['description'].replace('{date}', formatted_date_with_weekday).replace('{time}', training_time)
+        # Формируем описание с новыми переменными
+        description = template['description']
+        description = description.replace('{date}', formatted_date_with_weekday)
+        description = description.replace('{start_time}', start_time)
+        description = description.replace('{end_time}', end_time)
+        description = description.replace('{time}', f"{start_time} - {end_time}")  # Для обратной совместимости
+        description = description.replace('{location}', location)
+        description = description.replace('{name}', name)
 
         poll_message = await self.create_poll(
             bot=bot,
@@ -339,7 +349,12 @@ class VolleyBot:
         chat_id = schedule['chat_id']
         thread_id = schedule.get('message_thread_id', None)
         training_day = schedule['training_day']
-        training_time = schedule['training_time']
+        
+        # Получаем новые поля или используем старые для обратной совместимости
+        start_time = schedule.get('start_time', schedule.get('training_time', '18:00').split(' - ')[0].strip())
+        end_time = schedule.get('end_time', schedule.get('training_time', '18:00 - 20:00').split(' - ')[1].strip() if ' - ' in schedule.get('training_time', '') else '20:00')
+        location = schedule.get('location', '')
+        name = schedule.get('name', 'Тренировка')
         options = schedule.get('options', [])
 
         target_day = get_day_of_week_number(training_day)
@@ -356,7 +371,15 @@ class VolleyBot:
         formatted_date_with_weekday = format_date_with_weekday(next_training_date)
 
         template = self.get_default_template()
-        description = template['description'].replace('{date}', formatted_date_with_weekday).replace('{time}', training_time)
+        
+        # Формируем описание с новыми переменными
+        description = template['description']
+        description = description.replace('{date}', formatted_date_with_weekday)
+        description = description.replace('{start_time}', start_time)
+        description = description.replace('{end_time}', end_time)
+        description = description.replace('{time}', f"{start_time} - {end_time}")  # Для обратной совместимости
+        description = description.replace('{location}', location)
+        description = description.replace('{name}', name)
 
         poll_options = options if options else template['options']
 
