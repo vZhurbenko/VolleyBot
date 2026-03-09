@@ -81,7 +81,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -91,11 +91,11 @@ const props = defineProps({
   },
   year: {
     type: Number,
-    default: () => new Date().getFullYear()
+    required: true
   },
   month: {
     type: Number,
-    default: () => new Date().getMonth() + 1
+    required: true
   },
   isAdmin: {
     type: Boolean,
@@ -103,86 +103,87 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['click-training', 'update:year', 'update:month', 'add-training'])
+const emit = defineEmits(['click-training', 'update-month', 'add-training'])
 
-const currentDate = ref(new Date(props.year, props.month - 1, 1))
-
-// Следим за изменением пропсов
-watch(() => [props.year, props.month], ([newYear, newMonth]) => {
-  currentDate.value = new Date(newYear, newMonth - 1, 1)
-})
+// Следим за изменением пропсов year и month
+watch([() => props.year, () => props.month], ([newYear, newMonth]) => {
+  // Проверяем, что год корректный (не 1900-е годы)
+  if (newYear && newYear > 2000 && newMonth >= 1 && newMonth <= 12) {
+    // Props уже обновлены через v-model, watch нужен для валидации
+  }
+}, { immediate: true })
 
 const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
+// Используем props напрямую для реактивности
 const monthName = computed(() => {
   const months = [
     'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
   ]
-  return months[currentDate.value.getMonth()]
+  return months[props.month - 1]
 })
 
-const currentYear = computed(() => currentDate.value.getFullYear())
+const currentYear = computed(() => props.year)
 
 const daysInMonth = computed(() => {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth()
-  return new Date(year, month + 1, 0).getDate()
+  return new Date(props.year, props.month, 0).getDate()
 })
 
 const firstDayOffset = computed(() => {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth()
   // Получаем день недели первого дня месяца (0 = воскресенье, 1 = понедельник, ...)
-  let firstDay = new Date(year, month, 1).getDay()
+  let firstDay = new Date(props.year, props.month - 1, 1).getDay()
   // Преобразуем: 0 (вс) -> 6, 1 (пн) -> 0, 2 (вт) -> 1, ...
   firstDay = firstDay === 0 ? 6 : firstDay - 1
   return firstDay
 })
 
 const previousMonth = () => {
-  const newDate = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1)
-  currentDate.value = newDate
-  emit('update:year', newDate.getFullYear())
-  emit('update:month', newDate.getMonth() + 1)
+  // Вычисляем предыдущий месяц на основе props
+  let prevYear = props.year
+  let prevMonth = props.month - 1
+  
+  if (prevMonth < 1) {
+    prevMonth = 12
+    prevYear = props.year - 1
+  }
+  
+  emit('update-month', { year: prevYear, month: prevMonth })
 }
 
 const nextMonth = () => {
-  const newDate = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1, 1)
-  currentDate.value = newDate
-  emit('update:year', newDate.getFullYear())
-  emit('update:month', newDate.getMonth() + 1)
+  // Вычисляем следующий месяц на основе props
+  let nextYear = props.year
+  let nextMonth = props.month + 1
+  
+  if (nextMonth > 12) {
+    nextMonth = 1
+    nextYear = props.year + 1
+  }
+  
+  emit('update-month', { year: nextYear, month: nextMonth })
 }
 
 const handleAddTraining = (day) => {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth() + 1
-  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const dateStr = `${props.year}-${String(props.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   emit('add-training', dateStr)
 }
 
 const isPastDate = (day) => {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const date = new Date(year, month, day)
+  const date = new Date(props.year, props.month, day)
   return date < today
 }
 
 const isWeekend = (day) => {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth()
-  const date = new Date(year, month, day)
+  const date = new Date(props.year, props.month - 1, day)
   const dayOfWeek = date.getDay()
   return dayOfWeek === 0 || dayOfWeek === 6
 }
 
 const getTrainingsForDay = (day) => {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth() + 1
-  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-  
+  const dateStr = `${props.year}-${String(props.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   return props.trainings.filter(t => t.date === dateStr)
 }
 
