@@ -919,6 +919,9 @@ class Database:
         cursor = self.conn.cursor()
 
         try:
+            # Сначала удаляем все записи на тренировки
+            self.remove_user_from_all_trainings(telegram_id)
+
             # Удаляем пользователя
             cursor.execute('DELETE FROM users WHERE telegram_id = ?', (telegram_id,))
             self.conn.commit()
@@ -1060,6 +1063,10 @@ class Database:
         cursor = self.conn.cursor()
 
         try:
+            # Если деактивируем — удаляем все записи на тренировки
+            if not is_active:
+                self.remove_user_from_all_trainings(telegram_id)
+
             cursor.execute('''
                 UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE telegram_id = ?
@@ -1069,6 +1076,57 @@ class Database:
             return {"success": True, "is_active": is_active}
         except Exception as e:
             logger.error(f"Ошибка переключения статуса: {e}")
+            return {"success": False, "error": str(e)}
+
+    def remove_user_from_all_trainings(self, telegram_id: int) -> Dict[str, Any]:
+        """Удаление всех записей пользователя на тренировки с переносом waitlist"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        removed_count = 0
+
+        try:
+            # Получаем все записи пользователя
+            cursor.execute('''
+                SELECT training_date, training_time, chat_id, status
+                FROM training_registrations
+                WHERE user_telegram_id = ?
+            ''', (telegram_id,))
+
+            trainings = cursor.fetchall()
+
+            # Для каждой записи удаляем и переносим waitlist
+            for training in trainings:
+                # Удаляем запись
+                cursor.execute('''
+                    DELETE FROM training_registrations
+                    WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
+                ''', (training['training_date'], training['training_time'], training['chat_id'], telegram_id))
+
+                # Находим первого в waitlist и переводим в registered
+                cursor.execute('''
+                    SELECT id FROM training_registrations
+                    WHERE training_date = ? AND training_time = ? AND chat_id = ? AND status = 'waitlist'
+                    ORDER BY registered_at ASC
+                    LIMIT 1
+                ''', (training['training_date'], training['training_time'], training['chat_id']))
+
+                waitlist_user = cursor.fetchone()
+                if waitlist_user:
+                    cursor.execute('''
+                        UPDATE training_registrations
+                        SET status = 'registered'
+                        WHERE id = ?
+                    ''', (waitlist_user['id'],))
+
+                removed_count += 1
+
+            self.conn.commit()
+
+            return {"success": True, "removed_count": removed_count}
+        except Exception as e:
+            logger.error(f"Ошибка удаления пользователя из тренировок: {e}")
             return {"success": False, "error": str(e)}
 
     # ==================== Методы для статистики ====================
