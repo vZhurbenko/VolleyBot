@@ -1066,3 +1066,51 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка переключения статуса: {e}")
             return {"success": False, "error": str(e)}
+
+    # ==================== Методы для статистики ====================
+
+    def get_users_count(self) -> int:
+        """Получение общего количества пользователей"""
+        if not self.conn:
+            return 0
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users')
+        return cursor.fetchone()[0]
+
+    def get_training_registrations_count(self, days: int = 30) -> int:
+        """Получение количества записей на тренировки за период"""
+        if not self.conn:
+            return 0
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT COUNT(*) FROM training_registrations
+            WHERE registered_at >= datetime('now', '-' || ? || ' days')
+        ''', (days,))
+        return cursor.fetchone()[0]
+
+    def get_recent_activities(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Получение последних активностей (записей на тренировки)"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT 
+                tr.training_date,
+                tr.training_time,
+                tr.chat_id,
+                tr.status,
+                tr.registered_at,
+                u.telegram_id,
+                u.first_name,
+                u.last_name,
+                u.username
+            FROM training_registrations tr
+            LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
+            ORDER BY tr.registered_at DESC
+            LIMIT ?
+        ''', (limit,))
+
+        return [dict(row) for row in cursor.fetchall()]
