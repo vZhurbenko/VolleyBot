@@ -23,6 +23,7 @@
             <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Код</th>
             <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Создан</th>
             <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Действует до</th>
+            <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Кем принят</th>
             <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Статус</th>
             <th class="text-right py-3 px-4 text-sm font-semibold text-gray-700">Действие</th>
           </tr>
@@ -37,6 +38,15 @@
             </td>
             <td class="py-3 px-4 text-sm text-gray-700">
               {{ code.expires_at ? formatDate(code.expires_at) : "∞" }}
+            </td>
+            <td class="py-3 px-4 text-sm text-gray-700">
+              <div v-if="code.used_by" class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-semibold text-xs">
+                  {{ getUserInitials(code) }}
+                </div>
+                <span>{{ getUserName(code) }}</span>
+              </div>
+              <span v-else class="text-gray-400">—</span>
             </td>
             <td class="py-3 px-4">
               <span class="px-2 py-1 rounded text-xs font-medium" :class="getStatusClass(code)">
@@ -253,5 +263,19 @@ const getStatusText = (code) => {
     }
   }
   return "Активен";
+};
+
+const getUserInitials = (code) => {
+  if (!code) return '?';
+  const first = code.used_user_first_name?.[0] || '';
+  const last = code.used_user_last_name?.[0] || '';
+  return (first + last).toUpperCase() || '?';
+};
+
+const getUserName = (code) => {
+  if (!code) return '';
+  const first = code.used_user_first_name || '';
+  const last = code.used_user_last_name || '';
+  return `${first} ${last}`.trim() || code.used_user_username || 'Аноним';
 };
 </script>
