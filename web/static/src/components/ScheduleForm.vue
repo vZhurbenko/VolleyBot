@@ -60,12 +60,24 @@
       </div>
 
       <div class="flex flex-col gap-2">
-        <label class="block text-sm font-medium text-gray-700">Время тренировки</label>
+        <label class="block text-sm font-medium text-gray-700">Время начала</label>
         <input
-          v-model="form.training_time"
-          type="text"
+          v-model="form.start_time"
+          type="time"
           class="w-full h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
-          placeholder="18:00 - 20:00"
+          placeholder="18:00"
+          required
+        />
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label class="block text-sm font-medium text-gray-700">Время окончания</label>
+        <input
+          v-model="form.end_time"
+          type="time"
+          class="w-full h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+          placeholder="20:00"
+          required
         />
       </div>
     </div>
@@ -125,7 +137,8 @@ const defaultForm = {
   message_thread_id: props.defaultTopicId || null,
   training_day: 'sunday',
   poll_day: 'friday',
-  training_time: '18:00 - 20:00',
+  start_time: '',
+  end_time: '',
   enabled: true
 }
 
@@ -139,7 +152,8 @@ watch(() => props.schedule, (newSchedule) => {
       message_thread_id: newSchedule.message_thread_id || null,
       training_day: newSchedule.training_day || 'sunday',
       poll_day: newSchedule.poll_day || 'friday',
-      training_time: newSchedule.training_time || '18:00 - 20:00',
+      start_time: newSchedule.start_time || '',
+      end_time: newSchedule.end_time || '',
       enabled: newSchedule.enabled !== false
     }
   } else if (!props.isEdit) {
@@ -150,7 +164,8 @@ watch(() => props.schedule, (newSchedule) => {
       message_thread_id: props.defaultTopicId || null,
       training_day: 'sunday',
       poll_day: 'friday',
-      training_time: '18:00 - 20:00',
+      start_time: '',
+      end_time: '',
       enabled: true
     }
   }

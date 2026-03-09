@@ -138,11 +138,13 @@ class Database:
     def get_default_template(self) -> Dict[str, Any]:
         """Получение шаблона опроса по умолчанию"""
         default = {
-            'name': 'Волейбольный опрос',
-            'description': 'Волейбол {date} {time} ВГАФК',
+            'name': 'Волейбольная тренировка',
+            'description': '{name} {date} {start_time} - {end_time} {location}',
             'training_day': 'sunday',
             'poll_day': 'friday',
-            'training_time': '18:00',
+            'start_time': '18:00',
+            'end_time': '20:00',
+            'location': 'ВГАФК',
             'options': ['Буду', 'Не буду', 'Возможно'],
             'enabled': True,
             'default_chat_id': '',
@@ -188,9 +190,10 @@ class Database:
         cursor = self.conn.cursor()
         schedule_id = schedule.get('id', str(datetime.now().timestamp()))
         cursor.execute('''
-            INSERT INTO poll_schedules (id, name, chat_id, message_thread_id, 
-                                        training_day, poll_day, training_time, enabled)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO poll_schedules (id, name, chat_id, message_thread_id,
+                                        training_day, poll_day, training_time,
+                                        start_time, end_time, enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             schedule_id,
             schedule.get('name', 'Расписание'),
@@ -199,6 +202,8 @@ class Database:
             schedule['training_day'],
             schedule['poll_day'],
             schedule['training_time'],
+            schedule.get('start_time'),
+            schedule.get('end_time'),
             1 if schedule.get('enabled', True) else 0
         ))
         self.conn.commit()
@@ -738,19 +743,20 @@ class Database:
         return [dict(row) for row in cursor.fetchall()]
 
     def add_one_time_training(self, training_id: str, training_date: str, training_time: str,
-                              chat_id: str, topic_id: Optional[int], name: str) -> Dict[str, Any]:
+                              chat_id: str, topic_id: Optional[int], name: str,
+                              start_time: Optional[str] = None, end_time: Optional[str] = None) -> Dict[str, Any]:
         """Добавление разовой тренировки"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
-        
+
         try:
             cursor.execute('''
-                INSERT INTO one_time_trainings (id, training_date, training_time, chat_id, topic_id, name, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (training_id, training_date, training_time, chat_id, topic_id, name))
-            
+                INSERT INTO one_time_trainings (id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time))
+
             self.conn.commit()
             return {"success": True}
         except Exception as e:

@@ -501,8 +501,17 @@ class PollSchedule(BaseModel):
     message_thread_id: Optional[int] = None
     training_day: str
     poll_day: str
-    training_time: str
+    start_time: str
+    end_time: str
     enabled: bool = True
+    
+    @validator('start_time', 'end_time')
+    def validate_time(cls, v):
+        import re
+        time_pattern = re.compile(r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$')
+        if not time_pattern.match(v):
+            raise ValueError('Неверный формат времени (ожидается HH:MM)')
+        return v
 
 
 @app.get("/api/admin/settings/template")
@@ -541,8 +550,16 @@ async def add_poll_schedule(schedule: PollSchedule, user: dict = Depends(get_cur
     Добавление нового расписания опроса
     """
     require_admin(user)
+    
+    # Topic ID только с Chat ID
+    if schedule.message_thread_id and not schedule.chat_id:
+        raise HTTPException(status_code=400, detail="Topic ID доступен только при наличии Chat ID")
+    
     schedule_dict = schedule.dict()
     schedule_dict['id'] = str(uuid.uuid4())
+    # Формируем training_time из start_time и end_time для обратной совместимости
+    schedule_dict['training_time'] = f"{schedule.start_time} - {schedule.end_time}"
+    
     db.add_poll_schedule(schedule_dict)
     return {"success": True, "message": "Расписание добавлено", "id": schedule_dict['id']}
 
@@ -898,21 +915,54 @@ async def add_one_time_training(request: Request, user: dict = Depends(get_curre
     Добавление разовой тренировки (только админы)
     """
     require_admin(user)
-    
+
     body = await request.json()
     training_date = body.get('training_date')
-    training_time = body.get('training_time')
+    start_time = body.get('start_time')
+    end_time = body.get('end_time')
     chat_id = body.get('chat_id')
     topic_id = body.get('topic_id')
     name = body.get('name', 'Тренировка')
     
-    if not all([training_date, training_time, chat_id]):
-        raise HTTPException(status_code=400, detail="Missing required fields")
+    # Формируем training_time из start_time и end_time
+    training_time = f"{start_time} - {end_time}" if start_time and end_time else ''
+
+    # Валидация обязательных полей
+    if not all([training_date, start_time, end_time, chat_id]):
+        raise HTTPException(status_code=400, detail="Заполните обязательные поля: дата, время начала, время окончания, chat_id")
+
+    # Валидация времени начала и окончания
+    import re
+    time_pattern = re.compile(r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$')
+    if not time_pattern.match(start_time):
+        raise HTTPException(status_code=400, detail="Неверный формат start_time (ожидается HH:MM)")
+    if not time_pattern.match(end_time):
+        raise HTTPException(status_code=400, detail="Неверный формат end_time (ожидается HH:MM)")
     
-    training_id = f"{training_date}_{training_time}_{chat_id}"
-    
-    result = db.add_one_time_training(training_id, training_date, training_time, chat_id, topic_id, name)
-    
+    # Проверка что end_time >= start_time (с учётом перехода через полночь)
+    try:
+        start_parts = list(map(int, start_time.split(':')))
+        end_parts = list(map(int, end_time.split(':')))
+        start_minutes = start_parts[0] * 60 + start_parts[1]
+        end_minutes = end_parts[0] * 60 + end_parts[1]
+        
+        # Если end_time < start_time, считаем что тренировка через полночь
+        if end_minutes < start_minutes:
+            end_minutes += 24 * 60  # Добавляем 24 часа
+        
+        if end_minutes - start_minutes < 15:
+            raise HTTPException(status_code=400, detail="Минимальная длительность тренировки 15 минут")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Ошибка парсинга времени")
+
+    # Topic ID только с Chat ID
+    if topic_id and not chat_id:
+        raise HTTPException(status_code=400, detail="Topic ID доступен только при наличии Chat ID")
+
+    training_id = f"{training_date}_{start_time}_{chat_id}"
+
+    result = db.add_one_time_training(training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time)
+
     if result.get('success'):
         return result
     else:
