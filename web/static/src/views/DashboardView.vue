@@ -117,7 +117,7 @@
             <div>
               <p class="font-medium text-gray-900">{{ schedule.name }}</p>
               <p class="text-sm text-gray-500">
-                <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}, {{ schedule.start_time }} - {{ schedule.end_time }}
+                <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}, {{ schedule.start_time }} - {{ schedule.end_time }}, {{ schedule.location }}
                 <span class="mx-2 text-gray-300">|</span>
                 <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(getPollDay(schedule.training_day)) }}
               </p>
