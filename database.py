@@ -82,6 +82,39 @@ class Database:
             )
         ''')
 
+        # Таблица игр
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS games (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                location TEXT,
+                start_time TEXT,
+                end_time TEXT,
+                opponent TEXT,
+                chat_id TEXT,
+                topic_id INTEGER,
+                result TEXT,
+                score TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Таблица записей на игры
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS game_signups (
+                id TEXT PRIMARY KEY,
+                game_id TEXT NOT NULL,
+                user_telegram_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'registered',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+            )
+        ''')
+
         self.conn.commit()
         logger.info("Таблицы базы данных созданы/проверены")
 
@@ -1187,5 +1220,194 @@ class Database:
             ORDER BY tr.registered_at DESC
             LIMIT ?
         ''', (limit,))
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    # ==================== Методы для работы с играми ====================
+
+    def get_all_games(self, year: Optional[int] = None, month: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Получение всех игр"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        
+        if year and month:
+            cursor.execute('''
+                SELECT * FROM games
+                WHERE strftime('%Y', date) = ? AND strftime('%m', date) = ?
+                ORDER BY date ASC, start_time ASC
+            ''', (str(year), str(month).zfill(2)))
+        else:
+            cursor.execute('SELECT * FROM games ORDER BY date ASC, start_time ASC')
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_game(self, game_id: str) -> Optional[Dict[str, Any]]:
+        """Получение игры по ID"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM games WHERE id = ?', (game_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def add_game(self, game: Dict[str, Any]) -> Dict[str, Any]:
+        """Добавление игры"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        game_id = game.get('id', str(datetime.now().timestamp()))
+
+        try:
+            cursor.execute('''
+                INSERT INTO games (id, name, date, location, start_time, opponent, chat_id, topic_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                game_id,
+                game['name'],
+                game['date'],
+                game.get('location', ''),
+                game.get('start_time'),
+                game.get('opponent', ''),
+                game.get('chat_id', ''),
+                game.get('topic_id')
+            ))
+            self.conn.commit()
+            return {"success": True, "id": game_id}
+        except Exception as e:
+            logger.error(f"Ошибка добавления игры: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_game(self, game_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Обновление игры"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        # Добавляем updated_at
+        updates['updated_at'] = 'CURRENT_TIMESTAMP'
+        
+        set_clause = ', '.join([f"{key} = ?" for key in updates.keys()])
+        values = list(updates.values()) + [game_id]
+
+        try:
+            cursor.execute(f'''
+                UPDATE games
+                SET {set_clause}
+                WHERE id = ?
+            ''', values)
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка обновления игры: {e}")
+            return {"success": False, "error": str(e)}
+
+    def remove_game(self, game_id: str) -> Dict[str, Any]:
+        """Удаление игры"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Удаляем все записи на эту игру
+            cursor.execute('DELETE FROM game_signups WHERE game_id = ?', (game_id,))
+            # Удаляем саму игру
+            cursor.execute('DELETE FROM games WHERE id = ?', (game_id,))
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка удаления игры: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_game_signups(self, game_id: str) -> List[Dict[str, Any]]:
+        """Получение всех записей на игру"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT gs.*, u.first_name, u.last_name, u.username, u.photo_url
+            FROM game_signups gs
+            LEFT JOIN users u ON gs.user_telegram_id = u.telegram_id
+            WHERE gs.game_id = ?
+            ORDER BY gs.created_at ASC
+        ''', (game_id,))
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def signup_for_game(self, game_id: str, user_telegram_id: int) -> Dict[str, Any]:
+        """Запись на игру (без ограничения количества)"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        signup_id = f"{game_id}_{user_telegram_id}_{datetime.now().timestamp()}"
+
+        try:
+            # Проверяем, есть ли уже запись
+            cursor.execute('''
+                SELECT id, status FROM game_signups
+                WHERE game_id = ? AND user_telegram_id = ?
+            ''', (game_id, user_telegram_id))
+
+            existing = cursor.fetchone()
+
+            if existing:
+                # Если уже записан - отменяем запись (удаляем)
+                cursor.execute('''
+                    DELETE FROM game_signups
+                    WHERE game_id = ? AND user_telegram_id = ?
+                ''', (game_id, user_telegram_id))
+                self.conn.commit()
+                return {"success": True, "action": "removed"}
+            else:
+                # Создаём новую запись
+                cursor.execute('''
+                    INSERT INTO game_signups (id, game_id, user_telegram_id, status, created_at, updated_at)
+                    VALUES (?, ?, ?, 'registered', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (signup_id, game_id, user_telegram_id))
+                self.conn.commit()
+                return {"success": True, "action": "registered", "status": "registered"}
+        except Exception as e:
+            logger.error(f"Ошибка записи на игру: {e}")
+            return {"success": False, "error": str(e)}
+
+    def set_game_result(self, game_id: str, result: str, score: str) -> Dict[str, Any]:
+        """Установка результата игры"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                UPDATE games
+                SET result = ?, score = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (result, score, game_id))
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка установки результата игры: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_user_games(self, user_telegram_id: int) -> List[Dict[str, Any]]:
+        """Получение всех игр, на которые записан пользователь"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT g.*, gs.status as signup_status
+            FROM games g
+            INNER JOIN game_signups gs ON g.id = gs.game_id
+            WHERE gs.user_telegram_id = ?
+            ORDER BY g.date ASC, g.start_time ASC
+        ''', (user_telegram_id,))
 
         return [dict(row) for row in cursor.fetchall()]

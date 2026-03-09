@@ -59,6 +59,11 @@ const router = createRouter({
           name: 'trainings',
           component: () => import('@/views/TrainingsView.vue'),
           meta: { requiresAdmin: true }
+        },
+        {
+          path: 'games',
+          name: 'games',
+          component: () => import('@/views/GamesView.vue')
         }
       ]
     },
