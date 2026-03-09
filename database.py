@@ -1000,12 +1000,16 @@ class Database:
 
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT ic.*, 
+            SELECT ic.*,
                    creator.first_name as creator_first_name,
                    creator.last_name as creator_last_name,
-                   creator.username as creator_username
+                   creator.username as creator_username,
+                   used_user.first_name as used_user_first_name,
+                   used_user.last_name as used_user_last_name,
+                   used_user.username as used_user_username
             FROM invite_codes ic
             LEFT JOIN users creator ON ic.created_by = creator.telegram_id
+            LEFT JOIN users used_user ON ic.used_by = used_user.telegram_id
             ORDER BY ic.created_at DESC
         ''')
 
