@@ -8,6 +8,7 @@ import logging
 import uuid
 import httpx
 import json
+import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
@@ -24,9 +25,6 @@ logging.basicConfig(
 httpx_logger = logging.getLogger('httpx')
 httpx_logger.handlers = []
 httpx_logger.propagate = True
-
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 from telegram import Update, Bot, Poll, Message, Chat, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -414,11 +412,273 @@ TokenMaskingFilter.set_token(volley_bot.bot_token)
 TokenMaskingFormatter.set_token(volley_bot.bot_token)
 
 
-async def schedule_poll_creation(context: ContextTypes.DEFAULT_TYPE):
-    """Функция для автоматического создания опросов по расписанию"""
-    logger.info("Запуск автоматического создания опросов по расписанию")
-    await volley_bot.create_polls_for_all_enabled_templates(context.bot)
+# ==================== HTTP API для веб-сервера ====================
 
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+
+
+class BotAPIHandler(BaseHTTPRequestHandler):
+    """HTTP обработчик для API бота"""
+
+    def do_POST(self):
+        """Обработка POST запросов"""
+        if self.path == '/api/create_poll':
+            # Получаем данные из тела запроса
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+
+            # Проверяем авторизацию (простой секретный ключ)
+            api_key = self.headers.get('X-API-Key', '')
+            expected_key = os.getenv('BOT_API_KEY', 'volleybot_secret_key')
+
+            if api_key != expected_key:
+                self.send_response(401)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Unauthorized'}).encode())
+                return
+
+            try:
+                # Извлекаем параметры
+                chat_id = data.get('chat_id')
+                topic_id = data.get('topic_id')
+                training_date = data.get('training_date')
+                start_time = data.get('start_time')
+                end_time = data.get('end_time')
+                location = data.get('location')
+                name = data.get('name', 'Тренировка')
+
+                if not all([chat_id, training_date, start_time, end_time]):
+                    raise ValueError("Missing required fields")
+
+                # Создаём опрос через бота
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(
+                        create_poll_via_bot(
+                            chat_id=chat_id,
+                            topic_id=topic_id,
+                            training_date=training_date,
+                            start_time=start_time,
+                            end_time=end_time,
+                            location=location,
+                            name=name
+                        )
+                    )
+                    loop.close()
+
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'success': True, 'result': result}).encode())
+                except Exception as e:
+                    logger.error(f"Ошибка при создании опроса: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+            except Exception as e:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+        elif self.path == '/api/delete_poll':
+            # Удаляем опрос в Telegram
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+
+            # Проверяем авторизацию
+            api_key = self.headers.get('X-API-Key', '')
+            expected_key = os.getenv('BOT_API_KEY', 'volleybot_secret_key')
+
+            if api_key != expected_key:
+                self.send_response(401)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Unauthorized'}).encode())
+                return
+
+            try:
+                chat_id = data.get('chat_id')
+                message_id = data.get('message_id')
+                action = data.get('action', 'stop')  # 'stop' или 'delete'
+
+                if not all([chat_id, message_id]):
+                    raise ValueError("Missing required fields")
+
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(
+                        delete_poll_via_bot(
+                            chat_id=chat_id,
+                            message_id=message_id,
+                            action=action
+                        )
+                    )
+                    loop.close()
+
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'success': True, 'result': result}).encode())
+                except Exception as e:
+                    logger.error(f"Ошибка при удалении опроса: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+            except Exception as e:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+        else:
+            self.send_response(404)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': 'Not found'}).encode())
+
+    def log_message(self, format, *args):
+        """Логирование HTTP запросов"""
+        logger.info(f"HTTP API: {args[0]}")
+
+
+async def create_poll_via_bot(chat_id: str, training_date: str, start_time: str,
+                               end_time: str, location: str, name: str,
+                               topic_id: Optional[int] = None):
+    """Создание опроса через бота (вызывается из веб-сервера)"""
+    from utils import format_date_with_weekday
+    import uuid
+
+    # Форматируем дату
+    date_obj = datetime.strptime(training_date, '%Y-%m-%d')
+    formatted_date = format_date_with_weekday(date_obj)
+
+    # Формируем вопрос
+    question = f"{name} {formatted_date} {start_time} - {end_time} {location}"
+
+    # Варианты ответов
+    options = ['Буду', 'Не буду', 'Возможно']
+
+    # Создаём бота и отправляем опрос
+    from telegram import Bot
+    bot = Bot(token=volley_bot.bot_token)
+
+    try:
+        data = {
+            'chat_id': chat_id,
+            'question': question,
+            'options': json.dumps(options, ensure_ascii=False),
+            'is_anonymous': False,
+            'allows_multiple_answers': False
+        }
+        if topic_id is not None:
+            data['message_thread_id'] = topic_id
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f'https://api.telegram.org/bot{volley_bot.bot_token}/sendPoll',
+                json=data,
+                timeout=30
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            if result.get('ok'):
+                message_id = result['result']['message_id']
+
+                # Сохраняем опрос в БД с полной информацией
+                poll_id = str(uuid.uuid4())
+                volley_bot.db.add_active_poll(
+                    poll_id=poll_id,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    message_thread_id=topic_id,
+                    template_id='scheduled',
+                    name=name,
+                    training_date=training_date,
+                    training_time=f'{start_time} - {end_time}',
+                    location=location
+                )
+
+                logger.info(f"Создан опрос в чате {chat_id}{' (топик ' + str(topic_id) + ')' if topic_id else ''}")
+                return {'success': True, 'message_id': message_id, 'poll_id': poll_id}
+            else:
+                raise Exception(f"Telegram API error: {result}")
+    finally:
+        await bot.close()
+
+
+async def delete_poll_via_bot(chat_id: str, message_id: int, action: str = 'stop'):
+    """
+    Удаление/остановка опроса в Telegram (вызывается из веб-сервера)
+    
+    Args:
+        chat_id: ID чата
+        message_id: ID сообщения с опросом
+        action: 'stop' - остановить голосование, 'delete' - удалить сообщение
+    """
+    from telegram import Bot
+    bot = Bot(token=volley_bot.bot_token)
+
+    try:
+        async with httpx.AsyncClient() as client:
+            if action == 'delete':
+                # Полное удаление сообщения
+                response = await client.post(
+                    f'https://api.telegram.org/bot{volley_bot.bot_token}/deleteMessage',
+                    json={
+                        'chat_id': chat_id,
+                        'message_id': message_id
+                    },
+                    timeout=30
+                )
+            else:
+                # Остановка голосования
+                response = await client.post(
+                    f'https://api.telegram.org/bot{volley_bot.bot_token}/stopPoll',
+                    json={
+                        'chat_id': chat_id,
+                        'message_id': message_id
+                    },
+                    timeout=30
+                )
+            
+            response.raise_for_status()
+            result = response.json()
+
+            if result.get('ok'):
+                if action == 'delete':
+                    logger.info(f"Опрос удалён из чата {chat_id}")
+                    return {'success': True, 'message': 'Poll deleted'}
+                else:
+                    logger.info(f"Опрос остановлен в чате {chat_id}")
+                    return {'success': True, 'message': 'Poll stopped'}
+            else:
+                raise Exception(f"Telegram API error: {result}")
+    finally:
+        await bot.close()
+
+
+def start_http_server(port=8001):
+    """Запуск HTTP сервера для API бота"""
+    server = HTTPServer(('127.0.0.1', port), BotAPIHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logger.info(f"HTTP API сервер запущен на порту {port}")
+    return server
+
+
+# ==================== Основная функция ====================
 
 def main():
     """Основная функция запуска бота"""
@@ -428,16 +688,8 @@ def main():
     # Сохраняем экземпляр бота в context.bot_data
     application.bot_data['volley_bot'] = volley_bot
 
-    # Создаем планировщик
-    scheduler = AsyncIOScheduler()
-
-    # Планируем создание опросов каждый день в 12:00 MSK
-    scheduler.add_job(schedule_poll_creation,
-                      CronTrigger(hour=12, minute=0),
-                      args=(application.bot,))
-
-    # Запускаем планировщик
-    scheduler.start()
+    # Запускаем HTTP сервер для API
+    start_http_server(port=8001)
 
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))

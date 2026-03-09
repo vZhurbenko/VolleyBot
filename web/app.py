@@ -8,6 +8,7 @@ FastAPI приложение для авторизации через Telegram L
 import os
 import sys
 import uuid
+import json
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
@@ -26,6 +27,11 @@ import logging
 
 from database import Database
 from telegram_auth import TelegramAuth
+
+# APScheduler для автоматического создания тренировок и опросов
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import httpx
 
 # Настройка логирования
 logging.basicConfig(
@@ -62,6 +68,124 @@ db = Database(DB_PATH)
 db.create_tables()  # Создаём таблицы если не существуют
 security = HTTPBearer(auto_error=False)
 
+# Инициализация планировщика
+scheduler = AsyncIOScheduler()
+
+
+# ==================== Планировщик задач ====================
+
+async def add_trainings_and_polls_from_schedules():
+    """
+    Автоматическое добавление тренировок из расписаний в календарь за 3 дня
+    и вызов API бота для создания опросов
+    Запускается каждый день в 12:00
+    """
+    logger.info("Запуск автоматического добавления тренировок и опросов из расписаний")
+
+    from datetime import datetime, timedelta
+    import uuid as uuid_module
+    import httpx
+
+    # Получаем все активные расписания
+    schedules = db.get_poll_schedules()
+
+    # Дата через 3 дня (тренировки которые нужно добавить)
+    target_date = datetime.now() + timedelta(days=3)
+    target_date_str = target_date.strftime('%Y-%m-%d')
+
+    # Дни недели для mapping
+    day_map = {'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+               'friday': 4, 'saturday': 5, 'sunday': 6}
+
+    target_weekday = target_date.weekday()
+
+    added_count = 0
+    poll_count = 0
+
+    # API ключ для вызова бота
+    bot_api_key = os.getenv('BOT_API_KEY', 'volleybot_secret_key')
+    bot_api_url = 'http://127.0.0.1:8001/api/create_poll'
+
+    for schedule in schedules:
+        if not schedule.get('enabled', True):
+            continue
+
+        # Проверяем, совпадает ли день недели расписания с целевым днём
+        training_day = schedule.get('training_day', 'monday')
+        schedule_weekday = day_map.get(training_day.lower(), -1)
+
+        if schedule_weekday != target_weekday:
+            continue
+
+        # Проверяем, есть ли уже такая тренировка в календаре
+        existing = db.get_scheduled_training_by_schedule_and_date(
+            schedule['id'], target_date_str
+        )
+
+        if existing:
+            logger.info(f"Тренировка из расписания {schedule['id']} на {target_date_str} уже существует")
+            continue
+
+        # Генерируем уникальный ID для тренировки
+        training_id = f"sched_{schedule['id']}_{target_date_str}_{str(uuid_module.uuid4())[:8]}"
+
+        # Получаем параметры тренировки
+        start_time = schedule.get('start_time', '')
+        end_time = schedule.get('end_time', '')
+        training_time = f"{start_time} - {end_time}"
+        chat_id = schedule.get('chat_id', '')
+        topic_id = schedule.get('message_thread_id')
+        name = schedule.get('name', 'Тренировка')
+        location = schedule.get('location', '')
+
+        # Добавляем тренировку в календарь
+        result = db.add_scheduled_training(
+            training_id=training_id,
+            schedule_id=schedule['id'],
+            training_date=target_date_str,
+            training_time=training_time,
+            chat_id=chat_id,
+            topic_id=topic_id,
+            name=name,
+            start_time=start_time,
+            end_time=end_time,
+            location=location
+        )
+
+        if result.get('success'):
+            logger.info(f"Добавлена тренировка из расписания {schedule['id']} на {target_date_str}")
+            added_count += 1
+
+            # Вызываем API бота для создания опроса
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        bot_api_url,
+                        json={
+                            'chat_id': chat_id,
+                            'topic_id': topic_id,
+                            'training_date': target_date_str,
+                            'start_time': start_time,
+                            'end_time': end_time,
+                            'location': location,
+                            'name': name
+                        },
+                        headers={'X-API-Key': bot_api_key},
+                        timeout=30
+                    )
+                    api_result = response.json()
+
+                    if response.status_code == 200 and api_result.get('success'):
+                        poll_count += 1
+                        logger.info(f"Создан опрос для тренировки {schedule['id']} в Telegram")
+                    else:
+                        logger.error(f"Ошибка API бота: {api_result}")
+            except Exception as e:
+                logger.error(f"Ошибка вызова API бота: {e}")
+        else:
+            logger.error(f"Ошибка добавления тренировки из расписания {schedule['id']}: {result.get('error')}")
+
+    logger.info(f"Добавлено {added_count} тренировок, создано {poll_count} опросов на {target_date_str}")
 
 # ==================== Pydantic модели ====================
 
@@ -486,7 +610,6 @@ class PollTemplate(BaseModel):
     name: str
     description: str
     training_day: str
-    poll_day: str
     training_time: str
     options: List[str]
     enabled: bool = True
@@ -500,12 +623,11 @@ class PollSchedule(BaseModel):
     chat_id: str
     message_thread_id: Optional[int] = None
     training_day: str
-    poll_day: str
     start_time: str
     end_time: str
     location: str = "ВГАФК"
     enabled: bool = True
-    
+
     @validator('start_time', 'end_time')
     def validate_time(cls, v):
         import re
@@ -605,6 +727,97 @@ async def get_active_polls(user: dict = Depends(get_current_user_from_access_coo
     return polls
 
 
+@app.delete("/api/admin/settings/active_polls/{poll_id}")
+async def remove_active_poll(poll_id: str, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Удаление активного опроса (останавливает в Telegram + удаляет из БД)
+    """
+    require_admin(user)
+
+    # Получаем опрос из БД
+    poll = db.get_active_poll(poll_id)
+    if not poll:
+        raise HTTPException(status_code=404, detail="Опрос не найден")
+
+    # Вызываем API бота для удаления опроса из Telegram
+    bot_api_key = os.getenv('BOT_API_KEY', 'volleybot_secret_key')
+    bot_api_url = 'http://127.0.0.1:8001/api/delete_poll'
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                bot_api_url,
+                json={
+                    'chat_id': poll['chat_id'],
+                    'message_id': poll['message_id'],
+                    'action': 'delete'  # Полное удаление сообщения
+                },
+                headers={'X-API-Key': bot_api_key},
+                timeout=30
+            )
+            api_result = response.json()
+
+            if response.status_code != 200 or not api_result.get('success'):
+                logger.warning(f"API бота вернуло ошибку: {api_result}")
+                # Не прерываем удаление из БД, даже если бот не ответил
+    except Exception as e:
+        logger.error(f"Ошибка вызова API бота: {e}")
+        # Продолжаем удаление из БД
+
+    # Удаляем опрос из БД
+    db.remove_active_poll(poll_id)
+
+    return {"success": True, "message": "Опрос удалён"}
+
+
+@app.post("/api/admin/settings/active_polls/{poll_id}/stop")
+async def stop_active_poll(poll_id: str, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Остановка активного опроса (без удаления из БД)
+    """
+    require_admin(user)
+
+    # Получаем опрос из БД
+    poll = db.get_active_poll(poll_id)
+    if not poll:
+        raise HTTPException(status_code=404, detail="Опрос не найден")
+
+    # Вызываем API бота для остановки опроса в Telegram
+    bot_api_key = os.getenv('BOT_API_KEY', 'volleybot_secret_key')
+    bot_api_url = 'http://127.0.0.1:8001/api/delete_poll'
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                bot_api_url,
+                json={
+                    'chat_id': poll['chat_id'],
+                    'message_id': poll['message_id'],
+                    'action': 'stop'  # Остановка голосования
+                },
+                headers={'X-API-Key': bot_api_key},
+                timeout=30
+            )
+            api_result = response.json()
+
+            # Если flood control или другая ошибка — всё равно считаем успехом
+            if response.status_code != 200:
+                logger.warning(f"API бота вернуло ошибку: {api_result}")
+            elif not api_result.get('success'):
+                logger.warning(f"API бота вернуло ошибку: {api_result}")
+    except httpx.RequestError as e:
+        logger.error(f"Ошибка вызова API бота: {e}")
+
+    # Обновляем статус опроса в БД
+    cursor = db.conn.cursor()
+    cursor.execute('''
+        UPDATE active_polls SET status = 'stopped' WHERE id = ?
+    ''', (poll_id,))
+    db.conn.commit()
+
+    return {"success": True, "message": "Опрос остановлен"}
+
+
 @app.get("/api/admin/settings/admin_ids")
 async def get_admin_ids(user: dict = Depends(get_current_user_from_access_cookie)):
     """
@@ -621,13 +834,13 @@ async def get_stats(user: dict = Depends(get_current_user_from_access_cookie)):
     Получение статистики для дашборда (только для администраторов)
     """
     require_admin(user)
-    
-    # Получаем количество записей за 30 дней
-    registrations_count = db.get_training_registrations_count(days=30)
-    
-    # Получаем последние активности
+
+    # Получаем количество записей за 30 дней (тренировки + игры)
+    registrations_count = db.get_registrations_count(days=30)
+
+    # Получаем последние активности (тренировки + игры)
     recent_activities = db.get_recent_activities(limit=10)
-    
+
     return {
         "admin_count": db.get_admin_count(),
         "users_count": db.get_users_count(),
@@ -662,14 +875,10 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
     Удаление ID администратора
     """
     require_admin(user)
-    admin_ids = db.get_admin_ids()
-    if admin_id in admin_ids:
-        admin_ids.remove(admin_id)
-        db.set_admin_ids(admin_ids)
     
-    # Обновляем поле is_admin в таблице users
-    db.update_user_admin_status(int(admin_id), False)
-    
+    # Используем метод remove_admin_id из database
+    db.remove_admin_id(int(admin_id))
+
     return {"success": True, "message": "Администратор удалён"}
 
 
@@ -684,61 +893,16 @@ async def get_calendar(year: int, month: int, user: dict = Depends(get_current_u
     """
     from datetime import datetime, timedelta
     import calendar
-    
-    # Получаем все расписания
-    schedules = db.get_poll_schedules()
-    
+
     # Получаем разовые тренировки на месяц
     one_time_trainings = db.get_one_time_trainings(year, month)
-    
+
+    # Получаем тренировки из расписаний на месяц (добавленные автоматически за 3 дня)
+    scheduled_trainings = db.get_scheduled_trainings(year, month)
+
     # Генерируем все даты тренировок на месяц
     trainings = {}
-    
-    # Дни недели для mapping
-    day_map = {'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 
-               'friday': 4, 'saturday': 5, 'sunday': 6}
-    
-    # Для каждого расписания генерируем даты
-    for schedule in schedules:
-        if not schedule.get('enabled', True):
-            continue
 
-        training_day = schedule.get('training_day', 'monday')
-        start_time = schedule.get('start_time', '')
-        end_time = schedule.get('end_time', '')
-        # training_time может быть None, поэтому формируем из start_time и end_time
-        training_time = schedule.get('training_time') or f"{start_time} - {end_time}"
-        chat_id = schedule.get('chat_id', '')
-        topic_id = schedule.get('message_thread_id')
-        name = schedule.get('name', 'Тренировка')
-        location = schedule.get('location', '')
-
-        weekday = day_map.get(training_day.lower(), 0)
-
-        # Находим все дни этого weekday в месяце
-        cal = calendar.monthcalendar(year, month)
-        for week in cal:
-            day = week[weekday]
-            if day == 0:
-                continue
-
-            date_str = f"{year}-{month:02d}-{day:02d}"
-            key = f"{date_str}_{training_time}_{chat_id}"
-
-            if key not in trainings:
-                trainings[key] = {
-                    'date': date_str,
-                    'time': training_time,
-                    'start_time': start_time,
-                    'end_time': end_time,
-                    'chat_id': chat_id,
-                    'topic_id': topic_id,
-                    'is_one_time': False,
-                    'name': name,
-                    'location': location,
-                    'registrations': []
-                }
-    
     # Добавляем разовые тренировки
     for training in one_time_trainings:
         date_str = training.get('training_date', '')
@@ -763,6 +927,38 @@ async def get_calendar(year: int, month: int, user: dict = Depends(get_current_u
                 'chat_id': chat_id,
                 'topic_id': topic_id,
                 'is_one_time': True,
+                'is_scheduled': False,
+                'name': name,
+                'location': location,
+                'registrations': []
+            }
+
+    # Добавляем тренировки из расписаний
+    for training in scheduled_trainings:
+        date_str = training.get('training_date', '')
+        time = training.get('training_time', '')
+        start_time = training.get('start_time', '')
+        end_time = training.get('end_time', '')
+        chat_id = training.get('chat_id', '')
+        topic_id = training.get('topic_id')
+        name = training.get('name', '') or training.get('schedule_name', 'Тренировка')
+        location = training.get('location', '')
+        training_id = training.get('id', '')
+        schedule_id = training.get('schedule_id', '')
+
+        key = training_id or f"{date_str}_{time}_{chat_id}"
+        if key not in trainings:
+            trainings[key] = {
+                'id': training_id,
+                'schedule_id': schedule_id,
+                'date': date_str,
+                'time': time,
+                'start_time': start_time,
+                'end_time': end_time,
+                'chat_id': chat_id,
+                'topic_id': topic_id,
+                'is_one_time': False,
+                'is_scheduled': True,
                 'name': name,
                 'location': location,
                 'registrations': []
@@ -883,14 +1079,37 @@ async def admin_remove_user_from_training(
 @app.get("/api/user/my-trainings")
 async def get_my_trainings(user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Получение моих записей на тренировки
+    Получение моих записей на тренировки и игры
     """
     require_auth(user)
-    
+
     user_telegram_id = user.get('telegram_id')
+
+    # Получаем тренировки
     trainings = db.get_user_trainings(user_telegram_id)
-    
-    return {"trainings": trainings}
+
+    # Получаем игры
+    games = db.get_user_games(user_telegram_id)
+
+    # Объединяем в один список с указанием типа
+    all_items = []
+
+    for training in trainings:
+        all_items.append({
+            **training,
+            'type': 'training'
+        })
+
+    for game in games:
+        all_items.append({
+            **game,
+            'type': 'game'
+        })
+
+    # Сортируем по дате
+    all_items.sort(key=lambda x: x.get('training_date') or x.get('date') or '')
+
+    return {"items": all_items}
 
 
 # ==================== API для админов (Users & Trainings) ====================
@@ -1039,9 +1258,20 @@ async def get_all_trainings(start_date: str, end_date: str, user: dict = Depends
     Получение всех записей на тренировки за период (только админы)
     """
     require_admin(user)
-    
+
     trainings = db.get_all_trainings(start_date, end_date)
     return {"trainings": trainings}
+
+
+@app.get("/api/admin/games/signups")
+async def get_all_game_signups(start_date: str, end_date: str, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение всех записей на игры за период (только админы)
+    """
+    require_admin(user)
+
+    signups = db.get_all_game_signups(start_date, end_date)
+    return {"signups": signups}
 
 
 # ==================== API для игр ====================
@@ -1336,15 +1566,15 @@ async def signup_for_game(
     Повторный вызов отменяет запись
     """
     require_auth(user)
-    
+
     # Проверяем существование игры
     game = db.get_game(game_id)
     if not game:
         raise HTTPException(status_code=404, detail="Игра не найдена")
-    
+
     telegram_id = user.get('telegram_id')
     result = db.signup_for_game(game_id, telegram_id)
-    
+
     if result.get('success'):
         action = result.get('action', 'registered')
         return {
@@ -1354,6 +1584,30 @@ async def signup_for_game(
         }
     else:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to signup'))
+
+
+@app.post("/api/games/{game_id}/unregister")
+async def unregister_from_game(
+    game_id: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Отписка от игры (доступно всем авторизованным пользователям)
+    """
+    require_auth(user)
+
+    # Проверяем существование игры
+    game = db.get_game(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Игра не найдена")
+
+    telegram_id = user.get('telegram_id')
+    result = db.unregister_from_game(game_id, telegram_id)
+
+    if result.get('success'):
+        return {"success": True, "message": "Вы успешно выписались с игры"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to unregister'))
 
 
 @app.put("/api/admin/games/{game_id}/result")
@@ -1409,11 +1663,25 @@ async def get_my_games(user: dict = Depends(get_current_user_from_access_cookie)
     Получение списка игр, на которые записан текущий пользователь
     """
     require_auth(user)
-    
+
     telegram_id = user.get('telegram_id')
     games = db.get_user_games(telegram_id)
-    
+
     return {"games": games}
+
+
+# ==================== Запуск планировщика ====================
+
+# Планируем добавление тренировок и опросов каждый день в 12:00 MSK
+scheduler.add_job(
+    add_trainings_and_polls_from_schedules,
+    CronTrigger(hour=12, minute=0),
+    id='daily_trainings_polls'
+)
+
+# Запускаем планировщик
+scheduler.start()
+logger.info("Планировщик запущен: добавление тренировок и опросов в 12:00")
 
 
 # ==================== Статика ====================

@@ -1,48 +1,73 @@
 <template>
   <div class="bg-white rounded shadow p-4 lg:p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Мои тренировки</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Мои тренировки и игры</h1>
 
     <div v-if="loading" class="text-center py-8 text-gray-500">
       Загрузка...
     </div>
 
-    <div v-else-if="trainings.length === 0" class="text-center py-8 text-gray-500">
-      Вы ещё не записаны ни на одну тренировку
+    <div v-else-if="items.length === 0" class="text-center py-8 text-gray-500">
+      Вы ещё не записаны ни на одну тренировку или игру
     </div>
 
     <div v-else class="space-y-4">
+      <!-- Группировка по типу события -->
       <div
-        v-for="training in trainings"
-        :key="training.id"
-        class="flex items-center justify-between p-4 bg-gray-50 rounded"
+        v-for="item in items"
+        :key="item.id"
+        class="border border-gray-200 rounded-lg overflow-hidden"
       >
-        <div class="flex-1">
-          <!-- Название тренировки -->
-          <p v-if="training.training_name || training.schedule_name" class="text-base font-semibold text-gray-900 mb-1">
-            {{ training.training_name || training.schedule_name }}
-          </p>
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-lg font-semibold text-gray-900">
-              {{ formatDate(training.training_date) }}
+        <!-- Заголовок карточки -->
+        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+          <div class="flex items-center gap-2">
+            <span :class="['px-2 py-0.5 rounded text-xs font-medium', item.type === 'game' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700']">
+              {{ item.type === 'game' ? 'Игра' : 'Тренировка' }}
             </span>
-            <span
-              class="px-2 py-0.5 rounded text-xs font-medium"
-              :class="training.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
-            >
-              {{ training.status === 'registered' ? 'Записан' : 'Резерв' }}
-            </span>
+            <h3 class="font-semibold text-gray-900">
+              <template v-if="item.type === 'game'">
+                {{ item.name }}
+                <span class="text-gray-500 font-normal">
+                  {{ formatShortDate(item.date) }}, {{ item.start_time }}
+                  <span v-if="item.location">, {{ item.location }}</span>
+                  <span v-if="item.opponent">, vs {{ item.opponent }}</span>
+                </span>
+              </template>
+              <template v-else>
+                {{ item.training_name || item.schedule_name }}
+                <span class="text-gray-500 font-normal">
+                  {{ item.training_date ? formatShortDate(item.training_date) + ', ' : '' }}
+                  {{ item.training_time }}
+                  <span v-if="item.location">, {{ item.location }}</span>
+                </span>
+              </template>
+            </h3>
           </div>
-          <p class="text-sm text-gray-500 flex items-center gap-1">
-            <Clock class="w-4 h-4" /> {{ training.training_time }}
-          </p>
         </div>
-
-        <button
-          @click="unregister(training)"
-          class="px-4 py-2 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
-        >
-          Выписаться
-        </button>
+        
+        <!-- Тело карточки -->
+        <div class="px-4 py-3 flex items-center justify-between">
+          <div>
+            <p class="font-medium text-gray-900">
+              Вы
+              <span v-if="authStore.user?.username" class="text-gray-400 font-normal">@{{ authStore.user.username }}</span>
+            </p>
+            <div v-if="item.type === 'training' && item.status" class="flex items-center gap-2 mt-1">
+              <span
+                class="px-2 py-0.5 rounded text-xs font-medium"
+                :class="item.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
+              >
+                {{ item.status === 'registered' ? 'Записан' : 'Резерв' }}
+              </span>
+            </div>
+          </div>
+          
+          <button
+            @click="item.type === 'game' ? unregisterFromGame(item) : unregister(item)"
+            class="px-4 py-2 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
+          >
+            Выписаться
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -59,29 +84,37 @@ const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
 const confirmStore = useConfirmStore()
 
-const trainings = ref([])
+const items = ref([])
 const loading = ref(false)
 
 onMounted(() => {
-  loadMyTrainings()
+  loadItems()
 })
 
-const loadMyTrainings = async () => {
+const loadItems = async () => {
   loading.value = true
-  
+
   try {
     const response = await fetch('/api/user/my-trainings', {
       credentials: 'include'
     })
-    
+
     if (!response.ok) {
-      throw new Error('Failed to load trainings')
+      throw new Error('Failed to load items')
     }
-    
+
     const data = await response.json()
-    trainings.value = data.trainings || []
+    
+    // Фильтруем прошедшие тренировки и игры
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    items.value = (data.items || []).filter(item => {
+      const itemDate = new Date(item.training_date || item.date)
+      return itemDate >= today
+    })
   } catch (error) {
-    console.error('Error loading trainings:', error)
+    console.error('Error loading items:', error)
   } finally {
     loading.value = false
   }
@@ -108,7 +141,7 @@ const unregister = async (training) => {
     const result = await response.json()
 
     if (response.ok && result.success) {
-      loadMyTrainings()
+      loadItems()
       notificationsStore.success('Вы успешно выписались с тренировки')
     } else {
       notificationsStore.error(result.detail || 'Ошибка отписки')
@@ -119,9 +152,42 @@ const unregister = async (training) => {
   }
 }
 
+const unregisterFromGame = async (game) => {
+  const confirmed = await confirmStore.info('Выписаться с игры?')
+  if (!confirmed) return
+
+  try {
+    const response = await fetch(`/api/games/${game.id}/unregister`, {
+      method: 'POST',
+      credentials: 'include'
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      loadItems()
+      notificationsStore.success('Вы успешно выписались с игры')
+    } else {
+      notificationsStore.error(result.detail || 'Ошибка отписки')
+    }
+  } catch (error) {
+    console.error('Error unregistering from game:', error)
+    notificationsStore.error('Ошибка отписки от игры')
+  }
+}
+
 const formatDate = (dateStr) => {
   const date = new Date(dateStr)
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
   return date.toLocaleDateString('ru-RU', options)
+}
+
+const formatShortDate = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}.${month}.${year}`
 }
 </script>

@@ -43,6 +43,12 @@ const router = createRouter({
           meta: { requiresAdmin: true }
         },
         {
+          path: 'polls',
+          name: 'polls',
+          component: () => import('@/views/PollsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
           path: 'users',
           name: 'users',
           component: () => import('@/views/AdminsView.vue'),
