@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import {
   LayoutDashboard,
   Calendar,
@@ -8,13 +9,32 @@ import {
   ClipboardList,
   Users,
   Link,
-  X
+  X,
+  LogOut
 } from 'lucide-vue-next'
 import logo from '@/img/logo.svg'
 
 const authStore = useAuthStore()
+const router = useRouter()
 
 const isOpen = ref(false)
+
+const user = computed(() => authStore.user)
+
+const userName = computed(() => {
+  if (!user.value) return '';
+  return user.value.first_name || '';
+});
+
+const userUsername = computed(() => {
+  if (!user.value) return '';
+  return user.value.username || '';
+});
+
+const handleLogout = async () => {
+  await authStore.logout();
+  router.push('/');
+};
 
 const handleToggleMenu = () => {
   isOpen.value = !isOpen.value
@@ -40,11 +60,11 @@ onUnmounted(() => {
   <!-- Sidebar -->
   <aside
     :class="[
-      'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col transform transition-transform duration-300 lg:transform-none',
+      'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:transform-none',
       isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
     ]"
   >
-    <div class="p-4 flex items-center justify-between">
+    <div class="p-4 flex items-center justify-between flex-shrink-0">
       <div class="flex items-center gap-3">
         <img :src="logo" alt="Team R Logo" class="w-10 h-10" />
         <span class="text-xl font-bold text-gray-900">Team R</span>
@@ -58,7 +78,7 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <nav class="flex-1 px-4 pb-4 flex flex-col gap-2">
+    <nav class="flex-1 px-4 pb-4 flex flex-col gap-2 overflow-y-auto">
       <!-- Меню для администраторов -->
       <template v-if="authStore.isAdmin">
         <router-link
@@ -157,5 +177,38 @@ onUnmounted(() => {
         </router-link>
       </template>
     </nav>
+
+    <!-- Информация о пользователе внизу сайдбара -->
+    <div class="border-t border-gray-200 p-4 flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <img
+          v-if="user?.photo_url"
+          :src="user.photo_url"
+          alt="User"
+          class="w-10 h-10 rounded-full border-2 border-gray-300 flex-shrink-0"
+        />
+        <div
+          v-else
+          class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold flex-shrink-0"
+        >
+          {{ userName.charAt(0).toUpperCase() }}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-900 truncate">
+            {{ userName }}
+          </p>
+          <p v-if="userUsername" class="text-xs text-gray-500 truncate">
+            @{{ userUsername }}
+          </p>
+        </div>
+        <button
+          @click="handleLogout"
+          class="p-2 text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+          title="Выйти"
+        >
+          <LogOut class="w-5 h-5" />
+        </button>
+      </div>
+    </div>
   </aside>
 </template>
