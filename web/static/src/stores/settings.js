@@ -105,6 +105,30 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function deletePoll(pollId) {
+    const response = await fetch(`/api/admin/settings/active_polls/${pollId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    if (response.ok) {
+      await loadActivePolls()
+      return true
+    }
+    return false
+  }
+
+  async function stopPoll(pollId) {
+    const response = await fetch(`/api/admin/settings/active_polls/${pollId}/stop`, {
+      method: 'POST',
+      credentials: 'include'
+    })
+    if (response.ok) {
+      await loadActivePolls()
+      return true
+    }
+    return false
+  }
+
   // Admin IDs
   async function loadAdminIds() {
     try {
@@ -175,6 +199,8 @@ export const useSettingsStore = defineStore('settings', () => {
     updateSchedule,
     deleteSchedule,
     loadActivePolls,
+    deletePoll,
+    stopPoll,
     loadAdminIds,
     addAdminId,
     removeAdminId,

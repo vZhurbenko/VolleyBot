@@ -49,11 +49,11 @@
             </div>
           </router-link>
 
-          <router-link to="/dashboard/template" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-            <ClipboardList class="w-10 h-10 text-teal-600" />
+          <router-link to="/dashboard/polls" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+            <Radio class="w-10 h-10 text-teal-600" />
             <div>
-              <p class="font-medium text-gray-900">Шаблон</p>
-              <p class="text-sm text-gray-500">Редактировать шаблон опроса</p>
+              <p class="font-medium text-gray-900">Опросы</p>
+              <p class="text-sm text-gray-500">Управление активными опросами</p>
             </div>
           </router-link>
 
@@ -117,9 +117,9 @@
             <div>
               <p class="font-medium text-gray-900">{{ schedule.name }}</p>
               <p class="text-sm text-gray-500">
-                <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}
+                <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}, {{ schedule.start_time }} - {{ schedule.end_time }}
                 <span class="mx-2 text-gray-300">|</span>
-                <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(schedule.poll_day) }}
+                <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(getPollDay(schedule.training_day)) }}
               </p>
             </div>
             <span :class="['px-3 py-1 rounded text-xs font-medium', schedule.enabled ? 'bg-teal-100 text-teal-700' : 'bg-red-100 text-red-700']">
@@ -192,9 +192,9 @@ import {
   BarChart3,
   Users,
   User,
-  ClipboardList,
   FileText,
-  Link
+  Link,
+  Radio
 } from 'lucide-vue-next'
 
 const settingsStore = useSettingsStore()
@@ -218,7 +218,25 @@ const days = {
   sunday: 'Вс'
 }
 
+const dayOrder = {
+  monday: 0,
+  tuesday: 1,
+  wednesday: 2,
+  thursday: 3,
+  friday: 4,
+  saturday: 5,
+  sunday: 6
+}
+
 const formatDay = (day) => days[day] || day
+
+// Вычисляем день опроса (за 3 дня до тренировки)
+const getPollDay = (trainingDay) => {
+  if (!trainingDay) return ''
+  const trainingDayIndex = dayOrder[trainingDay]
+  const pollDayIndex = (trainingDayIndex - 3 + 7) % 7
+  return Object.keys(dayOrder).find(key => dayOrder[key] === pollDayIndex) || trainingDay
+}
 
 const getInitials = (user) => {
   if (!user) return '?'

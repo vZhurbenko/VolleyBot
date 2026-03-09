@@ -3,9 +3,9 @@
     <div class="flex-1 min-w-0">
       <h3 class="font-semibold text-gray-900 mb-1 truncate">{{ schedule.name }}</h3>
       <p class="text-sm text-gray-500 mb-1 whitespace-nowrap">
-        <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}
+        <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}, {{ schedule.start_time }} - {{ schedule.end_time }}, {{ schedule.location }}
         <span class="mx-1 text-gray-300">|</span>
-        <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(schedule.poll_day) }}
+        <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(pollDay) }}
       </p>
       <p class="text-xs text-gray-400 truncate">
         Chat: {{ schedule.chat_id }}
@@ -32,8 +32,9 @@
 
 <script setup>
 import { X, Edit2 } from 'lucide-vue-next'
+import { computed } from 'vue'
 
-defineProps({
+const props = defineProps({
   schedule: {
     type: Object,
     required: true
@@ -52,5 +53,26 @@ const days = {
   sunday: 'Вс'
 }
 
+const dayOrder = {
+  monday: 0,
+  tuesday: 1,
+  wednesday: 2,
+  thursday: 3,
+  friday: 4,
+  saturday: 5,
+  sunday: 6
+}
+
 const formatDay = (day) => days[day] || day
+
+// Вычисляем день опроса (за 3 дня до тренировки)
+const pollDay = computed(() => {
+  const trainingDay = props.schedule?.training_day
+  if (!trainingDay) return ''
+  
+  const trainingDayIndex = dayOrder[trainingDay]
+  // Опрос за 3 дня до тренировки
+  const pollDayIndex = (trainingDayIndex - 3 + 7) % 7
+  return Object.keys(dayOrder).find(key => dayOrder[key] === pollDayIndex) || trainingDay
+})
 </script>

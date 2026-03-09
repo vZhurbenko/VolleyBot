@@ -47,19 +47,6 @@
       </div>
 
       <div class="flex flex-col gap-2">
-        <label class="block text-sm font-medium text-gray-700">День создания опроса</label>
-        <select v-model="form.poll_day" class="w-full h-11 px-4 border border-gray-300 rounded appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors">
-          <option value="monday">Понедельник</option>
-          <option value="tuesday">Вторник</option>
-          <option value="wednesday">Среда</option>
-          <option value="thursday">Четверг</option>
-          <option value="friday">Пятница</option>
-          <option value="saturday">Суббота</option>
-          <option value="sunday">Воскресенье</option>
-        </select>
-      </div>
-
-      <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">Время начала</label>
         <input
           v-model="form.start_time"
@@ -147,7 +134,6 @@ const defaultForm = {
   chat_id: props.defaultChatId || '',
   message_thread_id: props.defaultTopicId || null,
   training_day: 'sunday',
-  poll_day: 'friday',
   start_time: '',
   end_time: '',
   location: 'ВГАФК',
@@ -163,7 +149,6 @@ watch(() => props.schedule, (newSchedule) => {
       chat_id: newSchedule.chat_id || '',
       message_thread_id: newSchedule.message_thread_id || null,
       training_day: newSchedule.training_day || 'sunday',
-      poll_day: newSchedule.poll_day || 'friday',
       start_time: newSchedule.start_time || '',
       end_time: newSchedule.end_time || '',
       location: newSchedule.location || 'ВГАФК',
@@ -176,7 +161,6 @@ watch(() => props.schedule, (newSchedule) => {
       chat_id: props.defaultChatId || '',
       message_thread_id: props.defaultTopicId || null,
       training_day: 'sunday',
-      poll_day: 'friday',
       start_time: '',
       end_time: '',
       location: 'ВГАФК',

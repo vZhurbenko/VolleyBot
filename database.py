@@ -62,8 +62,9 @@ class Database:
                 chat_id TEXT NOT NULL,
                 message_thread_id INTEGER,
                 training_day TEXT NOT NULL,
-                poll_day TEXT NOT NULL,
-                training_time TEXT NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                location TEXT,
                 enabled INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -167,6 +168,33 @@ class Database:
         if admin_id not in admin_ids:
             admin_ids.append(admin_id)
             self.set_admin_ids(admin_ids)
+        
+        # Обновляем is_admin в таблице users
+        if self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute('UPDATE users SET is_admin = 1 WHERE telegram_id = ?', (admin_id,))
+            self.conn.commit()
+
+    def remove_admin_id(self, admin_id: int):
+        """Удаление ID администратора"""
+        admin_ids = self.get_admin_ids()
+        if admin_id in admin_ids:
+            admin_ids.remove(admin_id)
+            self.set_admin_ids(admin_ids)
+        
+        # Обновляем is_admin в таблице users
+        if self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute('UPDATE users SET is_admin = 0 WHERE telegram_id = ?', (admin_id,))
+            self.conn.commit()
+
+    def update_user_admin_status(self, telegram_id: int, is_admin: bool):
+        """Обновление статуса администратора пользователя"""
+        if self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute('UPDATE users SET is_admin = ? WHERE telegram_id = ?',
+                          (1 if is_admin else 0, telegram_id))
+            self.conn.commit()
 
     def get_default_template(self) -> Dict[str, Any]:
         """Получение шаблона опроса по умолчанию"""
@@ -174,7 +202,6 @@ class Database:
             'name': 'Волейбольная тренировка',
             'description': '{name} {date} {start_time} - {end_time} {location}',
             'training_day': 'sunday',
-            'poll_day': 'friday',
             'start_time': '18:00',
             'end_time': '20:00',
             'location': 'ВГАФК',
@@ -224,15 +251,14 @@ class Database:
         schedule_id = schedule.get('id', str(datetime.now().timestamp()))
         cursor.execute('''
             INSERT INTO poll_schedules (id, name, chat_id, message_thread_id,
-                                        training_day, poll_day, start_time, end_time, location, enabled)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        training_day, start_time, end_time, location, enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             schedule_id,
             schedule.get('name', 'Расписание'),
             schedule['chat_id'],
             schedule.get('message_thread_id'),
             schedule['training_day'],
-            schedule['poll_day'],
             schedule.get('start_time'),
             schedule.get('end_time'),
             schedule.get('location', 'ВГАФК'),
@@ -409,8 +435,9 @@ class Database:
                 chat_id TEXT NOT NULL,
                 message_thread_id INTEGER,
                 training_day TEXT NOT NULL,
-                poll_day TEXT NOT NULL,
-                training_time TEXT NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                location TEXT,
                 enabled INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -757,17 +784,17 @@ class Database:
 
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT tr.*, 
+            SELECT tr.*,
                    ot.name as training_name,
                    ps.name as schedule_name
             FROM training_registrations tr
-            LEFT JOIN one_time_trainings ot 
-                ON tr.training_date = ot.training_date 
-                AND tr.training_time = ot.training_time 
+            LEFT JOIN one_time_trainings ot
+                ON tr.training_date = ot.training_date
+                AND tr.training_time = ot.training_time
                 AND tr.chat_id = ot.chat_id
             LEFT JOIN poll_schedules ps
                 ON tr.chat_id = ps.chat_id
-                AND tr.training_time = ps.training_time
+                AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
             WHERE tr.user_telegram_id = ?
             ORDER BY tr.training_date ASC, tr.training_time ASC
         ''', (user_telegram_id,))
@@ -846,6 +873,89 @@ class Database:
         
         return [dict(row) for row in cursor.fetchall()]
 
+    def get_scheduled_trainings(self, year: int, month: int) -> List[Dict[str, Any]]:
+        """Получение всех тренировок из расписаний за месяц"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT st.*, ps.name as schedule_name
+            FROM scheduled_trainings st
+            LEFT JOIN poll_schedules ps ON st.schedule_id = ps.id
+            WHERE strftime('%Y', st.training_date) = ? AND strftime('%m', st.training_date) = ?
+            ORDER BY st.training_date ASC
+        ''', (str(year), str(month).zfill(2)))
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def add_scheduled_training(self, training_id: str, schedule_id: str, training_date: str,
+                               training_time: str, chat_id: str, topic_id: Optional[int] = None,
+                               name: str = '', start_time: Optional[str] = None,
+                               end_time: Optional[str] = None,
+                               location: Optional[str] = None) -> Dict[str, Any]:
+        """Добавление тренировки из расписания в календарь"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                INSERT INTO scheduled_trainings
+                (id, schedule_id, training_date, training_time, start_time, end_time,
+                 chat_id, topic_id, name, location, added_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, schedule_id, training_date, training_time,
+                  start_time, end_time, chat_id, topic_id, name, location))
+
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка добавления тренировки из расписания: {e}")
+            return {"success": False, "error": str(e)}
+
+    def remove_scheduled_training(self, training_id: str) -> Dict[str, Any]:
+        """Удаление тренировки из расписания"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('DELETE FROM scheduled_trainings WHERE id = ?', (training_id,))
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка удаления тренировки из расписания: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_scheduled_training(self, training_id: str) -> Optional[Dict[str, Any]]:
+        """Получение тренировки из расписания по ID"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM scheduled_trainings WHERE id = ?', (training_id,))
+        row = cursor.fetchone()
+
+        return dict(row) if row else None
+
+    def get_scheduled_training_by_schedule_and_date(self, schedule_id: str,
+                                                     training_date: str) -> Optional[Dict[str, Any]]:
+        """Проверка: существует ли уже тренировка из расписания на эту дату"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM scheduled_trainings
+            WHERE schedule_id = ? AND training_date = ?
+        ''', (schedule_id, training_date))
+
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
     def get_all_trainings(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Получение всех записей на тренировки за период (для админа)"""
         if not self.conn:
@@ -853,18 +963,18 @@ class Database:
 
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT tr.*, u.first_name, u.last_name, u.username, 
+            SELECT tr.*, u.first_name, u.last_name, u.username,
                    ot.name as training_name,
                    ps.name as schedule_name
             FROM training_registrations tr
             LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
-            LEFT JOIN one_time_trainings ot 
-                ON tr.training_date = ot.training_date 
-                AND tr.training_time = ot.training_time 
+            LEFT JOIN one_time_trainings ot
+                ON tr.training_date = ot.training_date
+                AND tr.training_time = ot.training_time
                 AND tr.chat_id = ot.chat_id
             LEFT JOIN poll_schedules ps
                 ON tr.chat_id = ps.chat_id
-                AND tr.training_time = ps.training_time
+                AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
             WHERE tr.training_date BETWEEN ? AND ?
             ORDER BY tr.training_date ASC, tr.training_time ASC, tr.registered_at ASC
         ''', (start_date, end_date))
@@ -1375,6 +1485,24 @@ class Database:
                 return {"success": True, "action": "registered", "status": "registered"}
         except Exception as e:
             logger.error(f"Ошибка записи на игру: {e}")
+            return {"success": False, "error": str(e)}
+
+    def unregister_from_game(self, game_id: str, user_telegram_id: int) -> Dict[str, Any]:
+        """Отписка от игры"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute('''
+                DELETE FROM game_signups
+                WHERE game_id = ? AND user_telegram_id = ?
+            ''', (game_id, user_telegram_id))
+            self.conn.commit()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Ошибка отписки от игры: {e}")
             return {"success": False, "error": str(e)}
 
     def set_game_result(self, game_id: str, result: str, score: str) -> Dict[str, Any]:
