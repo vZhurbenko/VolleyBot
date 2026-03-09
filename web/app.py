@@ -212,7 +212,14 @@ async def get_current_user_from_access_cookie(request: Request) -> dict:
             status_code=status.HTTP_404_UNAUTHORIZED,
             detail="Пользователь не найден",
         )
-    
+
+    # Проверяем, что пользователь активен
+    if not user.get('is_active', True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Пользователь деактивирован",
+        )
+
     return user
 
 
