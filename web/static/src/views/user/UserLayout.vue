@@ -34,31 +34,6 @@
               Админка
             </router-link>
           </nav>
-
-          <!-- Профиль и выход -->
-          <div class="flex items-center gap-3">
-            <img
-              v-if="user?.photo_url"
-              :src="user.photo_url"
-              alt="User"
-              class="w-8 h-8 rounded-full border border-gray-300"
-            />
-            <div
-              v-else
-              class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-sm"
-            >
-              {{ userInitials }}
-            </div>
-            <span class="text-sm text-gray-700 font-medium hidden sm:block">
-              {{ user?.first_name }}
-            </span>
-            <button
-              @click="handleLogout"
-              class="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 rounded transition-colors"
-            >
-              Выйти
-            </button>
-          </div>
         </div>
       </div>
     </header>
@@ -71,25 +46,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import logo from '@/img/logo.svg'
 
 const router = useRouter()
 const authStore = useAuthStore()
-
-const user = computed(() => authStore.user)
-
-const userInitials = computed(() => {
-  if (!user.value) return '?'
-  const first = user.value.first_name?.[0] || ''
-  const last = user.value.last_name?.[0] || ''
-  return (first + last).toUpperCase()
-})
-
-const handleLogout = async () => {
-  await authStore.logout()
-  router.push('/')
-}
 </script>
