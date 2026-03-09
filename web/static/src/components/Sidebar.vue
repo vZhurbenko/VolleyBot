@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import {
@@ -16,6 +16,8 @@ import logo from '@/img/logo.svg'
 
 const authStore = useAuthStore()
 const router = useRouter()
+
+const emit = defineEmits(['menu-change'])
 
 const isOpen = ref(false)
 
@@ -38,7 +40,14 @@ const handleLogout = async () => {
 
 const handleToggleMenu = () => {
   isOpen.value = !isOpen.value
+  // Блокируем прокрутку body при открытом меню
+  document.body.style.overflow = isOpen.value ? 'hidden' : ''
 }
+
+// Отправляем состояние меню родителю
+watch(isOpen, (newValue) => {
+  emit('menu-change', newValue)
+})
 
 onMounted(() => {
   window.addEventListener('toggle-menu', handleToggleMenu)
@@ -46,6 +55,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('toggle-menu', handleToggleMenu)
+  // Сбрасываем блокировку прокрутки
+  document.body.style.overflow = ''
 })
 </script>
 
@@ -60,7 +71,7 @@ onUnmounted(() => {
   <!-- Sidebar -->
   <aside
     :class="[
-      'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:transform-none',
+      'fixed lg:relative inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:transform-none lg:h-full',
       isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
     ]"
   >
