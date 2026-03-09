@@ -566,8 +566,20 @@ async def get_stats(user: dict = Depends(get_current_user_from_access_cookie)):
     Получение статистики для дашборда (только для администраторов)
     """
     require_admin(user)
+    
+    # Получаем количество записей за 30 дней
+    registrations_count = db.get_training_registrations_count(days=30)
+    
+    # Получаем последние активности
+    recent_activities = db.get_recent_activities(limit=10)
+    
     return {
-        "admin_count": db.get_admin_count()
+        "admin_count": db.get_admin_count(),
+        "users_count": db.get_users_count(),
+        "registrations_count": registrations_count,
+        "recent_activities": recent_activities,
+        "schedules_count": len(db.get_poll_schedules()),
+        "active_polls_count": len(db.get_active_polls())
     }
 
 
