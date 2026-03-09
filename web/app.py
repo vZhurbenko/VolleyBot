@@ -74,6 +74,7 @@ class TelegramUserData(BaseModel):
     photo_url: Optional[str] = None
     auth_date: int
     hash: str
+    invite_code: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
@@ -348,6 +349,17 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
 
     # 6. Возвращаем данные пользователя (без токенов)
     user = db.get_user_by_telegram_id(telegram_id)
+    
+    # 7. Если был передан invite_code, автоматически принимаем приглашение
+    if user_data.invite_code:
+        invite = db.get_invite_code(user_data.invite_code)
+        if invite and invite.get('enabled') and not invite.get('used_by'):
+            # Проверяем срок действия
+            from datetime import datetime
+            if not invite.get('expires_at') or datetime.fromisoformat(invite['expires_at']) > datetime.now():
+                db.use_invite_code(user_data.invite_code, telegram_id)
+                logger.info(f"Пользователь {telegram_id} принял приглашение {user_data.invite_code}")
+    
     return {
         "success": True,
         "message": "Авторизация успешна",
