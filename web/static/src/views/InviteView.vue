@@ -40,11 +40,9 @@
               {{ code.expires_at ? formatDate(code.expires_at) : "∞" }}
             </td>
             <td class="py-3 px-4 text-sm text-gray-700">
-              <div v-if="code.used_by" class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-semibold text-xs">
-                  {{ getUserInitials(code) }}
-                </div>
-                <span>{{ getUserName(code) }}</span>
+              <div v-if="code.used_by" class="flex flex-col gap-1">
+                <span class="font-medium text-gray-900">{{ getUserName(code) }}</span>
+                <span v-if="code.used_user_username" class="text-xs text-gray-500">@{{ code.used_user_username }}</span>
               </div>
               <span v-else class="text-gray-400">—</span>
             </td>
@@ -265,17 +263,10 @@ const getStatusText = (code) => {
   return "Активен";
 };
 
-const getUserInitials = (code) => {
-  if (!code) return '?';
-  const first = code.used_user_first_name?.[0] || '';
-  const last = code.used_user_last_name?.[0] || '';
-  return (first + last).toUpperCase() || '?';
-};
-
 const getUserName = (code) => {
   if (!code) return '';
   const first = code.used_user_first_name || '';
   const last = code.used_user_last_name || '';
-  return `${first} ${last}`.trim() || code.used_user_username || 'Аноним';
+  return `${first} ${last}`.trim() || 'Аноним';
 };
 </script>

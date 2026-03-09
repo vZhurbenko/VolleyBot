@@ -252,10 +252,18 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
     Эндпоинт для авторизации через Telegram Login Widget
     Устанавливает access и refresh токены в HttpOnly cookie
     """
+    # Сохраняем invite_code до валидации
+    invite_code = user_data.invite_code
+    
     logger.info(f"Попытка авторизации пользователя: {user_data.username or user_data.first_name}")
+    logger.info(f"invite_code: {invite_code}")
 
-    # 1. Проверяем валидность hash
-    if not telegram_auth.validate(user_data.dict()):
+    # 1. Проверяем валидность hash (invite_code не должен участвовать в валидации)
+    # Временно удаляем invite_code из данных для валидации
+    user_data_for_validation = user_data.model_copy()
+    user_data_for_validation.invite_code = None
+    
+    if not telegram_auth.validate(user_data_for_validation.dict(exclude_none=True)):
         logger.warning(f"Неверная подпись данных для пользователя {user_data.id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -275,31 +283,49 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
     # 3. Проверяем, существует ли пользователь в БД
     existing_user = db.get_user_by_telegram_id(telegram_id)
 
-    # Если пользователя нет в БД — проверяем, является ли он администратором
+    # Если пользователя нет в БД — проверяем, есть ли приглашение или он администратор
     if not existing_user:
-        admin_ids = db.get_admin_ids()
-        is_admin = telegram_id in admin_ids
+        invite_code = user_data.invite_code
+        invite_valid = False
+        
+        # Проверяем приглашение, если оно было передано
+        if invite_code:
+            invite = db.get_invite_code(invite_code)
+            if invite and invite.get('enabled') and not invite.get('used_by'):
+                from datetime import datetime
+                if not invite.get('expires_at') or datetime.fromisoformat(invite['expires_at']) > datetime.now():
+                    invite_valid = True
+                    logger.info(f"Валидное приглашение {invite_code} для пользователя {telegram_id}")
+        
+        # Если нет валидного приглашения — проверяем администратора
+        if not invite_valid:
+            admin_ids = db.get_admin_ids()
+            is_admin = telegram_id in admin_ids
 
-        # Если не администратор — запрещаем вход
-        if not is_admin:
-            logger.warning(f"Пользователь {telegram_id} не найден в БД и не является администратором")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Вам недоступна авторизация. Обратитесь к администратору."
-            )
+            # Если не администратор — запрещаем вход
+            if not is_admin:
+                logger.warning(f"Пользователь {telegram_id} не найден в БД, не является администратором и не имеет приглашения")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Вам недоступна авторизация. Обратитесь к администратору."
+                )
 
-        # Администраторов регистрируем автоматически
+        # Регистрируем пользователя с приглашением или как администратора
         db.add_user(
             telegram_id=telegram_id,
             first_name=user_data.first_name,
             last_name=user_data.last_name,
             username=user_data.username,
             photo_url=user_data.photo_url,
-            is_admin=is_admin,
-            is_active=True
+            is_admin=False  # Приглашение не даёт прав админа
         )
-        logger.info(f"Новый администратор зарегистрирован: {user_data.username or user_data.first_name}")
+        logger.info(f"Новый пользователь зарегистрирован: {user_data.username or user_data.first_name}")
         existing_user = db.get_user_by_telegram_id(telegram_id)
+        
+        # Если было приглашение — используем его
+        if invite_code and invite_valid:
+            db.use_invite_code(invite_code, telegram_id)
+            logger.info(f"Пользователь {telegram_id} принял приглашение {invite_code}")
     else:
         # Проверяем, активен ли пользователь
         if not existing_user.get('is_active', True):
@@ -349,17 +375,6 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
 
     # 6. Возвращаем данные пользователя (без токенов)
     user = db.get_user_by_telegram_id(telegram_id)
-    
-    # 7. Если был передан invite_code, автоматически принимаем приглашение
-    if user_data.invite_code:
-        invite = db.get_invite_code(user_data.invite_code)
-        if invite and invite.get('enabled') and not invite.get('used_by'):
-            # Проверяем срок действия
-            from datetime import datetime
-            if not invite.get('expires_at') or datetime.fromisoformat(invite['expires_at']) > datetime.now():
-                db.use_invite_code(user_data.invite_code, telegram_id)
-                logger.info(f"Пользователь {telegram_id} принял приглашение {user_data.invite_code}")
-    
     return {
         "success": True,
         "message": "Авторизация успешна",

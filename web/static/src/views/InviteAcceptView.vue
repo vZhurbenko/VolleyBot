@@ -133,13 +133,27 @@ const initTelegramWidget = (botUsername) => {
 }
 
 const onTelegramAuth = async (user) => {
+  console.log('=== onTelegramAuth вызвана ===')
+  console.log('inviteCode.value:', inviteCode.value)
+  console.log('user:', user)
+  
   try {
+    // Проверяем, что invite_code установлен
+    if (!inviteCode.value) {
+      console.error('invite_code не установлен!')
+      error.value = 'Код приглашения не найден'
+      return
+    }
+  
     // Добавляем invite_code к данным пользователя
     const authData = {
       ...user,
       invite_code: inviteCode.value
     }
     
+    console.log('Авторизация с приглашением:', inviteCode.value)
+    console.log('authData:', authData)
+
     const response = await fetch('/api/auth/telegram', {
       method: 'POST',
       headers: {
@@ -154,9 +168,13 @@ const onTelegramAuth = async (user) => {
     if (response.ok && result.success) {
       authStore.setUser(result.user)
       notificationsStore.success('Вы успешно авторизовались!')
-      
-      // Автоматически принимаем приглашение после авторизации
-      await acceptInvite()
+
+      // Приглашение уже принято на бэкенде при авторизации
+      inviteAccepted.value = true
+      notificationsStore.success('Вы успешно присоединились к команде!')
+      setTimeout(() => {
+        router.push('/dashboard/')
+      }, 800)
     } else {
       error.value = result.detail || 'Ошибка авторизации'
     }
