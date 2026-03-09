@@ -52,27 +52,41 @@
           </div>
           <!-- Кнопка добавления для админов -->
           <button
-            v-if="isAdmin && !isPastDate(day)"
+            v-if="isAdmin && !isPastDay(day)"
             @click="handleAddTraining(day)"
             class="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded bg-teal-100 text-teal-600 hover:bg-teal-200 transition-opacity"
             title="Добавить тренировку"
-            :disabled="isPastDate(day)"
           >
             <Plus class="w-4 h-4" />
           </button>
         </div>
 
-        <!-- Тренировки в этот день -->
+        <!-- Тренировки и игры в этот день -->
         <div class="space-y-1 overflow-y-auto max-h-[120px]">
+          <!-- Тренировки -->
           <div
             v-for="training in getTrainingsForDay(day)"
             :key="training.key"
-            @click="!isPastDate(day) && $emit('click-training', training)"
-            class="text-xs p-1.5 rounded cursor-pointer transition-colors border"
+            @click="!isPastTraining(training) && $emit('click-training', training)"
+            class="text-xs p-1.5 rounded transition-colors border"
             :class="getTrainingClass(training, day)"
           >
             <div class="font-medium truncate">{{ training.name || training.time }}</div>
             <div class="truncate opacity-75">{{ training.registered_count }}/12</div>
+          </div>
+
+          <!-- Игры -->
+          <div
+            v-for="game in getGamesForDay(day)"
+            :key="game.id"
+            @click="!isPastGame(game) && $emit('click-game', game)"
+            class="text-xs p-1.5 rounded transition-colors border"
+            :class="getGameClass(game, day)"
+          >
+            <div class="font-medium truncate">{{ game.name }}</div>
+            <div v-if="game.opponent" class="text-[10px] truncate opacity-75">vs {{ game.opponent }}</div>
+            <div v-if="game.start_time" class="text-[10px] truncate opacity-75">{{ game.start_time }}</div>
+            <div class="text-[10px] truncate opacity-75">{{ game.registered_count }} запис.</div>
           </div>
         </div>
       </div>
@@ -86,6 +100,10 @@ import { Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 const props = defineProps({
   trainings: {
+    type: Array,
+    default: () => []
+  },
+  games: {
     type: Array,
     default: () => []
   },
@@ -103,7 +121,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['click-training', 'update-month', 'add-training'])
+const emit = defineEmits(['click-training', 'click-game', 'update-month', 'add-training'])
 
 // Следим за изменением пропсов year и month
 watch([() => props.year, () => props.month], ([newYear, newMonth]) => {
@@ -176,6 +194,47 @@ const isPastDate = (day) => {
   return date < today
 }
 
+const isPastDay = (day) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const date = new Date(props.year, props.month - 1, day)
+  return date < today
+}
+
+const isPastTraining = (training) => {
+  const now = new Date()
+  // Если есть start_time, сравниваем по времени
+  if (training.start_time) {
+    const [hours, minutes] = training.start_time.split(':').map(Number)
+    const trainingDateTime = new Date(props.year, props.month - 1, getDayFromTraining(training), hours, minutes)
+    return trainingDateTime < now
+  }
+  // Если времени нет, сравниваем по дате (конец дня)
+  const trainingDate = new Date(training.date)
+  trainingDate.setHours(23, 59, 59, 999)
+  return trainingDate < now
+}
+
+const isPastGame = (game) => {
+  const now = new Date()
+  // Если есть start_time, сравниваем по времени
+  if (game.start_time) {
+    const [hours, minutes] = game.start_time.split(':').map(Number)
+    const gameDateTime = new Date(game.date)
+    gameDateTime.setHours(hours, minutes)
+    return gameDateTime < now
+  }
+  // Если времени нет, сравниваем по дате (конец дня)
+  const gameDate = new Date(game.date)
+  gameDate.setHours(23, 59, 59, 999)
+  return gameDate < now
+}
+
+const getDayFromTraining = (training) => {
+  const date = new Date(training.date)
+  return date.getDate()
+}
+
 const isWeekend = (day) => {
   const date = new Date(props.year, props.month - 1, day)
   const dayOfWeek = date.getDay()
@@ -187,19 +246,32 @@ const getTrainingsForDay = (day) => {
   return props.trainings.filter(t => t.date === dateStr)
 }
 
+const getGamesForDay = (day) => {
+  const dateStr = `${props.year}-${String(props.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  return props.games.filter(g => g.date === dateStr)
+}
+
 const getTrainingClass = (training, day) => {
   // Если тренировка прошла, делаем её серой и неактивной
-  if (isPastDate(day)) {
-    return 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300 opacity-50'
+  if (isPastTraining(training)) {
+    return 'bg-gray-200 text-gray-400 border-gray-300'
   }
   if (training.user_status === 'registered') {
-    return 'bg-teal-100 text-teal-800 hover:bg-teal-200 border-teal-200'
+    return 'bg-teal-100 text-teal-800 hover:bg-teal-200 border-teal-200 cursor-pointer'
   } else if (training.user_status === 'waitlist') {
-    return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200'
+    return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200 cursor-pointer'
   } else if (training.registered_count >= 12) {
-    return 'bg-red-100 text-red-800 hover:bg-red-200 border-red-200'
+    return 'bg-red-100 text-red-800 hover:bg-red-200 border-red-200 cursor-pointer'
   } else {
-    return 'bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200'
+    return 'bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 cursor-pointer'
   }
+}
+
+const getGameClass = (game, day) => {
+  // Если игра прошла, делаем её серой и неактивной
+  if (isPastGame(game)) {
+    return 'bg-gray-200 text-gray-400 border-gray-300'
+  }
+  return 'bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200 cursor-pointer'
 }
 </script>

@@ -515,6 +515,16 @@ class PollSchedule(BaseModel):
         return v
 
 
+@app.get("/api/user/template")
+async def get_template(user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение шаблона опроса по умолчанию (доступно всем авторизованным)
+    """
+    require_auth(user)
+    template = db.get_default_template()
+    return {"template": template}
+
+
 @app.get("/api/admin/settings/template")
 async def get_poll_template(user: dict = Depends(get_current_user_from_access_cookie)):
     """
@@ -771,8 +781,25 @@ async def get_calendar(year: int, month: int, user: dict = Depends(get_current_u
         user_telegram_id = user.get('telegram_id')
         user_registration = next((r for r in registrations if r.get('user_telegram_id') == user_telegram_id), None)
         training['user_status'] = user_registration['status'] if user_registration else None
+
+    # Получаем игры на этот месяц
+    games = db.get_all_games(year, month)
     
-    return {"trainings": list(trainings.values())}
+    # Для каждой игры получаем записи
+    for game in games:
+        signups = db.get_game_signups(game['id'])
+        game['signups'] = signups
+        game['registered_count'] = len(signups)
+        
+        # Проверяем записан ли текущий пользователь
+        user_telegram_id = user.get('telegram_id')
+        user_signup = next((s for s in signups if s.get('user_telegram_id') == user_telegram_id), None)
+        game['user_status'] = user_signup['status'] if user_signup else None
+    
+    return {
+        "trainings": list(trainings.values()),
+        "games": games
+    }
 
 
 @app.post("/api/user/calendar/register")
@@ -1017,6 +1044,39 @@ async def get_all_trainings(start_date: str, end_date: str, user: dict = Depends
     return {"trainings": trainings}
 
 
+# ==================== API для игр ====================
+
+class GameCreate(BaseModel):
+    """Модель создания игры"""
+    name: str
+    date: str
+    location: Optional[str] = None
+    start_time: Optional[str] = None
+    opponent: Optional[str] = None
+    chat_id: Optional[str] = None
+    topic_id: Optional[int] = None
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "name": "Товарищеский матч",
+                "date": "2026-03-15",
+                "location": "СК Звезда",
+                "start_time": "19:00",
+                "opponent": "Команда соперников",
+                "chat_id": "-1001234567890",
+                "topic_id": 42
+            }
+        }
+    }
+
+
+class GameResult(BaseModel):
+    """Модель результата игры"""
+    result: str  # win, loss, draw
+    score: str  # например "3:1"
+
+
 # ==================== API для приглашений ====================
 
 class InviteCodeCreate(BaseModel):
@@ -1159,6 +1219,201 @@ async def accept_invite_code(
         return {"success": True, "message": "Вы успешно присоединились!"}
     else:
         raise HTTPException(status_code=500, detail="Не удалось использовать приглашение")
+
+
+# ==================== API для игр ====================
+
+@app.get("/api/games")
+async def get_games(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение списка игр.
+    Если указаны year и month — возвращает игры за месяц.
+    """
+    require_auth(user)
+    
+    games = db.get_all_games(year, month)
+    return {"games": games}
+
+
+@app.get("/api/games/{game_id}")
+async def get_game(
+    game_id: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение информации об игре
+    """
+    require_auth(user)
+    
+    game = db.get_game(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Игра не найдена")
+    
+    # Добавляем список записавшихся
+    signups = db.get_game_signups(game_id)
+    game['signups'] = signups
+    
+    return {"game": game}
+
+
+@app.post("/api/admin/games")
+async def create_game(
+    game_data: GameCreate,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Создание новой игры (только админы)
+    """
+    require_admin(user)
+    
+    game_dict = game_data.model_dump()
+    result = db.add_game(game_dict)
+    
+    if result.get('success'):
+        return {
+            "success": True,
+            "id": result['id'],
+            "message": "Игра создана"
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to create game'))
+
+
+@app.put("/api/admin/games/{game_id}")
+async def update_game(
+    game_id: str,
+    game_data: GameCreate,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Обновление игры (только админы)
+    """
+    require_admin(user)
+    
+    # Проверяем существование
+    existing = db.get_game(game_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Игра не найдена")
+    
+    updates = game_data.model_dump(exclude_unset=True)
+    result = db.update_game(game_id, updates)
+    
+    if result.get('success'):
+        return {"success": True, "message": "Игра обновлена"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to update game'))
+
+
+@app.delete("/api/admin/games/{game_id}")
+async def delete_game(
+    game_id: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Удаление игры (только админы)
+    """
+    require_admin(user)
+    
+    result = db.remove_game(game_id)
+    
+    if result.get('success'):
+        return {"success": True, "message": "Игра удалена"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to delete game'))
+
+
+@app.post("/api/games/{game_id}/signup")
+async def signup_for_game(
+    game_id: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Запись на игру (доступно всем авторизованным пользователям)
+    Повторный вызов отменяет запись
+    """
+    require_auth(user)
+    
+    # Проверяем существование игры
+    game = db.get_game(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Игра не найдена")
+    
+    telegram_id = user.get('telegram_id')
+    result = db.signup_for_game(game_id, telegram_id)
+    
+    if result.get('success'):
+        action = result.get('action', 'registered')
+        return {
+            "success": True,
+            "action": action,
+            "message": "Запись на игру" if action == 'registered' else "Запись отменена"
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to signup'))
+
+
+@app.put("/api/admin/games/{game_id}/result")
+async def set_game_result(
+    game_id: str,
+    result_data: GameResult,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Установка результата игры (только админы)
+    """
+    require_admin(user)
+
+    # Проверяем существование
+    game = db.get_game(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Игра не найдена")
+
+    result = db.set_game_result(game_id, result_data.result, result_data.score)
+
+    if result.get('success'):
+        return {"success": True, "message": "Результат установлен"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to set result'))
+
+
+@app.delete("/api/admin/games/{game_id}/result")
+async def clear_game_result(
+    game_id: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Сброс результата игры (только админы)
+    """
+    require_admin(user)
+
+    # Проверяем существование
+    game = db.get_game(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Игра не найдена")
+
+    result = db.set_game_result(game_id, '', '')
+
+    if result.get('success'):
+        return {"success": True, "message": "Результат сброшен"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to clear result'))
+
+
+@app.get("/api/games/my")
+async def get_my_games(user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Получение списка игр, на которые записан текущий пользователь
+    """
+    require_auth(user)
+    
+    telegram_id = user.get('telegram_id')
+    games = db.get_user_games(telegram_id)
+    
+    return {"games": games}
 
 
 # ==================== Статика ====================

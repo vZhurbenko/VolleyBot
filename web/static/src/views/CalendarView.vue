@@ -12,8 +12,10 @@
       :year="currentYear"
       :month="currentMonth"
       :trainings="trainings"
+      :games="games"
       :is-admin="authStore.isAdmin"
       @click-training="openTrainingModal"
+      @click-game="openGameModal"
       @update-month="updateMonth"
       @add-training="openAddTrainingModal"
     />
@@ -27,6 +29,14 @@
       @unregister="unregisterFromTraining"
       @remove-training="removeOneTimeTraining"
       @remove-user="removeUserFromTraining"
+    />
+
+    <!-- Модалка игры -->
+    <GameModal
+      v-if="selectedGame"
+      :game="selectedGame"
+      @close="closeGameModal"
+      @update-game="updateGameSignup"
     />
 
     <!-- Модалка добавления тренировки -->
@@ -51,6 +61,7 @@ import { useConfirmStore } from '@/stores/confirm'
 import Calendar from '@/components/Calendar.vue'
 import TrainingModal from '@/components/TrainingModal.vue'
 import AddTrainingModal from '@/components/AddTrainingModal.vue'
+import GameModal from '@/components/GameModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,7 +71,9 @@ const notificationsStore = useNotificationsStore()
 const confirmStore = useConfirmStore()
 
 const trainings = ref([])
+const games = ref([])
 const selectedTraining = ref(null)
+const selectedGame = ref(null)
 const loading = ref(false)
 
 // Для добавления тренировки
@@ -131,10 +144,16 @@ const loadCalendar = async () => {
 
     const data = await response.json()
     trainings.value = data.trainings || []
-    
+    games.value = data.games || []
+
     // Проверяем, есть ли параметры для открытия конкретной тренировки
     if (route.query.date && route.query.chat_id && route.query.time) {
       openTrainingByParams()
+    }
+    
+    // Проверяем, есть ли параметр для открытия игры
+    if (route.query.game_id) {
+      openGameByParams()
     }
   } catch (error) {
     console.error('Error loading calendar:', error)
@@ -147,17 +166,29 @@ const openTrainingByParams = () => {
   const targetDate = route.query.date
   const targetChatId = route.query.chat_id
   const targetTime = decodeURIComponent(route.query.time || '')
-  
-  const training = trainings.value.find(t => 
-    t.date === targetDate && 
-    t.chat_id === targetChatId && 
+
+  const training = trainings.value.find(t =>
+    t.date === targetDate &&
+    t.chat_id === targetChatId &&
     t.time === targetTime
   )
-  
+
   if (training) {
     selectedTraining.value = { ...training }
   } else {
     notificationsStore.error('Тренировка не найдена')
+  }
+}
+
+const openGameByParams = () => {
+  const targetGameId = route.query.game_id
+
+  const game = games.value.find(g => g.id === targetGameId)
+
+  if (game) {
+    selectedGame.value = { ...game }
+  } else {
+    notificationsStore.error('Игра не найдена')
   }
 }
 
@@ -376,6 +407,59 @@ const removeUserFromTraining = async (reg) => {
   } catch (error) {
     console.error('Error removing user:', error)
     notificationsStore.error('Ошибка удаления участника')
+  }
+}
+
+// Функции для работы с играми
+const openGameModal = (game) => {
+  selectedGame.value = { ...game }
+}
+
+const closeGameModal = () => {
+  selectedGame.value = null
+  // Очищаем query параметр game_id
+  router.push({
+    query: {
+      ...route.query,
+      game_id: undefined
+    }
+  })
+  loadCalendar()
+}
+
+const updateGameSignup = async () => {
+  if (!selectedGame.value) return
+
+  try {
+    const response = await fetch(`/api/games/${selectedGame.value.id}/signup`, {
+      method: 'POST',
+      credentials: 'include'
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      notificationsStore.success(
+        result.action === 'registered' ? 'Вы записаны на игру' : 'Запись отменена'
+      )
+      
+      // Обновляем статус в модалке
+      const isSignedUp = result.action === 'registered'
+      
+      // Перезагружаем календарь для обновления списка записавшихся
+      await loadCalendar()
+      
+      // Находим обновлённую игру и обновляем selectedGame
+      const updatedGame = games.value.find(g => g.id === selectedGame.value.id)
+      if (updatedGame) {
+        selectedGame.value = { ...updatedGame }
+      }
+    } else {
+      notificationsStore.error(result.detail || 'Ошибка')
+    }
+  } catch (error) {
+    console.error('Error signing up for game:', error)
+    notificationsStore.error('Ошибка записи на игру')
   }
 }
 </script>
