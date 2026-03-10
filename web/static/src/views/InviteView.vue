@@ -253,11 +253,11 @@ const isExpired = (code) => {
 };
 
 const getStatusText = (code) => {
-  if (!code.enabled) {
-    return "Отозван";
-  }
   if (code.used_by) {
     return "Принят";
+  }
+  if (!code.enabled) {
+    return "Отозван";
   }
   if (code.expires_at) {
     const expires = new Date(code.expires_at);
