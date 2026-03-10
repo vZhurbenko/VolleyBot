@@ -53,14 +53,14 @@
             </td>
             <td class="py-3 px-4 text-right">
               <button
-                v-if="code.enabled && !code.used_by"
+                v-if="code.enabled && !code.used_by && !isExpired(code)"
                 @click="copyLink(code.code)"
                 class="px-3 py-1.5 text-sm rounded font-medium transition-colors bg-teal-100 text-teal-700 hover:bg-teal-200"
               >
                 Копировать
               </button>
               <button
-                v-if="code.enabled && !code.used_by"
+                v-if="code.enabled && !code.used_by && !isExpired(code)"
                 @click="deactivateCode(code.code)"
                 class="ml-2 px-3 py-1.5 text-sm rounded font-medium transition-colors bg-red-100 text-red-700 hover:bg-red-200"
               >
@@ -247,12 +247,17 @@ const getStatusClass = (code) => {
   return "bg-teal-100 text-teal-700";
 };
 
+const isExpired = (code) => {
+  if (!code.expires_at) return false;
+  return new Date(code.expires_at) < new Date();
+};
+
 const getStatusText = (code) => {
   if (!code.enabled) {
     return "Отозван";
   }
   if (code.used_by) {
-    return "Использован";
+    return "Принят";
   }
   if (code.expires_at) {
     const expires = new Date(code.expires_at);
