@@ -1,7 +1,7 @@
 <template>
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-    @click="$emit('close')"
+    @click="handleClose"
   >
     <div
       class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-auto"
@@ -25,8 +25,9 @@
             <Link class="w-4 h-4 text-gray-600" />
           </button>
           <button
-            @click="$emit('close')"
+            @click="handleClose"
             class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+            title="Закрыть"
           >
             <X class="w-4 h-4 text-gray-600" />
           </button>
@@ -185,7 +186,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useConfirmStore } from '@/stores/confirm'
@@ -199,6 +201,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'register', 'unregister', 'remove-training', 'remove-user'])
+
+const router = useRouter()
+const route = useRoute()
 
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
@@ -319,4 +324,29 @@ const removeUser = async (reg) => {
     emit('remove-user', reg)
   }
 }
+
+const handleClose = () => {
+  // Очищаем параметр training из URL
+  const newQuery = { ...route.query }
+  delete newQuery.training
+  router.push({ query: newQuery })
+  emit('close')
+}
+
+// Обработчик нажатия клавиш
+const handleKeydown = (e) => {
+  if (e.key === 'Escape') {
+    handleClose()
+  }
+}
+
+// Подписка на события клавиатуры при монтировании
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+// Очистка при размонтировании
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>

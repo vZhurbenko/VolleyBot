@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
-  const isLoading = ref(true)
 
   const isAuthenticated = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.is_admin ?? false)
@@ -21,8 +20,6 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error) {
       console.error('Ошибка проверки авторизации:', error)
       user.value = null
-    } finally {
-      isLoading.value = false
     }
   }
 
@@ -44,7 +41,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user,
-    isLoading,
     isAuthenticated,
     isAdmin,
     checkAuth,

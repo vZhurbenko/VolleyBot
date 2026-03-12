@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -99,28 +98,6 @@ const router = createRouter({
       meta: { requiresAuth: false }, // Авторизация проверяется внутри компонента
     },
   ],
-})
-
-router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthStore()
-
-  if (to.meta.requiresAuth) {
-    if (authStore.isLoading) {
-      await authStore.checkAuth()
-    }
-
-    if (!authStore.isAuthenticated) {
-      return next('/')
-    }
-
-    // Проверка прав администратора для защищенных маршрутов
-    if (to.meta.requiresAdmin && !authStore.isAdmin) {
-      // Обычные пользователи перенаправляются на календарь
-      return next('/dashboard/calendar')
-    }
-  }
-
-  next()
 })
 
 export default router
