@@ -1578,12 +1578,11 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 async def get_training_redirect(training_uuid: str, request: Request):
     """
     Универсальная ссылка на тренировку
+    Возвращает JSON с редиректом для обработки на фронте
     Логика:
-    1. Если не авторизован → редирект на логин с redirect на /training/{uuid}
-    2. После авторизации:
-       - Если есть в users → /dashboard/calendar?training={uuid} (модалка)
-       - Если есть в guests → /guest/training/{uuid} (страница гостя)
-       - Если нет нигде → добавить в guests → /guest/training/{uuid}
+    1. Если не авторизован → redirect на /login?redirect=/training/{uuid}
+    2. Если гость → redirect на /guest/training/{uuid}
+    3. Если пользователь → redirect на /dashboard/calendar?training={uuid}
     """
     # Получаем пользователя из токена
     user = get_current_user_from_access_token(request)
@@ -1595,26 +1594,17 @@ async def get_training_redirect(training_uuid: str, request: Request):
     
     # Если пользователь не авторизован → редирект на логин
     if not user:
-        redirect_url = f"/login?redirect=/training/{training_uuid}"
-        return Response(
-            content=f"<html><head><meta http-equiv='refresh' content='0;url={redirect_url}'></head></html>",
-            media_type="text/html"
-        )
+        return {"redirect": f"/login?redirect=/training/{training_uuid}"}
     
     # Проверяем, является ли пользователь гостем
-    is_guest = user.get('is_guest', False)
+    is_guest = db.is_guest(user.get('telegram_id'))
     
     if is_guest:
         # Гость → страница гостя
-        redirect_url = f"/guest/training/{training_uuid}"
+        return {"redirect": f"/guest/training/{training_uuid}"}
     else:
         # Пользователь → календарь с открытой модалкой
-        redirect_url = f"/dashboard/calendar?training={training_uuid}"
-    
-    return Response(
-        content=f"<html><head><meta http-equiv='refresh' content='0;url={redirect_url}'></head></html>",
-        media_type="text/html"
-    )
+        return {"redirect": f"/dashboard/calendar?training={training_uuid}"}
 
 @app.get("/api/user/calendar")
 async def get_calendar(year: int, month: int, user: dict = Depends(get_current_user_from_access_cookie)):

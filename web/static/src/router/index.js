@@ -88,6 +88,11 @@ const router = createRouter({
       meta: { requiresAuth: false }, // Публичный доступ
     },
     {
+      path: '/training/:uuid',
+      name: 'training-redirect',
+      component: () => import('@/views/TrainingRedirectView.vue'),
+    },
+    {
       path: '/guest/training/:uuid',
       name: 'guest-training',
       component: () => import('@/views/guest/GuestTrainingView.vue'),
