@@ -7,7 +7,11 @@
       <h1 class="text-2xl font-bold text-gray-900 mb-2 text-center">Team R</h1>
       <p class="text-gray-500 mb-6 text-center">Система управления тренировками</p>
 
-      <div v-if="isAuthenticated" class="mt-6">
+      <div v-if="authStore.isLoading" class="mt-6 text-center text-gray-500">
+        Загрузка...
+      </div>
+
+      <div v-else-if="isAuthenticated" class="mt-6">
         <p class="text-green-600 font-medium mb-4 text-center">✓ Вы уже авторизованы</p>
         <button
           @click="goToAdmin"
