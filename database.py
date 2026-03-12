@@ -675,14 +675,19 @@ class Database:
 
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT tr.*, u.first_name, u.last_name, u.username, u.photo_url
+            SELECT tr.*, u.first_name, u.last_name, u.username, u.photo_url, u.is_admin
             FROM training_registrations tr
             LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
             WHERE tr.training_date = ? AND tr.training_time = ? AND tr.chat_id = ?
             ORDER BY tr.registered_at ASC
         ''', (training_date, training_time, chat_id))
-        
-        return [dict(row) for row in cursor.fetchall()]
+
+        rows = [dict(row) for row in cursor.fetchall()]
+        # Преобразуем is_admin в bool
+        for row in rows:
+            if 'is_admin' in row:
+                row['is_admin'] = bool(row['is_admin'])
+        return rows
 
     def register_for_training(self, training_id: str, training_date: str, training_time: str,
                               chat_id: str, topic_id: Optional[int], user_telegram_id: int) -> Dict[str, Any]:
@@ -1642,14 +1647,19 @@ class Database:
 
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT gs.*, u.first_name, u.last_name, u.username, u.photo_url
+            SELECT gs.*, u.first_name, u.last_name, u.username, u.photo_url, u.is_admin
             FROM game_signups gs
             LEFT JOIN users u ON gs.user_telegram_id = u.telegram_id
             WHERE gs.game_id = ?
             ORDER BY gs.created_at ASC
         ''', (game_id,))
 
-        return [dict(row) for row in cursor.fetchall()]
+        rows = [dict(row) for row in cursor.fetchall()]
+        # Преобразуем is_admin в bool
+        for row in rows:
+            if 'is_admin' in row:
+                row['is_admin'] = bool(row['is_admin'])
+        return rows
 
     def get_training_participants(self, training_uuid: str) -> List[Dict[str, Any]]:
         """

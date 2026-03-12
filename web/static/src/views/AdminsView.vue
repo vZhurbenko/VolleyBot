@@ -64,6 +64,16 @@
                   class="w-4 h-4 text-purple-600 flex-shrink-0"
                   title="Администратор"
                 />
+                <BadgeCheck
+                  v-else-if="!user.is_guest"
+                  class="w-4 h-4 text-teal-600 flex-shrink-0"
+                  title="Участник"
+                />
+                <User
+                  v-else
+                  class="w-4 h-4 text-blue-600 flex-shrink-0"
+                  title="Гость"
+                />
               </div>
               <p class="text-sm text-gray-500">ID: {{ user.telegram_id }}</p>
               <p v-if="!user.is_active" class="text-xs text-red-500 font-medium">Деактивирован</p>
@@ -94,7 +104,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Shield, Edit2 } from 'lucide-vue-next'
+import { Shield, Edit2, User, BadgeCheck } from 'lucide-vue-next'
 import UserEditModal from '@/components/UserEditModal.vue'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useConfirmStore } from '@/stores/confirm'

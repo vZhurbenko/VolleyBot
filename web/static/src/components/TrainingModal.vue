@@ -79,21 +79,21 @@
                     <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
                   </span>
                   <!-- Значок роли -->
-                  <span
+                  <Shield
                     v-if="reg.is_admin"
-                    class="text-yellow-600 flex-shrink-0"
+                    class="w-4 h-4 text-purple-600 flex-shrink-0"
                     title="Администратор"
-                  >
-                    👑
-                  </span>
-                  <span
-                    v-else-if="reg.is_guest"
-                    class="text-purple-600 flex-shrink-0"
+                  />
+                  <BadgeCheck
+                    v-else-if="!reg.is_guest"
+                    class="w-4 h-4 text-teal-600 flex-shrink-0"
+                    title="Участник"
+                  />
+                  <User
+                    v-else
+                    class="w-4 h-4 text-blue-600 flex-shrink-0"
                     title="Гость"
-                  >
-                    👤
-                  </span>
-                  <span v-else class="text-teal-600 flex-shrink-0" title="Участник"> ✅ </span>
+                  />
                 </div>
               </div>
               <!-- Кнопка удаления для админа -->
@@ -138,21 +138,21 @@
                       <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
                     </span>
                     <!-- Значок роли -->
-                    <span
+                    <Shield
                       v-if="reg.is_admin"
-                      class="text-yellow-600 flex-shrink-0"
+                      class="w-4 h-4 text-purple-600 flex-shrink-0"
                       title="Администратор"
-                    >
-                      👑
-                    </span>
-                    <span
-                      v-else-if="reg.is_guest"
-                      class="text-purple-600 flex-shrink-0"
+                    />
+                    <BadgeCheck
+                      v-else-if="!reg.is_guest"
+                      class="w-4 h-4 text-teal-600 flex-shrink-0"
+                      title="Участник"
+                    />
+                    <User
+                      v-else
+                      class="w-4 h-4 text-blue-600 flex-shrink-0"
                       title="Гость"
-                    >
-                      👤
-                    </span>
-                    <span v-else class="text-teal-600 flex-shrink-0" title="Участник"> ✅ </span>
+                    />
                   </div>
                 </div>
                 <!-- Кнопка удаления для админа -->
@@ -191,7 +191,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useConfirmStore } from '@/stores/confirm'
-import { Link, X } from 'lucide-vue-next'
+import { Link, X, Shield, User, BadgeCheck } from 'lucide-vue-next'
 
 const props = defineProps({
   training: {

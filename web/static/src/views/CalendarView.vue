@@ -198,8 +198,9 @@ watch(() => route.query.training, (newVal) => {
   }
 })
 
-// Закрываем модалку игры при изменении URL (если параметр game_id исчез)
-watch(() => route.query.game_id, (newVal) => {
+// Закрываем модалку игры при изменении URL (если параметр training исчез)
+// Для игр используется тот же параметр training, а не game_id
+watch(() => route.query.training, (newVal) => {
   if (!newVal) {
     selectedGame.value = null
   }
@@ -463,13 +464,6 @@ const openGameModal = (game) => {
 
 const closeGameModal = () => {
   selectedGame.value = null
-  // Очищаем query параметр game_id
-  router.push({
-    query: {
-      ...route.query,
-      game_id: undefined,
-    },
-  })
   loadCalendar()
 }
 

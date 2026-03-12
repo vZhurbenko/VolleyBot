@@ -84,6 +84,22 @@
                 {{ signup.first_name }} {{ signup.last_name || '' }}
                 <span v-if="signup.username" class="text-gray-400">@{{ signup.username }}</span>
               </span>
+              <!-- Значок роли -->
+              <Shield
+                v-if="signup.is_admin"
+                class="w-4 h-4 text-purple-600 flex-shrink-0"
+                title="Администратор"
+              />
+              <BadgeCheck
+                v-else-if="!signup.is_guest"
+                class="w-4 h-4 text-teal-600 flex-shrink-0"
+                title="Участник"
+              />
+              <User
+                v-else
+                class="w-4 h-4 text-blue-600 flex-shrink-0"
+                title="Гость"
+              />
             </div>
           </div>
         </div>
@@ -96,7 +112,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { X, Trophy, Link } from 'lucide-vue-next'
+import { X, Trophy, Link, Shield, User, BadgeCheck } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
 
@@ -204,17 +220,20 @@ const shareGame = () => {
 
 const handleClose = () => {
   console.log('[GameModal] handleClose вызван')
+  console.log('[GameModal] route.query:', route.query)
   
   // Сначала закрываем модалку
   emit('close')
+  console.log('[GameModal] emit(close) вызван')
   
-  // Затем очищаем параметр game_id из URL
+  // Затем очищаем параметр training из URL (не game_id!)
   const newQuery = { ...route.query }
-  delete newQuery.game_id
+  delete newQuery.training
   console.log('[GameModal] Новый query:', newQuery)
   
   // Используем router.replace для обновления URL
   router.replace({ query: newQuery })
+  console.log('[GameModal] router.replace вызван')
 }
 
 // Обработчик нажатия клавиш
