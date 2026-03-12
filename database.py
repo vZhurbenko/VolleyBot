@@ -615,6 +615,8 @@ class Database:
             user = dict(row)
             user['is_admin'] = bool(user['is_admin'])
             user['is_active'] = bool(user['is_active']) if 'is_active' in user else True
+            # Проверяем является ли пользователь гостем
+            user['is_guest'] = self.is_guest(user['telegram_id'])
             users.append(user)
 
         return users
@@ -1449,6 +1451,26 @@ class Database:
             return dict(row)
         return None
 
+    def get_training_id_by_uuid(self, training_uuid: str) -> Optional[str]:
+        """
+        Получение ID тренировки по UUID
+
+        Args:
+            training_uuid: UUID тренировки
+
+        Returns:
+            ID тренировки или None если не найдена
+        """
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT id FROM games WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            return row['id']
+        return None
+
     def get_training_uuid_by_id(self, training_id: str) -> Optional[str]:
         """Получение UUID тренировки по ID"""
         if not self.conn:
@@ -1746,10 +1768,10 @@ class Database:
     def get_guest_by_telegram(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         """
         Получение информации о госте по Telegram ID
-        
+
         Args:
             telegram_id: Telegram ID пользователя
-            
+
         Returns:
             Dict с информацией о госте или None если не найден
         """
@@ -1758,6 +1780,35 @@ class Database:
 
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM guests WHERE telegram_id = ?', (telegram_id,))
+        row = cursor.fetchone()
+
+        if row:
+            guest = dict(row)
+            guest['is_active'] = bool(guest['is_active'])
+            return guest
+        return None
+
+    def get_guest_with_training(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получение информации о госте с данными о тренировке
+
+        Args:
+            telegram_id: Telegram ID пользователя
+
+        Returns:
+            Dict с информацией о госте и тренировке или None если не найден
+        """
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT g.*, gu.uuid as training_uuid, gu.name as training_name,
+                   gu.date as training_date, gu.start_time, gu.location
+            FROM guests g
+            LEFT JOIN games gu ON g.training_uuid = gu.uuid
+            WHERE g.telegram_id = ?
+        ''', (telegram_id,))
         row = cursor.fetchone()
 
         if row:
