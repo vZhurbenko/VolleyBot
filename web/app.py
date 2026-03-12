@@ -268,6 +268,7 @@ class TelegramUserData(BaseModel):
     auth_date: int
     hash: str
     invite_code: Optional[str] = None
+    training_uuid: Optional[str] = None  # UUID тренировки для гостей
 
 
 class AuthResponse(BaseModel):
@@ -529,11 +530,12 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
     # 3. Проверяем, существует ли пользователь в БД
     existing_user = db.get_user_by_telegram_id(telegram_id)
 
-    # Если пользователя нет в БД — проверяем, есть ли приглашение или он администратор
+    # Если пользователя нет в БД — проверяем, есть ли приглашение, training_uuid или он администратор
     if not existing_user:
         invite_code = user_data.invite_code
+        training_uuid = user_data.training_uuid
         invite_valid = False
-        
+
         # Проверяем приглашение, если оно было передано
         if invite_code:
             invite = db.get_invite_code(invite_code)
@@ -542,36 +544,62 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
                 if not invite.get('expires_at') or datetime.fromisoformat(invite['expires_at']) > datetime.now():
                     invite_valid = True
                     logger.info(f"Валидное приглашение {invite_code} для пользователя {telegram_id}")
-        
-        # Если нет валидного приглашения — проверяем администратора
+
+        # Если нет валидного приглашения — проверяем training_uuid (гость)
+        if not invite_valid and training_uuid:
+            # Проверяем валидность тренировки
+            training = db.get_training_by_uuid(training_uuid)
+            if training:
+                invite_valid = True
+                logger.info(f"Валидная тренировка {training_uuid} для пользователя {telegram_id}")
+
+        # Если нет валидного приглашения или training_uuid — проверяем администратора
         if not invite_valid:
             admin_ids = db.get_admin_ids()
             is_admin = telegram_id in admin_ids
 
             # Если не администратор — запрещаем вход
             if not is_admin:
-                logger.warning(f"Пользователь {telegram_id} не найден в БД, не является администратором и не имеет приглашения")
+                logger.warning(f"Пользователь {telegram_id} не найден в БД, не имеет приглашения или training_uuid")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Вам недоступна авторизация. Обратитесь к администратору."
                 )
 
-        # Регистрируем пользователя с приглашением или как администратора
-        db.add_user(
-            telegram_id=telegram_id,
-            first_name=user_data.first_name,
-            last_name=user_data.last_name,
-            username=user_data.username,
-            photo_url=user_data.photo_url,
-            is_admin=False  # Приглашение не даёт прав админа
-        )
-        logger.info(f"Новый пользователь зарегистрирован: {user_data.username or user_data.first_name}")
-        existing_user = db.get_user_by_telegram_id(telegram_id)
-        
-        # Если было приглашение — используем его
-        if invite_code and invite_valid:
-            db.use_invite_code(invite_code, telegram_id)
-            logger.info(f"Пользователь {telegram_id} принял приглашение {invite_code}")
+        # Регистрируем как гостя если есть training_uuid
+        if training_uuid:
+            db.add_guest(
+                telegram_id=telegram_id,
+                training_uuid=training_uuid,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                username=user_data.username,
+                photo_url=user_data.photo_url
+            )
+            logger.info(f"Новый гость зарегистрирован: {user_data.username or user_data.first_name} на тренировку {training_uuid}")
+            existing_guest = db.get_guest_by_telegram(telegram_id)
+            existing_user = {
+                **existing_guest,
+                'is_guest': True,
+                'training_uuid': training_uuid
+            }
+        else:
+            # Регистрируем пользователя с приглашением или как администратора
+            db.add_user(
+                telegram_id=telegram_id,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                username=user_data.username,
+                photo_url=user_data.photo_url,
+                is_admin=False  # Приглашение не даёт прав админа
+            )
+            logger.info(f"Новый пользователь зарегистрирован: {user_data.username or user_data.first_name}")
+            existing_user = db.get_user_by_telegram_id(telegram_id)
+
+            # Если было приглашение — используем его
+            if invite_code and invite_valid:
+                db.use_invite_code(invite_code, telegram_id)
+                logger.info(f"Пользователь {telegram_id} принял приглашение {invite_code}")
     else:
         # Проверяем, активен ли пользователь
         if not existing_user.get('is_active', True):
@@ -620,7 +648,18 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
     set_auth_cookies(response, access_token, refresh_token)
 
     # 6. Возвращаем данные пользователя (без токенов)
-    user = db.get_user_by_telegram_id(telegram_id)
+    # Проверяем, является ли пользователь гостем
+    is_guest = db.is_guest(telegram_id)
+    if is_guest:
+        guest = db.get_guest_by_telegram(telegram_id)
+        user = {
+            **guest,
+            'is_guest': True,
+            'training_uuid': guest.get('training_uuid')
+        }
+    else:
+        user = db.get_user_by_telegram_id(telegram_id)
+    
     return {
         "success": True,
         "message": "Авторизация успешна",
@@ -1536,16 +1575,18 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 # ==================== Универсальные ссылки на тренировки ====================
 
 @app.get("/training/{training_uuid}")
-async def get_training_redirect(training_uuid: str, response: Response = None):
+async def get_training_redirect(training_uuid: str, request: Request):
     """
     Универсальная ссылка на тренировку
-    Перенаправляет:
-    - Гостей → на страницу гостя /guest/training/{uuid}
-    - Пользователей → на календарь /dashboard/calendar?training={uuid}
-    - Неавторизованных → на логин с редиректом
+    Логика:
+    1. Если не авторизован → редирект на логин с redirect на /training/{uuid}
+    2. После авторизации:
+       - Если есть в users → /dashboard/calendar?training={uuid} (модалка)
+       - Если есть в guests → /guest/training/{uuid} (страница гостя)
+       - Если нет нигде → добавить в guests → /guest/training/{uuid}
     """
     # Получаем пользователя из токена
-    user = get_current_user_from_access_token(Request(scope={"type": "http"}))
+    user = get_current_user_from_access_token(request)
     
     # Проверяем тренировку
     training = db.get_training_by_uuid(training_uuid)

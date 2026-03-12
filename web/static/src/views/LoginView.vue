@@ -86,13 +86,25 @@ const onTelegramAuth = async (user) => {
   console.log('Telegram user data:', user)
   console.log('Начало авторизации...')
 
+  // Проверяем, есть ли redirect параметр и является ли он ссылкой на тренировку
+  const redirect = route.query.redirect
+  const trainingRedirectMatch = redirect ? redirect.match(/\/training\/([a-f0-9-]+)/i) : null
+  const trainingUuid = trainingRedirectMatch ? trainingRedirectMatch[1] : null
+
+  // Добавляем training_uuid в данные для авторизации если есть
+  const authData = { ...user }
+  if (trainingUuid) {
+    authData.training_uuid = trainingUuid
+    console.log('Авторизация с training_uuid:', trainingUuid)
+  }
+
   try {
     const response = await fetch('/api/auth/telegram', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(user),
+      body: JSON.stringify(authData),
       credentials: 'include',
     })
 
@@ -105,21 +117,35 @@ const onTelegramAuth = async (user) => {
       // Обновляем auth store перед редиректом
       authStore.setUser(result.user)
 
-      // Проверяем, есть ли redirect параметр
-      const redirect = route.query.redirect
-
       // Проверяем, является ли пользователь гостем
       const isGuest = result.user?.is_guest ?? false
-      const trainingUuid = result.user?.training_uuid
+      const userTrainingUuid = result.user?.training_uuid
 
       if (redirect) {
-        console.log('Редирект на:', redirect)
-        window.location.href = redirect
-      } else if (isGuest && trainingUuid) {
-        // Гость редиректится на страницу тренировки
-        console.log('Гость редиректится на /guest/training/', trainingUuid)
-        window.location.href = `/guest/training/${trainingUuid}`
+        // Проверяем, является ли redirect ссылкой на тренировку /training/{uuid}
+        if (trainingRedirectMatch) {
+          const uuid = trainingUuid
+
+          if (isGuest) {
+            // Уже гость → страница гостя
+            console.log('Гость редиректится на страницу тренировки:', uuid)
+            window.location.href = `/guest/training/${uuid}`
+          } else {
+            // Пользователь → календарь с модалкой
+            console.log('Пользователь редиректится на календарь:', uuid)
+            window.location.href = `/dashboard/calendar?training=${uuid}`
+          }
+        } else {
+          // Обычный редирект (не тренировка)
+          console.log('Редирект на:', redirect)
+          window.location.href = redirect
+        }
+      } else if (isGuest && userTrainingUuid) {
+        // Гость без redirect → страница тренировки
+        console.log('Гость редиректится на /guest/training/', userTrainingUuid)
+        window.location.href = `/guest/training/${userTrainingUuid}`
       } else {
+        // Пользователь без redirect → админка
         console.log('Переход на /admin через window.location...')
         window.location.href = '/admin'
       }
