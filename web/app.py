@@ -1564,12 +1564,14 @@ async def get_calendar(year: int, month: int, user: dict = Depends(get_current_u
         name = training.get('name', '')
         location = training.get('location', '')
         training_id = training.get('id', '')
+        training_uuid = training.get('uuid')
 
         # Используем id как key для уникальности
         key = training_id or f"{date_str}_{time}_{chat_id}"
         if key not in trainings:
             trainings[key] = {
                 'id': training_id,
+                'uuid': training_uuid,
                 'date': date_str,
                 'time': time,
                 'start_time': start_time,
@@ -1595,11 +1597,13 @@ async def get_calendar(year: int, month: int, user: dict = Depends(get_current_u
         location = training.get('location', '')
         training_id = training.get('id', '')
         schedule_id = training.get('schedule_id', '')
+        training_uuid = training.get('uuid')
 
         key = training_id or f"{date_str}_{time}_{chat_id}"
         if key not in trainings:
             trainings[key] = {
                 'id': training_id,
+                'uuid': training_uuid,
                 'schedule_id': schedule_id,
                 'date': date_str,
                 'time': time,
