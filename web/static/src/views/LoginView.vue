@@ -7,17 +7,13 @@
       <h1 class="text-2xl font-bold text-gray-900 mb-2 text-center">Team R</h1>
       <p class="text-gray-500 mb-6 text-center">Система управления тренировками</p>
 
-      <div v-if="isLoading" class="mt-6 text-center text-gray-500">
-        Загрузка...
-      </div>
-
-      <div v-else-if="isAuthenticated" class="mt-6">
+      <div v-if="authStore.isAuthenticated" class="mt-6">
         <p class="text-green-600 font-medium mb-4 text-center">✓ Вы уже авторизованы</p>
         <button
-          @click="goToAdmin"
+          @click="handleRedirectOrAdmin"
           class="w-full h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
         >
-          Перейти в админ-панель
+          {{ hasTrainingRedirect ? 'Перейти к тренировке' : 'Перейти в админ-панель' }}
         </button>
       </div>
 
@@ -40,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import logo from '@/img/logo.svg'
@@ -49,30 +45,40 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-const isAuthenticated = ref(false)
-const isLoading = ref(true)
 const errorMessage = ref('')
 const telegramConfigLoaded = ref(false)
 
-console.log('=== LoginView: Компонент монтируется ===')
-console.log('[LoginView] route.query:', route.query)
-console.log('[LoginView] route.path:', route.path)
-console.log('[LoginView] route.name:', route.name)
-console.log('[LoginView] redirect:', route.query.redirect)
+// Проверяем, есть ли redirect на тренировку
+const hasTrainingRedirect = computed(() => {
+  return route.query.redirect && route.query.redirect.match(/\/t\/([a-f0-9-]+)/i)
+})
+
+const trainingUuid = computed(() => {
+  const match = route.query.redirect?.match(/\/t\/([a-f0-9-]+)/i)
+  return match ? match[1] : null
+})
+
+// Обработка кнопки
+const handleRedirectOrAdmin = () => {
+  if (hasTrainingRedirect.value && trainingUuid.value) {
+    // Редирект на календарь с открытой модалкой
+    window.location.href = `/dashboard/calendar?training=${trainingUuid.value}`
+  } else {
+    // Переход в админку
+    router.push('/admin')
+  }
+}
 
 // Функция инициализации Telegram виджета
 const initTelegramWidget = (botUsername) => {
-  console.log('[LoginView] Инициализация Telegram виджета для:', botUsername)
-  
-  // Очищаем контейнер перед инициализацией
   const container = document.getElementById('telegram-login')
   if (!container) {
     console.error('[LoginView] Контейнер #telegram-login не найден')
     return
   }
-  
+
   container.innerHTML = ''
-  
+
   const script = document.createElement('script')
   script.src = 'https://telegram.org/js/telegram-widget.js?22'
   script.setAttribute('data-telegram-login', botUsername)
@@ -86,7 +92,7 @@ const initTelegramWidget = (botUsername) => {
   script.onload = () => {
     console.log('[LoginView] Telegram скрипт загружен')
   }
-  
+
   script.onerror = (error) => {
     console.error('[LoginView] Ошибка загрузки Telegram скрипта:', error)
     errorMessage.value = 'Ошибка загрузки Telegram виджета'
@@ -98,18 +104,15 @@ const initTelegramWidget = (botUsername) => {
 // Загрузка конфигурации Telegram
 const loadTelegramConfig = async () => {
   if (telegramConfigLoaded.value) {
-    console.log('[LoginView] Конфигурация уже загружена')
     return
   }
-  
+
   try {
-    console.log('[LoginView] Загрузка конфигурации Telegram...')
     const response = await fetch('/api/auth/telegram/config')
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
     }
     const config = await response.json()
-    console.log('[LoginView] Конфигурация получена:', config.bot_username)
     initTelegramWidget(config.bot_username)
     telegramConfigLoaded.value = true
   } catch (error) {
@@ -120,21 +123,16 @@ const loadTelegramConfig = async () => {
 
 // Глобальная функция для Telegram виджета
 window.onTelegramAuth = async (user) => {
-  console.log('[LoginView] onTelegramAuth вызвана, user:', user)
-  console.log('[LoginView] redirect параметр:', route.query.redirect)
+  const redirect = route.query.redirect
+  const trainingRedirectMatch = redirect ? redirect.match(/\/t\/([a-f0-9-]+)/i) : null
+  const trainingUuid = trainingRedirectMatch ? trainingRedirectMatch[1] : null
+
+  const authData = { ...user }
+  if (trainingUuid) {
+    authData.training_uuid = trainingUuid
+  }
 
   try {
-    const redirect = route.query.redirect
-    const trainingRedirectMatch = redirect ? redirect.match(/\/t\/([a-f0-9-]+)/i) : null
-    const trainingUuid = trainingRedirectMatch ? trainingRedirectMatch[1] : null
-
-    const authData = { ...user }
-    if (trainingUuid) {
-      authData.training_uuid = trainingUuid
-      console.log('[LoginView] Авторизация с training_uuid:', trainingUuid)
-    }
-
-    console.log('[LoginView] Отправка данных на сервер...')
     const response = await fetch('/api/auth/telegram', {
       method: 'POST',
       headers: {
@@ -144,43 +142,24 @@ window.onTelegramAuth = async (user) => {
       credentials: 'include',
     })
 
-    console.log('[LoginView] Ответ сервера:', response.status)
     const result = await response.json()
-    console.log('[LoginView] Результат:', result)
 
     if (response.ok && result.success) {
-      console.log('[LoginView] Авторизация успешна')
       authStore.setUser(result.user)
-
       const isGuest = result.user?.is_guest ?? false
 
-      if (redirect) {
-        if (trainingRedirectMatch) {
-          const uuid = trainingUuid
-          if (isGuest) {
-            console.log('[LoginView] Гость редиректится на:', `/guest/training/${uuid}`)
-            window.location.href = `/guest/training/${uuid}`
-          } else {
-            console.log('[LoginView] Пользователь редиректится на:', `/dashboard/calendar?training=${uuid}`)
-            window.location.href = `/dashboard/calendar?training=${uuid}`
-          }
+      if (redirect && trainingRedirectMatch) {
+        const uuid = trainingUuid
+        if (isGuest) {
+          window.location.href = `/guest/training/${uuid}`
         } else {
-          console.log('[LoginView] Редирект на:', redirect)
-          window.location.href = redirect
+          window.location.href = `/dashboard/calendar?training=${uuid}`
         }
       } else {
-        console.log('[LoginView] Переход на /admin')
         window.location.href = '/admin'
       }
     } else {
       errorMessage.value = result.detail || 'Ошибка авторизации'
-      console.error('[LoginView] Ошибка авторизации:', errorMessage.value)
-      if (response.status === 403) {
-        const loginWidget = document.getElementById('telegram-login')
-        if (loginWidget) {
-          loginWidget.classList.add('hidden')
-        }
-      }
     }
   } catch (error) {
     console.error('[LoginView] Ошибка:', error)
@@ -192,39 +171,11 @@ const goToAdmin = () => {
   router.push('/admin')
 }
 
-// Проверка авторизации при загрузке
-onMounted(async () => {
-  console.log('[LoginView] onMounted вызван')
-  
-  try {
-    console.log('[LoginView] Проверка авторизации...')
-    const response = await fetch('/api/auth/me', {
-      credentials: 'include',
-    })
-    if (response.ok) {
-      const user = await response.json()
-      console.log('[LoginView] Пользователь авторизован:', user)
-      isAuthenticated.value = true
-      authStore.setUser(user)
-    } else {
-      console.log('[LoginView] Пользователь не авторизован')
-      isAuthenticated.value = false
-    }
-  } catch (error) {
-    console.error('[LoginView] Ошибка проверки авторизации:', error)
-    isAuthenticated.value = false
-  } finally {
-    isLoading.value = false
-    console.log('[LoginView] Загрузка завершена, isLoading = false')
-  }
-
-  // Всегда загружаем Telegram виджет (независимо от статуса авторизации)
+onMounted(() => {
   loadTelegramConfig()
 })
 
-// Очистка при размонтировании
 onBeforeUnmount(() => {
-  console.log('[LoginView] Компонент размонтируется')
   const container = document.getElementById('telegram-login')
   if (container) {
     container.innerHTML = ''

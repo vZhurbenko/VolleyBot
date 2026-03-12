@@ -1,10 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
+      alias: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
     },
@@ -98,6 +101,42 @@ const router = createRouter({
       meta: { requiresAuth: false }, // Авторизация проверяется внутри компонента
     },
   ],
+})
+
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
+
+  // Публичные маршруты — пропускаем сразу
+  if (
+    to.path === '/login' ||
+    to.path.startsWith('/t/') ||
+    to.path.startsWith('/guest/') ||
+    to.path.startsWith('/invite/')
+  ) {
+    return next()
+  }
+
+  // Ждём завершения проверки авторизации
+  if (authStore.isLoading) {
+    await new Promise(resolve => {
+      const stop = watch(() => authStore.isLoading, () => {
+        stop()
+        resolve()
+      })
+    })
+  }
+
+  // Для всех остальных маршрутов — проверяем авторизацию
+  if (!authStore.isAuthenticated) {
+    return next('/')
+  }
+
+  // Проверка прав администратора для защищённых маршрутов
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    return next('/dashboard/calendar')
+  }
+
+  next()
 })
 
 export default router
