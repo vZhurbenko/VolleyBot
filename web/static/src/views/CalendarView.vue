@@ -180,6 +180,13 @@ const openTrainingByUuid = (trainingUuid) => {
   }
 }
 
+// Закрываем модалку при изменении URL (если параметр training исчез)
+watch(() => route.query.training, (newVal) => {
+  if (!newVal) {
+    selectedTraining.value = null
+  }
+})
+
 const openTrainingByParams = () => {
   const targetDate = route.query.date
   const targetChatId = route.query.chat_id

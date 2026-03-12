@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import logo from '@/img/logo.svg'
@@ -57,6 +57,14 @@ const trainingUuid = computed(() => {
   const match = route.query.redirect?.match(/\/t\/([a-f0-9-]+)/i)
   return match ? match[1] : null
 })
+
+// Автоматический редирект если авторизован и есть redirect на тренировку
+watch(() => authStore.isAuthenticated, (isAuth) => {
+  if (isAuth && hasTrainingRedirect.value && trainingUuid.value) {
+    console.log('[LoginView] Автоматический редирект на тренировку:', trainingUuid.value)
+    window.location.href = `/dashboard/calendar?training=${trainingUuid.value}`
+  }
+}, { immediate: true })
 
 // Обработка кнопки
 const handleRedirectOrAdmin = () => {

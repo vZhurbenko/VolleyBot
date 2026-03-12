@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -108,6 +107,7 @@ router.beforeEach(async (to, from, next) => {
 
   // Публичные маршруты — пропускаем сразу
   if (
+    to.path === '/' ||
     to.path === '/login' ||
     to.path.startsWith('/t/') ||
     to.path.startsWith('/guest/') ||
@@ -116,14 +116,13 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
-  // Ждём завершения проверки авторизации
+  // Ждём завершения проверки авторизации (максимум 2 секунды)
   if (authStore.isLoading) {
-    await new Promise(resolve => {
-      const stop = watch(() => authStore.isLoading, () => {
-        stop()
-        resolve()
-      })
-    })
+    const maxWait = 2000
+    const startTime = Date.now()
+    while (authStore.isLoading && Date.now() - startTime < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
   }
 
   // Для всех остальных маршрутов — проверяем авторизацию
