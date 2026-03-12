@@ -152,6 +152,42 @@ class Database:
             )
         ''')
 
+        # Таблица регулярных тренировок
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scheduled_trainings (
+                id TEXT PRIMARY KEY,
+                uuid TEXT UNIQUE,
+                schedule_id TEXT NOT NULL,
+                training_date DATE NOT NULL,
+                training_time TEXT NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                chat_id TEXT NOT NULL,
+                topic_id INTEGER,
+                name TEXT,
+                location TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (schedule_id) REFERENCES poll_schedules(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Таблица разовых тренировок
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS one_time_trainings (
+                id TEXT PRIMARY KEY,
+                uuid TEXT UNIQUE,
+                training_date DATE NOT NULL,
+                training_time TEXT NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                chat_id TEXT NOT NULL,
+                topic_id INTEGER,
+                name TEXT,
+                location TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         self.conn.commit()
         logger.info("Таблицы базы данных созданы/проверены")
 
@@ -1440,20 +1476,41 @@ class Database:
         return dict(row) if row else None
 
     def get_training_by_uuid(self, training_uuid: str) -> Optional[Dict[str, Any]]:
-        """Получение тренировки по UUID"""
+        """Получение тренировки по UUID (из games, scheduled_trainings или one_time_trainings)"""
         if not self.conn:
             return None
 
         cursor = self.conn.cursor()
+        
+        # Пробуем найти в games
         cursor.execute('SELECT * FROM games WHERE uuid = ?', (training_uuid,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+            result = dict(row)
+            result['source'] = 'games'
+            return result
+        
+        # Пробуем найти в scheduled_trainings
+        cursor.execute('SELECT * FROM scheduled_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            result = dict(row)
+            result['source'] = 'scheduled_trainings'
+            return result
+        
+        # Пробуем найти в one_time_trainings
+        cursor.execute('SELECT * FROM one_time_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            result = dict(row)
+            result['source'] = 'one_time_trainings'
+            return result
+        
         return None
 
     def get_training_id_by_uuid(self, training_uuid: str) -> Optional[str]:
         """
-        Получение ID тренировки по UUID
+        Получение ID тренировки по UUID (из games, scheduled_trainings или one_time_trainings)
 
         Args:
             training_uuid: UUID тренировки
@@ -1465,10 +1522,25 @@ class Database:
             return None
 
         cursor = self.conn.cursor()
+        
+        # Пробуем найти в games
         cursor.execute('SELECT id FROM games WHERE uuid = ?', (training_uuid,))
         row = cursor.fetchone()
         if row:
             return row['id']
+        
+        # Пробуем найти в scheduled_trainings
+        cursor.execute('SELECT id FROM scheduled_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            return row['id']
+        
+        # Пробуем найти в one_time_trainings
+        cursor.execute('SELECT id FROM one_time_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            return row['id']
+        
         return None
 
     def get_training_uuid_by_id(self, training_id: str) -> Optional[str]:
