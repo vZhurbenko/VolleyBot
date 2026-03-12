@@ -173,15 +173,29 @@ const handleSignup = () => {
 }
 
 const shareGame = () => {
-  // Генерируем ссылку на игру в календаре
-  const url = `${window.location.origin}/dashboard/calendar?game_id=${props.game?.id}`
-  navigator.clipboard
-    .writeText(url)
-    .then(() => {
-      notificationsStore.success('Ссылка скопирована в буфер обмена')
-    })
-    .catch(() => {
-      notificationsStore.error('Не удалось скопировать ссылку')
-    })
+  // Генерируем ссылку на страницу гостя /guest/training/{uuid}
+  // Если у игры есть uuid, используем его, иначе генерируем ссылку на календарь
+  if (props.game?.uuid) {
+    const url = `${window.location.origin}/guest/training/${props.game.uuid}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        notificationsStore.success('Ссылка скопирована в буфер обмена')
+      })
+      .catch(() => {
+        notificationsStore.error('Не удалось скопировать ссылку')
+      })
+  } else {
+    // Фоллбэк на старую ссылку если uuid нет
+    const url = `${window.location.origin}/dashboard/calendar?game_id=${props.game?.id}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        notificationsStore.success('Ссылка скопирована в буфер обмена')
+      })
+      .catch(() => {
+        notificationsStore.error('Не удалось скопировать ссылку')
+      })
+  }
 }
 </script>
