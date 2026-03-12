@@ -170,12 +170,23 @@ const loadCalendar = async () => {
 }
 
 const openTrainingByUuid = (trainingUuid) => {
-  // Ищем тренировку по UUID
-  const training = trainings.value.find((t) => t.uuid === trainingUuid)
-
+  console.log('[CalendarView] openTrainingByUuid:', trainingUuid)
+  
+  // Сначала ищем в тренировках
+  let training = trainings.value.find((t) => t.uuid === trainingUuid)
   if (training) {
+    console.log('[CalendarView] Найдена тренировка:', training)
     selectedTraining.value = { ...training }
+    return
+  }
+  
+  // Если не найдено, ищем в играх
+  let game = games.value.find((g) => g.uuid === trainingUuid)
+  if (game) {
+    console.log('[CalendarView] Найдена игра:', game)
+    selectedGame.value = { ...game }
   } else {
+    console.log('[CalendarView] Не найдено ничего')
     notificationsStore.error('Тренировка не найдена')
   }
 }
@@ -184,6 +195,13 @@ const openTrainingByUuid = (trainingUuid) => {
 watch(() => route.query.training, (newVal) => {
   if (!newVal) {
     selectedTraining.value = null
+  }
+})
+
+// Закрываем модалку игры при изменении URL (если параметр game_id исчез)
+watch(() => route.query.game_id, (newVal) => {
+  if (!newVal) {
+    selectedGame.value = null
   }
 })
 

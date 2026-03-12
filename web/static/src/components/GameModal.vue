@@ -1,7 +1,7 @@
 <template>
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-    @click="$emit('close')"
+    @click="handleClose"
   >
     <div
       class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-auto"
@@ -29,7 +29,7 @@
             <Link class="w-4 h-4 text-gray-600" />
           </button>
           <button
-            @click="$emit('close')"
+            @click="handleClose"
             class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
           >
             <X class="w-4 h-4 text-gray-600" />
@@ -94,7 +94,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { X, Trophy, Link } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
@@ -108,6 +109,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'signup', 'update-game'])
 
+const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
 
@@ -198,4 +201,36 @@ const shareGame = () => {
       })
   }
 }
+
+const handleClose = () => {
+  console.log('[GameModal] handleClose вызван')
+  
+  // Сначала закрываем модалку
+  emit('close')
+  
+  // Затем очищаем параметр game_id из URL
+  const newQuery = { ...route.query }
+  delete newQuery.game_id
+  console.log('[GameModal] Новый query:', newQuery)
+  
+  // Используем router.replace для обновления URL
+  router.replace({ query: newQuery })
+}
+
+// Обработчик нажатия клавиш
+const handleKeydown = (e) => {
+  if (e.key === 'Escape') {
+    handleClose()
+  }
+}
+
+// Подписка на события клавиатуры при монтировании
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+// Очистка при размонтировании
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
