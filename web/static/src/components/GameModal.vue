@@ -173,10 +173,10 @@ const handleSignup = () => {
 }
 
 const shareGame = () => {
-  // Генерируем универсальную ссылку /training/{uuid}
+  // Генерируем универсальную ссылку /t/{uuid}
   // Бэкенд сам определит куда редиректить: гостя на страницу гостя, пользователя в модалку
   if (props.game?.uuid) {
-    const url = `${window.location.origin}/training/${props.game.uuid}`
+    const url = `${window.location.origin}/t/${props.game.uuid}`
     navigator.clipboard
       .writeText(url)
       .then(() => {

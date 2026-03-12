@@ -1594,7 +1594,7 @@ async def get_training_redirect(training_uuid: str, request: Request):
     
     # Если пользователь не авторизован → редирект на логин
     if not user:
-        return {"redirect": f"/login?redirect=/training/{training_uuid}"}
+        return {"redirect": f"/login?redirect=/t/{training_uuid}"}
     
     # Проверяем, является ли пользователь гостем
     is_guest = db.is_guest(user.get('telegram_id'))

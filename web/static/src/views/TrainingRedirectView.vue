@@ -16,23 +16,33 @@ const route = useRoute()
 onMounted(async () => {
   const trainingUuid = route.params.uuid
   
+  console.log('TrainingRedirect: UUID =', trainingUuid)
+  
   try {
+    // Запрашиваем бэкенд endpoint /training/{uuid} для получения редиректа
     const response = await fetch(`/training/${trainingUuid}`, {
       credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+      },
     })
     
-    if (response.ok) {
-      const data = await response.json()
-      if (data.redirect) {
-        // Используем window.location для полного редиректа
-        window.location.href = data.redirect
-      }
-    } else if (response.status === 404) {
-      // Тренировка не найдена
-      window.location.href = '/dashboard/calendar'
+    console.log('TrainingRedirect: response status =', response.status)
+    
+    const data = await response.json()
+    console.log('TrainingRedirect: response data =', data)
+    
+    if (data.redirect) {
+      console.log('TrainingRedirect: redirecting to', data.redirect)
+      // Используем window.location для полного редиректа
+      window.location.replace(data.redirect)
+      return
     }
+    
+    // Если нет redirect, идём в календарь
+    window.location.href = '/dashboard/calendar'
   } catch (error) {
-    console.error('Ошибка редиректа:', error)
+    console.error('TrainingRedirect: ошибка редиректа:', error)
     window.location.href = '/dashboard/calendar'
   }
 })

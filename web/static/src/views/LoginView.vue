@@ -92,7 +92,7 @@ const onTelegramAuth = async (user) => {
 
   // Проверяем, есть ли redirect параметр и является ли он ссылкой на тренировку
   const redirect = route.query.redirect
-  const trainingRedirectMatch = redirect ? redirect.match(/\/training\/([a-f0-9-]+)/i) : null
+  const trainingRedirectMatch = redirect ? redirect.match(/\/t\/([a-f0-9-]+)/i) : null
   const trainingUuid = trainingRedirectMatch ? trainingRedirectMatch[1] : null
 
   // Добавляем training_uuid в данные для авторизации если есть
