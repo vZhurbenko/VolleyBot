@@ -13,7 +13,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadTemplate() {
     try {
       const response = await fetch('/api/admin/settings/template', {
-        credentials: 'include'
+        credentials: 'include',
       })
       if (response.ok) {
         template.value = await response.json()
@@ -28,7 +28,7 @@ export const useSettingsStore = defineStore('settings', () => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(templateData)
+      body: JSON.stringify(templateData),
     })
     if (response.ok) {
       await loadTemplate()
@@ -41,7 +41,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadSchedules() {
     try {
       const response = await fetch('/api/admin/settings/schedules', {
-        credentials: 'include'
+        credentials: 'include',
       })
       if (response.ok) {
         schedules.value = await response.json()
@@ -56,7 +56,7 @@ export const useSettingsStore = defineStore('settings', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(scheduleData)
+      body: JSON.stringify(scheduleData),
     })
     if (response.ok) {
       await loadSchedules()
@@ -70,7 +70,7 @@ export const useSettingsStore = defineStore('settings', () => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(scheduleData)
+      body: JSON.stringify(scheduleData),
     })
     if (response.ok) {
       await loadSchedules()
@@ -82,7 +82,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function deleteSchedule(id) {
     const response = await fetch(`/api/admin/settings/schedules/${id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     })
     if (response.ok) {
       await loadSchedules()
@@ -95,7 +95,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadActivePolls() {
     try {
       const response = await fetch('/api/admin/settings/active_polls', {
-        credentials: 'include'
+        credentials: 'include',
       })
       if (response.ok) {
         activePolls.value = await response.json()
@@ -108,7 +108,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function deletePoll(pollId) {
     const response = await fetch(`/api/admin/settings/active_polls/${pollId}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     })
     if (response.ok) {
       await loadActivePolls()
@@ -120,7 +120,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function stopPoll(pollId) {
     const response = await fetch(`/api/admin/settings/active_polls/${pollId}/stop`, {
       method: 'POST',
-      credentials: 'include'
+      credentials: 'include',
     })
     if (response.ok) {
       // Не перезагружаем список, опрос остаётся в БД
@@ -133,7 +133,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadAdminIds() {
     try {
       const response = await fetch('/api/admin/settings/admin_ids', {
-        credentials: 'include'
+        credentials: 'include',
       })
       if (response.ok) {
         const data = await response.json()
@@ -149,7 +149,7 @@ export const useSettingsStore = defineStore('settings', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ admin_id: parseInt(adminId) })
+      body: JSON.stringify({ admin_id: parseInt(adminId) }),
     })
     if (response.ok) {
       await loadAdminIds()
@@ -161,7 +161,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function removeAdminId(adminId) {
     const response = await fetch(`/api/admin/settings/admin_ids/${adminId}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     })
     if (response.ok) {
       await loadAdminIds()
@@ -174,7 +174,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadAdminCount() {
     try {
       const response = await fetch('/api/admin/stats', {
-        credentials: 'include'
+        credentials: 'include',
       })
       if (response.ok) {
         const data = await response.json()
@@ -204,6 +204,6 @@ export const useSettingsStore = defineStore('settings', () => {
     loadAdminIds,
     addAdminId,
     removeAdminId,
-    loadAdminCount
+    loadAdminCount,
   }
 })

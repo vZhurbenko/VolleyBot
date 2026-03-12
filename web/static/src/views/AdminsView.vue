@@ -5,7 +5,9 @@
     <div class="flex flex-col gap-6">
       <!-- Форма добавления -->
       <div class="flex flex-col gap-2">
-        <label class="block text-sm font-medium text-gray-700">Добавить пользователя по Telegram ID</label>
+        <label class="block text-sm font-medium text-gray-700"
+          >Добавить пользователя по Telegram ID</label
+        >
         <div class="flex flex-col sm:flex-row gap-2">
           <input
             v-model="newTelegramId"
@@ -13,16 +15,17 @@
             class="flex-1 h-11 px-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
             placeholder="Telegram ID"
           />
-          <button @click="handleAdd" class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700 whitespace-nowrap">
+          <button
+            @click="handleAdd"
+            class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700 whitespace-nowrap"
+          >
             Добавить
           </button>
         </div>
       </div>
 
       <!-- Список пользователей -->
-      <div v-if="loading" class="text-center py-8 text-gray-500">
-        Загрузка...
-      </div>
+      <div v-if="loading" class="text-center py-8 text-gray-500">Загрузка...</div>
 
       <div v-else-if="users.length === 0" class="text-gray-500 text-center py-8">
         Нет пользователей
@@ -52,7 +55,9 @@
               <div class="flex items-center gap-2">
                 <p class="font-medium text-gray-900 truncate">
                   {{ user.first_name }} {{ user.last_name || '' }}
-                  <span v-if="user.username" class="text-gray-400 font-normal">@{{ user.username }}</span>
+                  <span v-if="user.username" class="text-gray-400 font-normal"
+                    >@{{ user.username }}</span
+                  >
                 </p>
                 <Shield
                   v-if="user.is_admin"
@@ -114,8 +119,8 @@ const loadUsers = async () => {
     const response = await fetch('/api/admin/users', {
       credentials: 'include',
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     })
 
     if (!response.ok) {
@@ -157,12 +162,12 @@ const handleAdd = async () => {
     const response = await fetch('/api/admin/users', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
-        telegram_id: parseInt(newTelegramId.value)
-      })
+        telegram_id: parseInt(newTelegramId.value),
+      }),
     })
 
     const result = await response.json()
@@ -189,16 +194,18 @@ const handleToggleActive = async (telegramId, isActive) => {
     const response = await fetch(`/api/admin/users/${telegramId}/toggle-active`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
       loadUsers()
-      notificationsStore.success(isActive ? 'Пользователь деактивирован' : 'Пользователь активирован')
+      notificationsStore.success(
+        isActive ? 'Пользователь деактивирован' : 'Пользователь активирован',
+      )
     } else {
       notificationsStore.error(result.detail || 'Ошибка')
     }
@@ -216,12 +223,12 @@ const handleMakeAdmin = async (telegramId) => {
     const response = await fetch('/api/admin/settings/admin_ids', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
-        admin_id: telegramId
-      })
+        admin_id: telegramId,
+      }),
     })
 
     const result = await response.json()
@@ -245,7 +252,7 @@ const handleRemoveAdmin = async (telegramId) => {
   try {
     const response = await fetch(`/api/admin/settings/admin_ids/${telegramId}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()
@@ -263,13 +270,15 @@ const handleRemoveAdmin = async (telegramId) => {
 }
 
 const handleDelete = async (telegramId, firstName) => {
-  const confirmed = await confirmStore.danger(`Полностью удалить пользователя "${firstName}"? Это действие необратимо.`)
+  const confirmed = await confirmStore.danger(
+    `Полностью удалить пользователя "${firstName}"? Это действие необратимо.`,
+  )
   if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/users/${telegramId}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()
@@ -302,7 +311,7 @@ const handleSaveUser = async (updatedUser) => {
 
   try {
     // Сравниваем с оригинальным пользователем из списка
-    const originalUser = users.value.find(u => u.telegram_id === updatedUser.telegram_id)
+    const originalUser = users.value.find((u) => u.telegram_id === updatedUser.telegram_id)
     if (!originalUser) {
       throw new Error('Пользователь не найден')
     }
@@ -314,10 +323,10 @@ const handleSaveUser = async (updatedUser) => {
         const response = await fetch('/api/admin/settings/admin_ids', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify({ admin_id: updatedUser.telegram_id })
+          body: JSON.stringify({ admin_id: updatedUser.telegram_id }),
         })
         if (!response.ok) {
           const error = await response.json()
@@ -327,7 +336,7 @@ const handleSaveUser = async (updatedUser) => {
         changes.push('снятие администраторских прав')
         const response = await fetch(`/api/admin/settings/admin_ids/${updatedUser.telegram_id}`, {
           method: 'DELETE',
-          credentials: 'include'
+          credentials: 'include',
         })
         if (!response.ok) {
           const error = await response.json()
@@ -341,9 +350,9 @@ const handleSaveUser = async (updatedUser) => {
       const response = await fetch(`/api/admin/users/${updatedUser.telegram_id}/toggle-active`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        credentials: 'include'
+        credentials: 'include',
       })
       if (!response.ok) {
         const error = await response.json()
@@ -361,13 +370,15 @@ const handleSaveUser = async (updatedUser) => {
 }
 
 const handleDeleteFromModal = async (user) => {
-  const confirmed = await confirmStore.danger(`Полностью удалить пользователя "${user.first_name}"? Это действие необратимо.`)
+  const confirmed = await confirmStore.danger(
+    `Полностью удалить пользователя "${user.first_name}"? Это действие необратимо.`,
+  )
   if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/users/${user.telegram_id}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()

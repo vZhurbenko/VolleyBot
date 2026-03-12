@@ -35,7 +35,10 @@
 
       <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700">День тренировки</label>
-        <select v-model="form.training_day" class="w-full h-11 px-4 border border-gray-300 rounded appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors">
+        <select
+          v-model="form.training_day"
+          class="w-full h-11 px-4 border border-gray-300 rounded appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+        >
           <option value="monday">Понедельник</option>
           <option value="tuesday">Вторник</option>
           <option value="wednesday">Среда</option>
@@ -86,18 +89,22 @@
           <p class="text-sm font-medium text-gray-700">Включено</p>
           <p class="text-xs text-gray-500">Активное расписание</p>
         </div>
-        <Toggle
-          :model-value="form.enabled"
-          @toggle="form.enabled = !form.enabled"
-        />
+        <Toggle :model-value="form.enabled" @toggle="form.enabled = !form.enabled" />
       </div>
     </div>
 
     <div class="pt-6 border-t border-gray-200 flex justify-end gap-2">
-      <button type="submit" class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
+      <button
+        type="submit"
+        class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
+      >
         {{ isEdit ? 'Сохранить' : 'Добавить' }}
       </button>
-      <button type="button" @click="$emit('cancel')" class="h-11 px-6 rounded font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+      <button
+        type="button"
+        @click="$emit('cancel')"
+        class="h-11 px-6 rounded font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+      >
         Отмена
       </button>
     </div>
@@ -111,20 +118,20 @@ import Toggle from '@/components/Toggle.vue'
 const props = defineProps({
   schedule: {
     type: Object,
-    default: null
+    default: null,
   },
   isEdit: {
     type: Boolean,
-    default: false
+    default: false,
   },
   defaultChatId: {
     type: String,
-    default: ''
+    default: '',
   },
   defaultTopicId: {
     type: [Number, String],
-    default: null
-  }
+    default: null,
+  },
 })
 
 const emit = defineEmits(['submit', 'cancel'])
@@ -137,49 +144,59 @@ const defaultForm = {
   start_time: '',
   end_time: '',
   location: 'ВГАФК',
-  enabled: true
+  enabled: true,
 }
 
 const form = ref({ ...defaultForm })
 
-watch(() => props.schedule, (newSchedule) => {
-  if (newSchedule) {
-    form.value = {
-      name: newSchedule.name || '',
-      chat_id: newSchedule.chat_id || '',
-      message_thread_id: newSchedule.message_thread_id || null,
-      training_day: newSchedule.training_day || 'sunday',
-      start_time: newSchedule.start_time || '',
-      end_time: newSchedule.end_time || '',
-      location: newSchedule.location || 'ВГАФК',
-      enabled: newSchedule.enabled !== false
+watch(
+  () => props.schedule,
+  (newSchedule) => {
+    if (newSchedule) {
+      form.value = {
+        name: newSchedule.name || '',
+        chat_id: newSchedule.chat_id || '',
+        message_thread_id: newSchedule.message_thread_id || null,
+        training_day: newSchedule.training_day || 'sunday',
+        start_time: newSchedule.start_time || '',
+        end_time: newSchedule.end_time || '',
+        location: newSchedule.location || 'ВГАФК',
+        enabled: newSchedule.enabled !== false,
+      }
+    } else if (!props.isEdit) {
+      // Сброс к значениям по умолчанию при открытии формы добавления
+      form.value = {
+        name: '',
+        chat_id: props.defaultChatId || '',
+        message_thread_id: props.defaultTopicId || null,
+        training_day: 'sunday',
+        start_time: '',
+        end_time: '',
+        location: 'ВГАФК',
+        enabled: true,
+      }
     }
-  } else if (!props.isEdit) {
-    // Сброс к значениям по умолчанию при открытии формы добавления
-    form.value = {
-      name: '',
-      chat_id: props.defaultChatId || '',
-      message_thread_id: props.defaultTopicId || null,
-      training_day: 'sunday',
-      start_time: '',
-      end_time: '',
-      location: 'ВГАФК',
-      enabled: true
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.defaultChatId,
+  (newVal) => {
+    if (!props.isEdit && !form.value.chat_id) {
+      form.value.chat_id = newVal
     }
-  }
-}, { immediate: true })
+  },
+)
 
-watch(() => props.defaultChatId, (newVal) => {
-  if (!props.isEdit && !form.value.chat_id) {
-    form.value.chat_id = newVal
-  }
-})
-
-watch(() => props.defaultTopicId, (newVal) => {
-  if (!props.isEdit && !form.value.message_thread_id) {
-    form.value.message_thread_id = newVal
-  }
-})
+watch(
+  () => props.defaultTopicId,
+  (newVal) => {
+    if (!props.isEdit && !form.value.message_thread_id) {
+      form.value.message_thread_id = newVal
+    }
+  },
+)
 
 const handleSubmit = () => {
   emit('submit', { ...form.value })

@@ -1,10 +1,16 @@
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="$emit('close')">
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click="$emit('close')"
+  >
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
       <!-- Заголовок -->
       <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Редактировать пользователя</h3>
-        <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
+        <button
+          @click="$emit('close')"
+          class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+        >
           <X class="w-5 h-5 text-gray-600" />
         </button>
       </div>
@@ -13,12 +19,7 @@
       <div class="p-6 space-y-4">
         <!-- Информация о пользователе -->
         <div class="flex items-center gap-3 pb-4 border-b border-gray-100">
-          <img
-            v-if="user.photo_url"
-            :src="user.photo_url"
-            alt=""
-            class="w-12 h-12 rounded-full"
-          />
+          <img v-if="user.photo_url" :src="user.photo_url" alt="" class="w-12 h-12 rounded-full" />
           <div
             v-else
             class="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold"
@@ -40,10 +41,7 @@
             <p class="font-medium text-gray-900">Администратор</p>
             <p class="text-sm text-gray-500">Права администратора</p>
           </div>
-          <Toggle
-            :model-value="user.is_admin"
-            @toggle="toggleAdmin"
-          />
+          <Toggle :model-value="user.is_admin" @toggle="toggleAdmin" />
         </div>
 
         <!-- Переключатель Активен -->
@@ -52,10 +50,7 @@
             <p class="font-medium text-gray-900">Активен</p>
             <p class="text-sm text-gray-500">Доступ к системе</p>
           </div>
-          <Toggle
-            :model-value="user.is_active"
-            @toggle="toggleActive"
-          />
+          <Toggle :model-value="user.is_active" @toggle="toggleActive" />
         </div>
 
         <!-- Кнопка удаления -->
@@ -95,8 +90,8 @@ import Toggle from '@/components/Toggle.vue'
 const props = defineProps({
   user: {
     type: Object,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const emit = defineEmits(['close', 'save', 'delete', 'update:user'])

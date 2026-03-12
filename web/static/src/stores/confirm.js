@@ -7,7 +7,7 @@ export const useConfirmStore = defineStore('confirm', () => {
   const message = ref('')
   const mode = ref('danger')
   const confirmText = ref('Подтвердить')
-  
+
   let resolvePromise = null
 
   const open = (options) => {
@@ -37,19 +37,21 @@ export const useConfirmStore = defineStore('confirm', () => {
   }
 
   // Удобные методы для разных типов подтверждений
-  const danger = (message, options = {}) => open({
-    message,
-    mode: 'danger',
-    confirmText: 'Удалить',
-    ...options
-  })
+  const danger = (message, options = {}) =>
+    open({
+      message,
+      mode: 'danger',
+      confirmText: 'Удалить',
+      ...options,
+    })
 
-  const info = (message, options = {}) => open({
-    message,
-    mode: 'info',
-    confirmText: 'Подтвердить',
-    ...options
-  })
+  const info = (message, options = {}) =>
+    open({
+      message,
+      mode: 'info',
+      confirmText: 'Подтвердить',
+      ...options,
+    })
 
   return {
     isOpen,
@@ -61,6 +63,6 @@ export const useConfirmStore = defineStore('confirm', () => {
     close,
     resolve,
     danger,
-    info
+    info,
   }
 })

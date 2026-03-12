@@ -41,7 +41,10 @@
       <div class="bg-white rounded shadow p-4 lg:p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <router-link to="/dashboard/schedules" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <router-link
+            to="/dashboard/schedules"
+            class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+          >
             <Calendar class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Расписания</p>
@@ -49,7 +52,10 @@
             </div>
           </router-link>
 
-          <router-link to="/dashboard/polls" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <router-link
+            to="/dashboard/polls"
+            class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+          >
             <Radio class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Опросы</p>
@@ -57,7 +63,10 @@
             </div>
           </router-link>
 
-          <router-link to="/dashboard/users" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <router-link
+            to="/dashboard/users"
+            class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+          >
             <Users class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Пользователи</p>
@@ -65,7 +74,10 @@
             </div>
           </router-link>
 
-          <router-link to="/dashboard/invites" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <router-link
+            to="/dashboard/invites"
+            class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+          >
             <Link class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Приглашения</p>
@@ -83,15 +95,27 @@
         </div>
 
         <div v-if="stats.recentActivities.length > 0" class="divide-y divide-gray-100">
-          <div v-for="activity in stats.recentActivities" :key="activity.registered_at" class="py-3 flex items-center justify-between">
+          <div
+            v-for="activity in stats.recentActivities"
+            :key="activity.registered_at"
+            class="py-3 flex items-center justify-between"
+          >
             <div>
               <div class="flex items-center gap-2 mb-1">
                 <p class="font-medium text-gray-900">
                   {{ getUserName(activity) }}
-                  <span v-if="activity.username" class="text-gray-400 font-normal">@{{ activity.username }}</span>
+                  <span v-if="activity.username" class="text-gray-400 font-normal"
+                    >@{{ activity.username }}</span
+                  >
                 </p>
-                <span class="px-2 py-0.5 rounded text-xs font-medium"
-                      :class="activity.activity_type === 'game' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'">
+                <span
+                  class="px-2 py-0.5 rounded text-xs font-medium"
+                  :class="
+                    activity.activity_type === 'game'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-teal-100 text-teal-700'
+                  "
+                >
                   {{ activity.activity_type === 'game' ? 'Игра' : 'Тренировка' }}
                 </span>
               </div>
@@ -101,41 +125,53 @@
                 {{ formatDate(activity.activity_date) }}, {{ activity.activity_time }}
               </p>
             </div>
-            <span :class="['px-3 py-1 rounded text-xs font-medium', getStatusClass(activity.status)]">
+            <span
+              :class="['px-3 py-1 rounded text-xs font-medium', getStatusClass(activity.status)]"
+            >
               {{ getStatusText(activity.status) }}
             </span>
           </div>
         </div>
-        <div v-else class="text-gray-500 text-center py-8">
-          Нет записей за последние 30 дней
-        </div>
+        <div v-else class="text-gray-500 text-center py-8">Нет записей за последние 30 дней</div>
       </div>
 
       <!-- Последние расписания -->
       <div class="bg-white rounded shadow p-4 lg:p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-gray-900">Расписания</h2>
-          <router-link to="/dashboard/schedules" class="text-sm text-teal-600 hover:underline">Все →</router-link>
+          <router-link to="/dashboard/schedules" class="text-sm text-teal-600 hover:underline"
+            >Все →</router-link
+          >
         </div>
 
         <div v-if="settingsStore.schedules.length > 0" class="divide-y divide-gray-100">
-          <div v-for="schedule in settingsStore.schedules.slice(0, 3)" :key="schedule.id" class="py-3 flex items-center justify-between">
+          <div
+            v-for="schedule in settingsStore.schedules.slice(0, 3)"
+            :key="schedule.id"
+            class="py-3 flex items-center justify-between"
+          >
             <div>
               <p class="font-medium text-gray-900">{{ schedule.name }}</p>
               <p class="text-sm text-gray-500">
-                <span class="font-medium text-gray-700">Тренировка:</span> {{ formatDay(schedule.training_day) }}, {{ schedule.start_time }} - {{ schedule.end_time }}, {{ schedule.location }}
+                <span class="font-medium text-gray-700">Тренировка:</span>
+                {{ formatDay(schedule.training_day) }}, {{ schedule.start_time }} -
+                {{ schedule.end_time }}, {{ schedule.location }}
                 <span class="mx-2 text-gray-300">|</span>
-                <span class="font-medium text-gray-700">Опрос:</span> {{ formatDay(getPollDay(schedule.training_day)) }}
+                <span class="font-medium text-gray-700">Опрос:</span>
+                {{ formatDay(getPollDay(schedule.training_day)) }}
               </p>
             </div>
-            <span :class="['px-3 py-1 rounded text-xs font-medium', schedule.enabled ? 'bg-teal-100 text-teal-700' : 'bg-red-100 text-red-700']">
+            <span
+              :class="[
+                'px-3 py-1 rounded text-xs font-medium',
+                schedule.enabled ? 'bg-teal-100 text-teal-700' : 'bg-red-100 text-red-700',
+              ]"
+            >
               {{ schedule.enabled ? 'Активно' : 'Отключено' }}
             </span>
           </div>
         </div>
-        <div v-else class="text-gray-500 text-center py-8">
-          Нет расписаний
-        </div>
+        <div v-else class="text-gray-500 text-center py-8">Нет расписаний</div>
       </div>
     </template>
 
@@ -159,7 +195,9 @@
             <h2 class="text-xl font-bold text-gray-900">
               {{ authStore.user?.first_name }} {{ authStore.user?.last_name || '' }}
             </h2>
-            <p v-if="authStore.user?.username" class="text-sm text-gray-500">@{{ authStore.user.username }}</p>
+            <p v-if="authStore.user?.username" class="text-sm text-gray-500">
+              @{{ authStore.user.username }}
+            </p>
             <p class="text-sm text-gray-500">ID: {{ authStore.user?.telegram_id }}</p>
           </div>
         </div>
@@ -168,7 +206,10 @@
       <div class="bg-white rounded shadow p-4 lg:p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <router-link to="/dashboard/calendar" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <router-link
+            to="/dashboard/calendar"
+            class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+          >
             <Calendar class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Календарь тренировок</p>
@@ -176,7 +217,10 @@
             </div>
           </router-link>
 
-          <router-link to="/dashboard/my-trainings" class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+          <router-link
+            to="/dashboard/my-trainings"
+            class="flex items-center gap-4 p-4 rounded border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+          >
             <FileText class="w-10 h-10 text-teal-600" />
             <div>
               <p class="font-medium text-gray-900">Мои записи</p>
@@ -193,15 +237,7 @@
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
-import {
-  Calendar,
-  BarChart3,
-  Users,
-  User,
-  FileText,
-  Link,
-  Radio
-} from 'lucide-vue-next'
+import { Calendar, BarChart3, Users, User, FileText, Link, Radio } from 'lucide-vue-next'
 
 const settingsStore = useSettingsStore()
 const authStore = useAuthStore()
@@ -211,7 +247,7 @@ const stats = ref({
   usersCount: 0,
   schedulesCount: 0,
   registrationsCount: 0,
-  recentActivities: []
+  recentActivities: [],
 })
 
 const days = {
@@ -221,7 +257,7 @@ const days = {
   thursday: 'Чт',
   friday: 'Пт',
   saturday: 'Сб',
-  sunday: 'Вс'
+  sunday: 'Вс',
 }
 
 const dayOrder = {
@@ -231,7 +267,7 @@ const dayOrder = {
   thursday: 3,
   friday: 4,
   saturday: 5,
-  sunday: 6
+  sunday: 6,
 }
 
 const formatDay = (day) => days[day] || day
@@ -241,7 +277,7 @@ const getPollDay = (trainingDay) => {
   if (!trainingDay) return ''
   const trainingDayIndex = dayOrder[trainingDay]
   const pollDayIndex = (trainingDayIndex - 3 + 7) % 7
-  return Object.keys(dayOrder).find(key => dayOrder[key] === pollDayIndex) || trainingDay
+  return Object.keys(dayOrder).find((key) => dayOrder[key] === pollDayIndex) || trainingDay
 }
 
 const getInitials = (user) => {
@@ -286,9 +322,9 @@ const getStatusText = (status) => {
 const loadStats = async () => {
   try {
     const response = await fetch('/api/admin/stats', {
-      credentials: 'include'
+      credentials: 'include',
     })
-    
+
     if (response.ok) {
       const data = await response.json()
       stats.value = {
@@ -296,7 +332,7 @@ const loadStats = async () => {
         usersCount: data.users_count || 0,
         schedulesCount: data.schedules_count || 0,
         registrationsCount: data.registrations_count || 0,
-        recentActivities: data.recent_activities || []
+        recentActivities: data.recent_activities || [],
       }
     }
   } catch (error) {
@@ -305,9 +341,6 @@ const loadStats = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    loadStats(),
-    settingsStore.loadSchedules()
-  ])
+  await Promise.all([loadStats(), settingsStore.loadSchedules()])
 })
 </script>

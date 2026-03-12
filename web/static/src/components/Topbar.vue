@@ -20,6 +20,6 @@
 
 <script setup>
 const toggleMenu = () => {
-  window.dispatchEvent(new CustomEvent('toggle-menu'));
-};
+  window.dispatchEvent(new CustomEvent('toggle-menu'))
+}
 </script>

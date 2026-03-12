@@ -2,9 +2,7 @@
   <div class="bg-white rounded shadow p-4 lg:p-6">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Календарь тренировок</h1>
 
-    <div v-if="loading" class="text-center py-8 text-gray-500">
-      Загрузка...
-    </div>
+    <div v-if="loading" class="text-center py-8 text-gray-500">Загрузка...</div>
 
     <Calendar
       v-if="!loading"
@@ -95,40 +93,42 @@ if (route.query.month) {
 }
 
 // Следим за изменениями query параметров и обновляем календарь
-watch(() => [route.query.year, route.query.month], ([year, month]) => {
-  const newYear = parseInt(year) || now.getFullYear()
-  const newMonth = parseInt(month) || now.getMonth() + 1
-  
-  // Обновляем только если значения изменились
-  if (newYear !== currentYear.value || newMonth !== currentMonth.value) {
-    currentYear.value = newYear
-    currentMonth.value = newMonth
-    loadCalendar()
-  }
-}, { immediate: false })
+watch(
+  () => [route.query.year, route.query.month],
+  ([year, month]) => {
+    const newYear = parseInt(year) || now.getFullYear()
+    const newMonth = parseInt(month) || now.getMonth() + 1
+
+    // Обновляем только если значения изменились
+    if (newYear !== currentYear.value || newMonth !== currentMonth.value) {
+      currentYear.value = newYear
+      currentMonth.value = newMonth
+      loadCalendar()
+    }
+  },
+  { immediate: false },
+)
 
 onMounted(async () => {
   // Ждём загрузки auth store
   if (authStore.isLoading) {
     await authStore.checkAuth()
   }
-  
+
   // Проверяем авторизацию
   if (!authStore.isAuthenticated) {
     router.push('/login?redirect=' + encodeURIComponent(route.fullPath))
     return
   }
-  
-  await Promise.all([
-    loadCalendar(),
-    settingsStore.loadTemplate()
-  ])
+
+  await Promise.all([loadCalendar(), settingsStore.loadTemplate()])
 
   // Загружаем значения по умолчанию из шаблона
   const template = settingsStore.template
   if (template) {
     defaultChatId.value = template.default_chat_id || ''
-    defaultTopicId.value = template.default_topic_id !== undefined ? template.default_topic_id : null
+    defaultTopicId.value =
+      template.default_topic_id !== undefined ? template.default_topic_id : null
   }
 })
 
@@ -136,7 +136,9 @@ const loadCalendar = async () => {
   loading.value = true
 
   try {
-    const response = await fetch(`/api/user/calendar?year=${currentYear.value}&month=${currentMonth.value}`)
+    const response = await fetch(
+      `/api/user/calendar?year=${currentYear.value}&month=${currentMonth.value}`,
+    )
 
     if (!response.ok) {
       throw new Error('Failed to load calendar')
@@ -150,7 +152,7 @@ const loadCalendar = async () => {
     if (route.query.date && route.query.chat_id && route.query.time) {
       openTrainingByParams()
     }
-    
+
     // Проверяем, есть ли параметр для открытия игры
     if (route.query.game_id) {
       openGameByParams()
@@ -167,10 +169,8 @@ const openTrainingByParams = () => {
   const targetChatId = route.query.chat_id
   const targetTime = decodeURIComponent(route.query.time || '')
 
-  const training = trainings.value.find(t =>
-    t.date === targetDate &&
-    t.chat_id === targetChatId &&
-    t.time === targetTime
+  const training = trainings.value.find(
+    (t) => t.date === targetDate && t.chat_id === targetChatId && t.time === targetTime,
   )
 
   if (training) {
@@ -183,7 +183,7 @@ const openTrainingByParams = () => {
 const openGameByParams = () => {
   const targetGameId = route.query.game_id
 
-  const game = games.value.find(g => g.id === targetGameId)
+  const game = games.value.find((g) => g.id === targetGameId)
 
   if (game) {
     selectedGame.value = { ...game }
@@ -198,8 +198,8 @@ const updateMonth = ({ year, month }) => {
     query: {
       ...route.query,
       year,
-      month
-    }
+      month,
+    },
   })
 }
 
@@ -209,17 +209,17 @@ const openTrainingModal = (training) => {
 
 const closeTrainingModal = () => {
   selectedTraining.value = null
-  
+
   // Очищаем query параметры, чтобы модалка не открывалась снова
   router.push({
     query: {
       ...route.query,
       date: undefined,
       chat_id: undefined,
-      time: undefined
-    }
+      time: undefined,
+    },
   })
-  
+
   loadCalendar()
 }
 
@@ -239,10 +239,10 @@ const addOneTimeTraining = async (formData) => {
     const response = await fetch('/api/admin/calendar/add-training', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify(formData)
+      body: JSON.stringify(formData),
     })
 
     const result = await response.json()
@@ -267,15 +267,15 @@ const registerForTraining = async () => {
     const response = await fetch('/api/user/calendar/register', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
         training_date: selectedTraining.value.date,
         training_time: selectedTraining.value.time,
         chat_id: selectedTraining.value.chat_id,
-        topic_id: selectedTraining.value.topic_id
-      })
+        topic_id: selectedTraining.value.topic_id,
+      }),
     })
 
     const result = await response.json()
@@ -288,10 +288,11 @@ const registerForTraining = async () => {
       await loadCalendar()
 
       // Находим обновлённую тренировку и обновляем selectedTraining
-      const updatedTraining = trainings.value.find(t =>
-        t.date === selectedTraining.value.date &&
-        t.time === selectedTraining.value.time &&
-        t.chat_id === selectedTraining.value.chat_id
+      const updatedTraining = trainings.value.find(
+        (t) =>
+          t.date === selectedTraining.value.date &&
+          t.time === selectedTraining.value.time &&
+          t.chat_id === selectedTraining.value.chat_id,
       )
       if (updatedTraining) {
         selectedTraining.value = { ...updatedTraining }
@@ -313,14 +314,14 @@ const unregisterFromTraining = async () => {
     const response = await fetch('/api/user/calendar/unregister', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
         training_date: selectedTraining.value.date,
         training_time: selectedTraining.value.time,
-        chat_id: selectedTraining.value.chat_id
-      })
+        chat_id: selectedTraining.value.chat_id,
+      }),
     })
 
     const result = await response.json()
@@ -330,10 +331,11 @@ const unregisterFromTraining = async () => {
       // Перезагружаем календарь для обновления списка записавшихся
       await loadCalendar()
       // Находим обновлённую тренировку и обновляем selectedTraining
-      const updatedTraining = trainings.value.find(t =>
-        t.date === selectedTraining.value.date &&
-        t.time === selectedTraining.value.time &&
-        t.chat_id === selectedTraining.value.chat_id
+      const updatedTraining = trainings.value.find(
+        (t) =>
+          t.date === selectedTraining.value.date &&
+          t.time === selectedTraining.value.time &&
+          t.chat_id === selectedTraining.value.chat_id,
       )
       if (updatedTraining) {
         selectedTraining.value = { ...updatedTraining }
@@ -355,10 +357,12 @@ const removeOneTimeTraining = async () => {
   if (!confirmed) return
 
   try {
-    const trainingId = selectedTraining.value.id || `${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`
+    const trainingId =
+      selectedTraining.value.id ||
+      `${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`
     const response = await fetch(`/api/admin/calendar/remove-training/${trainingId}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()
@@ -383,8 +387,8 @@ const removeUserFromTraining = async (reg) => {
       `/api/admin/calendar/remove-user/${selectedTraining.value.date}/${encodeURIComponent(selectedTraining.value.time)}/${selectedTraining.value.chat_id}/${reg.user_telegram_id}`,
       {
         method: 'DELETE',
-        credentials: 'include'
-      }
+        credentials: 'include',
+      },
     )
 
     const result = await response.json()
@@ -393,10 +397,11 @@ const removeUserFromTraining = async (reg) => {
       // Перезагружаем календарь для обновления данных
       await loadCalendar()
       // Находим обновлённую тренировку
-      const updatedTraining = trainings.value.find(t =>
-        t.date === selectedTraining.value.date &&
-        t.time === selectedTraining.value.time &&
-        t.chat_id === selectedTraining.value.chat_id
+      const updatedTraining = trainings.value.find(
+        (t) =>
+          t.date === selectedTraining.value.date &&
+          t.time === selectedTraining.value.time &&
+          t.chat_id === selectedTraining.value.chat_id,
       )
       if (updatedTraining) {
         selectedTraining.value = { ...updatedTraining }
@@ -421,8 +426,8 @@ const closeGameModal = () => {
   router.push({
     query: {
       ...route.query,
-      game_id: undefined
-    }
+      game_id: undefined,
+    },
   })
   loadCalendar()
 }
@@ -433,24 +438,24 @@ const updateGameSignup = async () => {
   try {
     const response = await fetch(`/api/games/${selectedGame.value.id}/signup`, {
       method: 'POST',
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
       notificationsStore.success(
-        result.action === 'registered' ? 'Вы записаны на игру' : 'Запись отменена'
+        result.action === 'registered' ? 'Вы записаны на игру' : 'Запись отменена',
       )
-      
+
       // Обновляем статус в модалке
       const isSignedUp = result.action === 'registered'
-      
+
       // Перезагружаем календарь для обновления списка записавшихся
       await loadCalendar()
-      
+
       // Находим обновлённую игру и обновляем selectedGame
-      const updatedGame = games.value.find(g => g.id === selectedGame.value.id)
+      const updatedGame = games.value.find((g) => g.id === selectedGame.value.id)
       if (updatedGame) {
         selectedGame.value = { ...updatedGame }
       }

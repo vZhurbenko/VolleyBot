@@ -1,12 +1,20 @@
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="$emit('close')">
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click="$emit('close')"
+  >
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
       <!-- Заголовок -->
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+      <div
+        class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white"
+      >
         <h3 class="text-lg font-semibold text-gray-900">
           {{ game ? 'Редактирование игры' : 'Новая игра' }}
         </h3>
-        <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
+        <button
+          @click="$emit('close')"
+          class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+        >
           <X class="w-5 h-5" />
         </button>
       </div>
@@ -16,9 +24,7 @@
         <form id="game-form" @submit.prevent="handleSubmit" class="space-y-4">
           <!-- Название -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Название игры *
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-1"> Название игры * </label>
             <input
               v-model="form.name"
               type="text"
@@ -30,9 +36,7 @@
 
           <!-- Дата -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Дата проведения *
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-1"> Дата проведения * </label>
             <input
               v-model="form.date"
               type="date"
@@ -43,9 +47,7 @@
 
           <!-- Время начала -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Время начала
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-1"> Время начала </label>
             <input
               v-model="form.start_time"
               type="time"
@@ -55,9 +57,7 @@
 
           <!-- Место проведения -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Место проведения
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-1"> Место проведения </label>
             <input
               v-model="form.location"
               type="text"
@@ -68,9 +68,7 @@
 
           <!-- Соперник -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Соперник
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-1"> Соперник </label>
             <input
               v-model="form.opponent"
               type="text"
@@ -81,9 +79,7 @@
 
           <!-- Chat ID -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Chat ID
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-1"> Chat ID </label>
             <input
               v-model="form.chat_id"
               type="text"
@@ -136,8 +132,8 @@ import { X } from 'lucide-vue-next'
 const props = defineProps({
   game: {
     type: Object,
-    default: null
-  }
+    default: null,
+  },
 })
 
 const emit = defineEmits(['close', 'save'])
@@ -149,7 +145,7 @@ const form = ref({
   start_time: '',
   opponent: '',
   chat_id: '',
-  topic_id: null
+  topic_id: null,
 })
 
 const saving = ref(false)
@@ -182,21 +178,26 @@ onMounted(() => {
   loadDefaults()
 })
 
-watch(() => props.game, (newGame) => {
-  if (newGame) {
-    form.value = {
-      name: newGame.name || '',
-      date: newGame.date || '',
-      location: newGame.location || '',
-      start_time: newGame.start_time || '',
-      opponent: newGame.opponent || '',
-      chat_id: newGame.chat_id || '',
-      topic_id: newGame.topic_id !== null && newGame.topic_id !== undefined ? newGame.topic_id : null
+watch(
+  () => props.game,
+  (newGame) => {
+    if (newGame) {
+      form.value = {
+        name: newGame.name || '',
+        date: newGame.date || '',
+        location: newGame.location || '',
+        start_time: newGame.start_time || '',
+        opponent: newGame.opponent || '',
+        chat_id: newGame.chat_id || '',
+        topic_id:
+          newGame.topic_id !== null && newGame.topic_id !== undefined ? newGame.topic_id : null,
+      }
+    } else {
+      resetForm()
     }
-  } else {
-    resetForm()
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 const resetForm = () => {
   form.value = {
@@ -206,13 +207,13 @@ const resetForm = () => {
     start_time: '',
     opponent: '',
     chat_id: '-1002588984009',
-    topic_id: 382
+    topic_id: 382,
   }
 }
 
 const handleSubmit = () => {
   saving.value = true
-  
+
   // Небольшая задержка для UX
   setTimeout(() => {
     emit('save', { ...form.value })

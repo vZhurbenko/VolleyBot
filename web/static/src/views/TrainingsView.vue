@@ -24,9 +24,7 @@
       </div>
     </div>
 
-    <div v-if="loading" class="text-center py-8 text-gray-500">
-      Загрузка...
-    </div>
+    <div v-if="loading" class="text-center py-8 text-gray-500">Загрузка...</div>
 
     <div v-else-if="allItems.length === 0" class="text-center py-8 text-gray-500">
       Нет записей за выбранный период
@@ -54,7 +52,7 @@
               </span>
             </h3>
           </div>
-          
+
           <!-- Заголовок для тренировок -->
           <div v-else class="flex items-center gap-2">
             <span class="px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">
@@ -80,14 +78,23 @@
               <!-- Имя участника -->
               <p class="font-medium text-gray-900">
                 {{ item.first_name }} {{ item.last_name || '' }}
-                <span v-if="item.username" class="text-gray-400 font-normal">@{{ item.username }}</span>
+                <span v-if="item.username" class="text-gray-400 font-normal"
+                  >@{{ item.username }}</span
+                >
               </p>
-              
+
               <!-- Статус только для тренировок -->
-              <div v-if="item.type === 'training' && item.status" class="flex items-center gap-2 mt-1">
+              <div
+                v-if="item.type === 'training' && item.status"
+                class="flex items-center gap-2 mt-1"
+              >
                 <span
                   class="px-2 py-0.5 rounded text-xs font-medium"
-                  :class="item.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
+                  :class="
+                    item.status === 'registered'
+                      ? 'bg-teal-100 text-teal-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                  "
                 >
                   {{ item.status === 'registered' ? 'Записан' : 'Резерв' }}
                 </span>
@@ -139,11 +146,11 @@ const loadTrainings = async () => {
     // Загружаем тренировки и игры параллельно
     const [trainingsResponse, gamesResponse] = await Promise.all([
       fetch(`/api/admin/trainings?start_date=${startDate.value}&end_date=${endDate.value}`, {
-        credentials: 'include'
+        credentials: 'include',
       }),
       fetch(`/api/admin/games/signups?start_date=${startDate.value}&end_date=${endDate.value}`, {
-        credentials: 'include'
-      })
+        credentials: 'include',
+      }),
     ])
 
     const trainingsData = await trainingsResponse.json()
@@ -151,15 +158,15 @@ const loadTrainings = async () => {
 
     // Объединяем с указанием типа
     const items = [
-      ...(trainingsData.trainings || []).map(t => ({ ...t, type: 'training' })),
-      ...(gamesData.signups || []).map(g => ({ ...g, type: 'game' }))
+      ...(trainingsData.trainings || []).map((t) => ({ ...t, type: 'training' })),
+      ...(gamesData.signups || []).map((g) => ({ ...g, type: 'game' })),
     ]
 
     // Фильтруем прошедшие
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    
-    const filteredItems = items.filter(item => {
+
+    const filteredItems = items.filter((item) => {
       const itemDate = new Date(item.training_date || item.date)
       return itemDate >= today
     })
@@ -184,32 +191,32 @@ const loadTrainings = async () => {
 const groupedItems = computed(() => {
   const groups = {}
 
-  allItems.value.forEach(item => {
+  allItems.value.forEach((item) => {
     // Для тренировок и игр используем разные поля даты
     const date = item.training_date || item.date
     const chatId = item.chat_id || ''
     const gameId = item.game_id || ''
-    
+
     // Для игр группируем по game_id, для тренировок по date+chat_id
     // Ключ сортировки начинается с даты
-    const key = item.type === 'game' 
-      ? `${date}_game_${gameId}` 
-      : `${date}_${chatId}`
-      
+    const key = item.type === 'game' ? `${date}_game_${gameId}` : `${date}_${chatId}`
+
     if (!groups[key]) {
       groups[key] = []
     }
     groups[key].push({
       ...item,
-      time: item.training_time || item.start_time
+      time: item.training_time || item.start_time,
     })
   })
 
   // Сортируем даты
   const sorted = {}
-  Object.keys(groups).sort().forEach(key => {
-    sorted[key] = groups[key]
-  })
+  Object.keys(groups)
+    .sort()
+    .forEach((key) => {
+      sorted[key] = groups[key]
+    })
 
   return sorted
 })
@@ -226,14 +233,14 @@ const formatDate = (dateKey) => {
   // Для тренировок - ключ может быть формата YYYY-MM-DD_chat_id или timestamp_chat_id
   const parts = dateKey.split('_')
   let date = parts[0]
-  
+
   // Если это timestamp (содержит точку), конвертируем
   if (date.includes('.')) {
     const d = new Date(date)
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
     return d.toLocaleDateString('ru-RU', options)
   }
-  
+
   // Иначе это YYYY-MM-DD
   const d = new Date(date)
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
@@ -252,7 +259,7 @@ const formatShortDate = (dateStr) => {
 const removeUser = async (item) => {
   const name = item.first_name + (item.last_name ? ' ' + item.last_name : '')
   const date = item.training_date || item.date
-  
+
   let confirmed
   if (item.type === 'game') {
     confirmed = await confirmStore.danger(`Удалить ${name} из игры ${date}?`)
@@ -267,7 +274,7 @@ const removeUser = async (item) => {
       // Удаление из игры
       response = await fetch(`/api/games/${item.game_id}/unregister`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
       })
     } else {
       // Удаление из тренировки
@@ -275,8 +282,8 @@ const removeUser = async (item) => {
         `/api/admin/calendar/remove-user/${item.training_date}/${encodeURIComponent(item.training_time)}/${item.chat_id}/${item.user_telegram_id}`,
         {
           method: 'DELETE',
-          credentials: 'include'
-        }
+          credentials: 'include',
+        },
       )
     }
 

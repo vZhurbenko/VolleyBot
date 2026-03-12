@@ -2,9 +2,7 @@
   <div class="bg-white rounded shadow p-4 lg:p-6">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Мои тренировки и игры</h1>
 
-    <div v-if="loading" class="text-center py-8 text-gray-500">
-      Загрузка...
-    </div>
+    <div v-if="loading" class="text-center py-8 text-gray-500">Загрузка...</div>
 
     <div v-else-if="items.length === 0" class="text-center py-8 text-gray-500">
       Вы ещё не записаны ни на одну тренировку или игру
@@ -20,7 +18,14 @@
         <!-- Заголовок карточки -->
         <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
           <div class="flex items-center gap-2">
-            <span :class="['px-2 py-0.5 rounded text-xs font-medium', item.type === 'game' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700']">
+            <span
+              :class="[
+                'px-2 py-0.5 rounded text-xs font-medium',
+                item.type === 'game'
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'bg-teal-100 text-teal-700',
+              ]"
+            >
               {{ item.type === 'game' ? 'Игра' : 'Тренировка' }}
             </span>
             <h3 class="font-semibold text-gray-900">
@@ -43,24 +48,33 @@
             </h3>
           </div>
         </div>
-        
+
         <!-- Тело карточки -->
         <div class="px-4 py-3 flex items-center justify-between">
           <div>
             <p class="font-medium text-gray-900">
               Вы
-              <span v-if="authStore.user?.username" class="text-gray-400 font-normal">@{{ authStore.user.username }}</span>
+              <span v-if="authStore.user?.username" class="text-gray-400 font-normal"
+                >@{{ authStore.user.username }}</span
+              >
             </p>
-            <div v-if="item.type === 'training' && item.status" class="flex items-center gap-2 mt-1">
+            <div
+              v-if="item.type === 'training' && item.status"
+              class="flex items-center gap-2 mt-1"
+            >
               <span
                 class="px-2 py-0.5 rounded text-xs font-medium"
-                :class="item.status === 'registered' ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'"
+                :class="
+                  item.status === 'registered'
+                    ? 'bg-teal-100 text-teal-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                "
               >
                 {{ item.status === 'registered' ? 'Записан' : 'Резерв' }}
               </span>
             </div>
           </div>
-          
+
           <button
             @click="item.type === 'game' ? unregisterFromGame(item) : unregister(item)"
             class="px-4 py-2 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
@@ -96,7 +110,7 @@ const loadItems = async () => {
 
   try {
     const response = await fetch('/api/user/my-trainings', {
-      credentials: 'include'
+      credentials: 'include',
     })
 
     if (!response.ok) {
@@ -104,12 +118,12 @@ const loadItems = async () => {
     }
 
     const data = await response.json()
-    
+
     // Фильтруем прошедшие тренировки и игры
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    
-    items.value = (data.items || []).filter(item => {
+
+    items.value = (data.items || []).filter((item) => {
       const itemDate = new Date(item.training_date || item.date)
       return itemDate >= today
     })
@@ -128,14 +142,14 @@ const unregister = async (training) => {
     const response = await fetch('/api/user/calendar/unregister', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
         training_date: training.training_date,
         training_time: training.training_time,
-        chat_id: training.chat_id
-      })
+        chat_id: training.chat_id,
+      }),
     })
 
     const result = await response.json()
@@ -159,7 +173,7 @@ const unregisterFromGame = async (game) => {
   try {
     const response = await fetch(`/api/games/${game.id}/unregister`, {
       method: 'POST',
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()

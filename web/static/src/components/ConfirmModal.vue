@@ -3,10 +3,7 @@
     <Transition name="modal">
       <div v-if="isOpen" class="fixed inset-0 z-[99] flex items-center justify-center p-4">
         <!-- Overlay -->
-        <div
-          class="absolute inset-0 bg-black/50"
-          @click="handleCancel"
-        />
+        <div class="absolute inset-0 bg-black/50" @click="handleCancel" />
 
         <!-- Modal -->
         <div
@@ -50,7 +47,11 @@
               <button
                 @click="handleConfirm"
                 class="px-4 py-2 rounded font-medium transition-colors"
-                :class="mode === 'danger' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-teal-600 text-white hover:bg-teal-700'"
+                :class="
+                  mode === 'danger'
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-teal-600 text-white hover:bg-teal-700'
+                "
               >
                 {{ confirmText }}
               </button>
@@ -69,29 +70,29 @@ import { AlertTriangle, Info } from 'lucide-vue-next'
 const props = defineProps({
   isOpen: {
     type: Boolean,
-    default: false
+    default: false,
   },
   title: {
     type: String,
-    default: 'Подтверждение'
+    default: 'Подтверждение',
   },
   message: {
     type: String,
-    required: true
+    required: true,
   },
   mode: {
     type: String,
     default: 'danger',
-    validator: (value) => ['danger', 'info'].includes(value)
+    validator: (value) => ['danger', 'info'].includes(value),
   },
   cancelText: {
     type: String,
-    default: 'Отмена'
+    default: 'Отмена',
   },
   confirmText: {
     type: String,
-    default: 'Подтвердить'
-  }
+    default: 'Подтвердить',
+  },
 })
 
 const emit = defineEmits(['confirm', 'cancel', 'close'])
@@ -124,7 +125,7 @@ watch(
       return () => document.removeEventListener('keydown', handleEsc)
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 </script>
 

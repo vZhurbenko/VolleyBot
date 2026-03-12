@@ -15,14 +15,22 @@
             <router-link
               to="/user/calendar"
               class="px-4 py-2 rounded text-sm font-medium transition-colors"
-              :class="$route.name === 'user-calendar' ? 'bg-teal-50 text-teal-700' : 'text-gray-600 hover:bg-gray-50'"
+              :class="
+                $route.name === 'user-calendar'
+                  ? 'bg-teal-50 text-teal-700'
+                  : 'text-gray-600 hover:bg-gray-50'
+              "
             >
               Календарь
             </router-link>
             <router-link
               to="/user/my-trainings"
               class="px-4 py-2 rounded text-sm font-medium transition-colors"
-              :class="$route.name === 'my-trainings' ? 'bg-teal-50 text-teal-700' : 'text-gray-600 hover:bg-gray-50'"
+              :class="
+                $route.name === 'my-trainings'
+                  ? 'bg-teal-50 text-teal-700'
+                  : 'text-gray-600 hover:bg-gray-50'
+              "
             >
               Мои тренировки
             </router-link>

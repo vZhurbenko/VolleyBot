@@ -185,8 +185,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Plus,
   ChevronLeft,
@@ -197,374 +197,372 @@ import {
   Trophy,
   Edit,
   Trash2,
-} from "lucide-vue-next";
-import { useAuthStore } from "@/stores/auth";
-import { useNotificationsStore } from "@/stores/notifications";
-import { useConfirmStore } from "@/stores/confirm";
-import GameForm from "@/components/GameForm.vue";
-import GameResultModal from "@/components/GameResultModal.vue";
+} from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
+import GameForm from '@/components/GameForm.vue'
+import GameResultModal from '@/components/GameResultModal.vue'
 
-const router = useRouter();
-const authStore = useAuthStore();
-const notificationsStore = useNotificationsStore();
-const confirmStore = useConfirmStore();
+const router = useRouter()
+const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
-const games = ref([]);
-const allGames = ref([]);
-const loading = ref(false);
-const selectedGame = ref(null);
-const showGameForm = ref(false);
-const showResultModal = ref(false);
+const games = ref([])
+const allGames = ref([])
+const loading = ref(false)
+const selectedGame = ref(null)
+const showGameForm = ref(false)
+const showResultModal = ref(false)
 
-const now = new Date();
-const currentYear = ref(now.getFullYear());
-const currentMonth = ref(now.getMonth() + 1);
+const now = new Date()
+const currentYear = ref(now.getFullYear())
+const currentMonth = ref(now.getMonth() + 1)
 
 const monthNames = [
-  "Январь",
-  "Февраль",
-  "Март",
-  "Апрель",
-  "Май",
-  "Июнь",
-  "Июль",
-  "Август",
-  "Сентябрь",
-  "Октябрь",
-  "Ноябрь",
-  "Декабрь",
-];
+  'Январь',
+  'Февраль',
+  'Март',
+  'Апрель',
+  'Май',
+  'Июнь',
+  'Июль',
+  'Август',
+  'Сентябрь',
+  'Октябрь',
+  'Ноябрь',
+  'Декабрь',
+]
 
-const monthName = (month) => monthNames[month - 1];
+const monthName = (month) => monthNames[month - 1]
 
 const sortedGames = computed(() => {
   return [...games.value].sort((a, b) => {
-    const dateA = new Date(a.date + (a.start_time ? "T" + a.start_time : ""));
-    const dateB = new Date(b.date + (b.start_time ? "T" + b.start_time : ""));
-    return dateA - dateB;
-  });
-});
+    const dateA = new Date(a.date + (a.start_time ? 'T' + a.start_time : ''))
+    const dateB = new Date(b.date + (b.start_time ? 'T' + b.start_time : ''))
+    return dateA - dateB
+  })
+})
 
 const gameStats = computed(() => {
-  const allGamesList = allGames.value || [];
-  const gamesWithResult = allGamesList.filter((g) => g.result);
+  const allGamesList = allGames.value || []
+  const gamesWithResult = allGamesList.filter((g) => g.result)
 
   return {
     total: allGamesList.length,
-    wins: gamesWithResult.filter((g) => g.result === "win").length,
-    losses: gamesWithResult.filter((g) => g.result === "loss").length,
-    draws: gamesWithResult.filter((g) => g.result === "draw").length,
-  };
-});
+    wins: gamesWithResult.filter((g) => g.result === 'win').length,
+    losses: gamesWithResult.filter((g) => g.result === 'loss').length,
+    draws: gamesWithResult.filter((g) => g.result === 'draw').length,
+  }
+})
 
 onMounted(async () => {
   if (authStore.isLoading) {
-    await authStore.checkAuth();
+    await authStore.checkAuth()
   }
 
   if (!authStore.isAuthenticated) {
-    router.push("/login?redirect=" + encodeURIComponent(router.currentRoute.value.fullPath));
-    return;
+    router.push('/login?redirect=' + encodeURIComponent(router.currentRoute.value.fullPath))
+    return
   }
 
-  loadGames();
-});
+  loadGames()
+})
 
 const loadGames = async () => {
-  loading.value = true;
+  loading.value = true
 
   try {
     // Загружаем все игры (без ограничения по месяцу для статистики)
     const response = await fetch(
       `/api/games?year=${currentYear.value}&month=${currentMonth.value}`,
       {
-        credentials: "include",
+        credentials: 'include',
       },
-    );
+    )
 
     if (!response.ok) {
-      throw new Error("Failed to load games");
+      throw new Error('Failed to load games')
     }
 
-    const data = await response.json();
+    const data = await response.json()
 
     // Для каждой игры загружаем записавшихся
     for (const game of data.games || []) {
       const gameResponse = await fetch(`/api/games/${game.id}`, {
-        credentials: "include",
-      });
+        credentials: 'include',
+      })
       if (gameResponse.ok) {
-        const gameData = await gameResponse.json();
-        game.signups = gameData.game?.signups || [];
+        const gameData = await gameResponse.json()
+        game.signups = gameData.game?.signups || []
       }
     }
 
-    games.value = data.games || [];
+    games.value = data.games || []
 
     // Загружаем все игры для статистики за все время
-    await loadAllGamesForStats();
+    await loadAllGamesForStats()
   } catch (error) {
-    console.error("Error loading games:", error);
-    notificationsStore.error("Ошибка загрузки игр");
+    console.error('Error loading games:', error)
+    notificationsStore.error('Ошибка загрузки игр')
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const loadAllGamesForStats = async () => {
   try {
     const response = await fetch(`/api/games`, {
-      credentials: "include",
-    });
+      credentials: 'include',
+    })
 
     if (!response.ok) {
-      throw new Error("Failed to load all games");
+      throw new Error('Failed to load all games')
     }
 
-    const data = await response.json();
-    allGames.value = data.games || [];
+    const data = await response.json()
+    allGames.value = data.games || []
   } catch (error) {
-    console.error("Error loading all games for stats:", error);
+    console.error('Error loading all games for stats:', error)
   }
-};
+}
 
 const previousMonth = () => {
-  currentMonth.value--;
+  currentMonth.value--
   if (currentMonth.value < 1) {
-    currentMonth.value = 12;
-    currentYear.value--;
+    currentMonth.value = 12
+    currentYear.value--
   }
-  loadGames();
-};
+  loadGames()
+}
 
 const nextMonth = () => {
-  currentMonth.value++;
+  currentMonth.value++
   if (currentMonth.value > 12) {
-    currentMonth.value = 1;
-    currentYear.value++;
+    currentMonth.value = 1
+    currentYear.value++
   }
-  loadGames();
-};
+  loadGames()
+}
 
 const formatDate = (dateStr) => {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    weekday: "short",
-  });
-};
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    weekday: 'short',
+  })
+}
 
 const formatCompactDate = (dateStr) => {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "short",
-    weekday: "short",
-  });
-};
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    weekday: 'short',
+  })
+}
 
 const getInitials = (user) => {
-  const first = user.first_name?.charAt(0) || "";
-  const last = user.last_name?.charAt(0) || "";
-  return (first + last).toUpperCase();
-};
+  const first = user.first_name?.charAt(0) || ''
+  const last = user.last_name?.charAt(0) || ''
+  return (first + last).toUpperCase()
+}
 
 const getGameStatusClass = (game) => {
-  const gameDate = new Date(game.date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const gameDate = new Date(game.date)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
   if (gameDate < today) {
-    return "bg-gray-50";
+    return 'bg-gray-50'
   }
-  return "bg-white";
-};
+  return 'bg-white'
+}
 
 const getResultClass = (result) => {
   switch (result) {
-    case "win":
-      return "bg-green-100 text-green-800";
-    case "loss":
-      return "bg-red-100 text-red-800";
-    case "draw":
-      return "bg-yellow-100 text-yellow-800";
+    case 'win':
+      return 'bg-green-100 text-green-800'
+    case 'loss':
+      return 'bg-red-100 text-red-800'
+    case 'draw':
+      return 'bg-yellow-100 text-yellow-800'
     default:
-      return "bg-gray-100 text-gray-800";
+      return 'bg-gray-100 text-gray-800'
   }
-};
+}
 
 const getResultText = (result) => {
   switch (result) {
-    case "win":
-      return "Победа";
-    case "loss":
-      return "Поражение";
-    case "draw":
-      return "Ничья";
+    case 'win':
+      return 'Победа'
+    case 'loss':
+      return 'Поражение'
+    case 'draw':
+      return 'Ничья'
     default:
-      return result;
+      return result
   }
-};
+}
 
 const getUserSignupClass = (game) => {
-  const isSignedUp = game.signups?.some((s) => s.user_telegram_id === authStore.user?.telegram_id);
+  const isSignedUp = game.signups?.some((s) => s.user_telegram_id === authStore.user?.telegram_id)
   if (isSignedUp) {
-    return "text-red-600 hover:text-red-700 bg-transparent";
+    return 'text-red-600 hover:text-red-700 bg-transparent'
   }
-  return "bg-teal-100 text-teal-700 hover:bg-teal-200";
-};
+  return 'bg-teal-100 text-teal-700 hover:bg-teal-200'
+}
 
 const getUserSignupText = (game) => {
-  const isSignedUp = game.signups?.some((s) => s.user_telegram_id === authStore.user?.telegram_id);
+  const isSignedUp = game.signups?.some((s) => s.user_telegram_id === authStore.user?.telegram_id)
   if (isSignedUp) {
-    return "Выписаться";
+    return 'Выписаться'
   }
-  return "Записаться";
-};
+  return 'Записаться'
+}
 
 const toggleSignup = async (game) => {
   try {
     const response = await fetch(`/api/games/${game.id}/signup`, {
-      method: "POST",
-      credentials: "include",
-    });
+      method: 'POST',
+      credentials: 'include',
+    })
 
     if (!response.ok) {
-      throw new Error("Failed to toggle signup");
+      throw new Error('Failed to toggle signup')
     }
 
-    const result = await response.json();
+    const result = await response.json()
 
     if (result.success) {
       notificationsStore.success(
-        result.action === "registered" ? "Вы записаны на игру" : "Запись отменена",
-      );
-      loadGames();
+        result.action === 'registered' ? 'Вы записаны на игру' : 'Запись отменена',
+      )
+      loadGames()
     }
   } catch (error) {
-    console.error("Error toggling signup:", error);
-    notificationsStore.error("Ошибка записи на игру");
+    console.error('Error toggling signup:', error)
+    notificationsStore.error('Ошибка записи на игру')
   }
-};
+}
 
 const openAddGameModal = () => {
-  selectedGame.value = null;
-  showGameForm.value = true;
-};
+  selectedGame.value = null
+  showGameForm.value = true
+}
 
 const openEditGameModal = (game) => {
-  selectedGame.value = { ...game };
-  showGameForm.value = true;
-};
+  selectedGame.value = { ...game }
+  showGameForm.value = true
+}
 
 const closeGameForm = () => {
-  showGameForm.value = false;
-  selectedGame.value = null;
-};
+  showGameForm.value = false
+  selectedGame.value = null
+}
 
 const saveGame = async (gameData) => {
   try {
     const url = selectedGame.value
       ? `/api/admin/games/${selectedGame.value.id}`
-      : "/api/admin/games";
+      : '/api/admin/games'
 
-    const method = selectedGame.value ? "PUT" : "POST";
+    const method = selectedGame.value ? 'PUT' : 'POST'
 
     const response = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(gameData),
-      credentials: "include",
-    });
+      credentials: 'include',
+    })
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to save game");
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to save game')
     }
 
-    notificationsStore.success(selectedGame.value ? "Игра обновлена" : "Игра создана");
-    closeGameForm();
-    loadGames();
+    notificationsStore.success(selectedGame.value ? 'Игра обновлена' : 'Игра создана')
+    closeGameForm()
+    loadGames()
   } catch (error) {
-    console.error("Error saving game:", error);
-    notificationsStore.error(error.message || "Ошибка сохранения игры");
+    console.error('Error saving game:', error)
+    notificationsStore.error(error.message || 'Ошибка сохранения игры')
   }
-};
+}
 
 const deleteGame = async (game) => {
-  const confirmed = await confirmStore.danger(
-    `Вы уверены, что хотите удалить игру "${game.name}"?`,
-  );
+  const confirmed = await confirmStore.danger(`Вы уверены, что хотите удалить игру "${game.name}"?`)
 
-  if (!confirmed) return;
+  if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/games/${game.id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+      method: 'DELETE',
+      credentials: 'include',
+    })
 
     if (!response.ok) {
-      throw new Error("Failed to delete game");
+      throw new Error('Failed to delete game')
     }
 
-    notificationsStore.success("Игра удалена");
-    loadGames();
+    notificationsStore.success('Игра удалена')
+    loadGames()
   } catch (error) {
-    console.error("Error deleting game:", error);
-    notificationsStore.error("Ошибка удаления игры");
+    console.error('Error deleting game:', error)
+    notificationsStore.error('Ошибка удаления игры')
   }
-};
+}
 
 const openResultModal = (game) => {
-  selectedGame.value = { ...game };
-  showResultModal.value = true;
-};
+  selectedGame.value = { ...game }
+  showResultModal.value = true
+}
 
 const closeResultModal = () => {
-  showResultModal.value = false;
-  selectedGame.value = null;
-};
+  showResultModal.value = false
+  selectedGame.value = null
+}
 
 const saveResult = async (resultData) => {
   try {
     // Если результат пустой — удаляем его
     if (!resultData.result || !resultData.score) {
       const response = await fetch(`/api/admin/games/${selectedGame.value.id}/result`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+        method: 'DELETE',
+        credentials: 'include',
+      })
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to clear result");
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to clear result')
       }
 
-      notificationsStore.success("Результат сброшен");
-      closeResultModal();
-      loadGames();
-      return;
+      notificationsStore.success('Результат сброшен')
+      closeResultModal()
+      loadGames()
+      return
     }
 
     const response = await fetch(`/api/admin/games/${selectedGame.value.id}/result`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(resultData),
-      credentials: "include",
-    });
+      credentials: 'include',
+    })
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Failed to save result");
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to save result')
     }
 
-    notificationsStore.success("Результат сохранён");
-    closeResultModal();
-    loadGames();
+    notificationsStore.success('Результат сохранён')
+    closeResultModal()
+    loadGames()
   } catch (error) {
-    console.error("Error saving result:", error);
-    notificationsStore.error(error.message || "Ошибка сохранения результата");
+    console.error('Error saving result:', error)
+    notificationsStore.error(error.message || 'Ошибка сохранения результата')
   }
-};
+}
 </script>
