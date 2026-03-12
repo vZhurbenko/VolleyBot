@@ -863,13 +863,16 @@ class Database:
         cursor = self.conn.cursor()
 
         try:
+            import uuid as uuid_module
+            training_uuid = str(uuid_module.uuid4())
+            
             cursor.execute('''
-                INSERT INTO one_time_trainings (id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location))
+                INSERT INTO one_time_trainings (id, uuid, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_uuid, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location))
 
             self.conn.commit()
-            return {"success": True}
+            return {"success": True, "uuid": training_uuid}
         except Exception as e:
             logger.error(f"Ошибка добавления разовой тренировки: {e}")
             return {"success": False, "error": str(e)}
@@ -952,16 +955,19 @@ class Database:
         cursor = self.conn.cursor()
 
         try:
+            import uuid as uuid_module
+            training_uuid = str(uuid_module.uuid4())
+            
             cursor.execute('''
                 INSERT INTO scheduled_trainings
-                (id, schedule_id, training_date, training_time, start_time, end_time,
+                (id, uuid, schedule_id, training_date, training_time, start_time, end_time,
                  chat_id, topic_id, name, location, added_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (training_id, schedule_id, training_date, training_time,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_uuid, schedule_id, training_date, training_time,
                   start_time, end_time, chat_id, topic_id, name, location))
 
             self.conn.commit()
-            return {"success": True}
+            return {"success": True, "uuid": training_uuid}
         except Exception as e:
             logger.error(f"Ошибка добавления тренировки из расписания: {e}")
             return {"success": False, "error": str(e)}
