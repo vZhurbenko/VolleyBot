@@ -36,105 +36,113 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import { useAuthStore } from "@/stores/auth";
-import logo from "@/img/logo.svg";
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import logo from '@/img/logo.svg'
 
-const router = useRouter();
-const route = useRoute();
-const authStore = useAuthStore();
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
 
-const isAuthenticated = computed(() => authStore.isAuthenticated);
-const user = computed(() => authStore.user);
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 
-const errorMessage = ref("");
+const errorMessage = ref('')
 
 onMounted(async () => {
-  await authStore.checkAuth();
-  loadTelegramConfig();
-});
+  await authStore.checkAuth()
+  loadTelegramConfig()
+})
 
 const loadTelegramConfig = async () => {
   try {
-    const response = await fetch("/api/auth/telegram/config");
-    const config = await response.json();
-    initTelegramWidget(config.bot_username);
+    const response = await fetch('/api/auth/telegram/config')
+    const config = await response.json()
+    initTelegramWidget(config.bot_username)
   } catch (error) {
-    console.error("Ошибка загрузки конфигурации:", error);
-    errorMessage.value = "Ошибка загрузки конфигурации Telegram";
+    console.error('Ошибка загрузки конфигурации:', error)
+    errorMessage.value = 'Ошибка загрузки конфигурации Telegram'
   }
-};
+}
 
 const initTelegramWidget = (botUsername) => {
-  const script = document.createElement("script");
-  script.src = "https://telegram.org/js/telegram-widget.js?22";
-  script.setAttribute("data-telegram-login", botUsername);
-  script.setAttribute("data-size", "large");
-  script.setAttribute("data-radius", "3");
-  script.setAttribute("data-lang", "ru");
-  script.setAttribute("data-onauth", "onTelegramAuth(user)");
-  script.setAttribute("data-request-access", "write");
-  script.async = true;
+  const script = document.createElement('script')
+  script.src = 'https://telegram.org/js/telegram-widget.js?22'
+  script.setAttribute('data-telegram-login', botUsername)
+  script.setAttribute('data-size', 'large')
+  script.setAttribute('data-radius', '3')
+  script.setAttribute('data-lang', 'ru')
+  script.setAttribute('data-onauth', 'onTelegramAuth(user)')
+  script.setAttribute('data-request-access', 'write')
+  script.async = true
 
-  const container = document.getElementById("telegram-login");
+  const container = document.getElementById('telegram-login')
   if (container) {
-    container.appendChild(script);
+    container.appendChild(script)
   }
-};
+}
 
 const onTelegramAuth = async (user) => {
-  console.log("Telegram user data:", user);
-  console.log("Начало авторизации...");
+  console.log('Telegram user data:', user)
+  console.log('Начало авторизации...')
 
   try {
-    const response = await fetch("/api/auth/telegram", {
-      method: "POST",
+    const response = await fetch('/api/auth/telegram', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(user),
-      credentials: "include",
-    });
+      credentials: 'include',
+    })
 
-    console.log("Ответ сервера:", response.status);
-    const result = await response.json();
-    console.log("Результат:", result);
+    console.log('Ответ сервера:', response.status)
+    const result = await response.json()
+    console.log('Результат:', result)
 
     if (response.ok && result.success) {
-      console.log("Авторизация успешна, обновляем store...");
+      console.log('Авторизация успешна, обновляем store...')
       // Обновляем auth store перед редиректом
-      authStore.setUser(result.user);
+      authStore.setUser(result.user)
 
       // Проверяем, есть ли redirect параметр
-      const redirect = route.query.redirect;
+      const redirect = route.query.redirect
+
+      // Проверяем, является ли пользователь гостем
+      const isGuest = result.user?.is_guest ?? false
+      const trainingUuid = result.user?.training_uuid
+
       if (redirect) {
-        console.log("Редирект на:", redirect);
-        window.location.href = redirect;
+        console.log('Редирект на:', redirect)
+        window.location.href = redirect
+      } else if (isGuest && trainingUuid) {
+        // Гость редиректится на страницу тренировки
+        console.log('Гость редиректится на /guest/training/', trainingUuid)
+        window.location.href = `/guest/training/${trainingUuid}`
       } else {
-        console.log("Переход на /admin через window.location...");
-        window.location.href = "/admin";
+        console.log('Переход на /admin через window.location...')
+        window.location.href = '/admin'
       }
     } else {
-      errorMessage.value = result.detail || "Ошибка авторизации";
-      console.error("Ошибка авторизации:", errorMessage.value);
+      errorMessage.value = result.detail || 'Ошибка авторизации'
+      console.error('Ошибка авторизации:', errorMessage.value)
       if (response.status === 403) {
-        const loginWidget = document.getElementById("telegram-login");
+        const loginWidget = document.getElementById('telegram-login')
         if (loginWidget) {
-          loginWidget.classList.add("hidden");
+          loginWidget.classList.add('hidden')
         }
       }
     }
   } catch (error) {
-    console.error("Ошибка:", error);
-    errorMessage.value = "Ошибка соединения с сервером";
+    console.error('Ошибка:', error)
+    errorMessage.value = 'Ошибка соединения с сервером'
   }
-};
+}
 
 const goToAdmin = () => {
-  router.push("/admin");
-};
+  router.push('/admin')
+}
 
 // Делаем функцию доступной глобально для Telegram виджета
-window.onTelegramAuth = onTelegramAuth;
+window.onTelegramAuth = onTelegramAuth
 </script>

@@ -1,8 +1,16 @@
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="$emit('close')">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-auto" @click.stop>
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click="$emit('close')"
+  >
+    <div
+      class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-auto"
+      @click.stop
+    >
       <!-- Заголовок -->
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+      <div
+        class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white"
+      >
         <div>
           <h3 class="text-lg font-semibold text-gray-900">{{ training.name || 'Тренировка' }}</h3>
           <p class="text-sm text-gray-500">{{ formatDate(training.date) }} • {{ training.time }}</p>
@@ -16,7 +24,10 @@
           >
             <Link class="w-4 h-4 text-gray-600" />
           </button>
-          <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
+          <button
+            @click="$emit('close')"
+            class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+          >
             <X class="w-4 h-4 text-gray-600" />
           </button>
         </div>
@@ -53,27 +64,42 @@
               :key="reg.user_telegram_id"
               class="flex items-center gap-3 p-2 bg-gray-50 rounded"
             >
-              <img
-                v-if="reg.photo_url"
-                :src="reg.photo_url"
-                alt=""
-                class="w-8 h-8 rounded-full"
-              />
+              <img v-if="reg.photo_url" :src="reg.photo_url" alt="" class="w-8 h-8 rounded-full" />
               <div
                 v-else
                 class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-xs"
               >
                 {{ getInitials(reg) }}
               </div>
-              <span class="text-sm text-gray-700 flex-1">
-                {{ reg.first_name }} {{ reg.last_name || '' }}
-                <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
-              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-gray-700 truncate">
+                    {{ reg.first_name }} {{ reg.last_name || '' }}
+                    <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
+                  </span>
+                  <!-- Значок роли -->
+                  <span
+                    v-if="reg.is_admin"
+                    class="text-yellow-600 flex-shrink-0"
+                    title="Администратор"
+                  >
+                    👑
+                  </span>
+                  <span
+                    v-else-if="reg.is_guest"
+                    class="text-purple-600 flex-shrink-0"
+                    title="Гость"
+                  >
+                    👤
+                  </span>
+                  <span v-else class="text-teal-600 flex-shrink-0" title="Участник"> ✅ </span>
+                </div>
+              </div>
               <!-- Кнопка удаления для админа -->
               <button
                 v-if="isAdmin"
                 @click="removeUser(reg)"
-                class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
+                class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors flex-shrink-0"
                 title="Удалить участника"
               >
                 <X class="w-4 h-4" />
@@ -104,15 +130,35 @@
                 >
                   {{ getInitials(reg) }}
                 </div>
-                <span class="text-sm text-gray-700 flex-1">
-                  {{ reg.first_name }} {{ reg.last_name || '' }}
-                  <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
-                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-700 truncate">
+                      {{ reg.first_name }} {{ reg.last_name || '' }}
+                      <span v-if="reg.username" class="text-gray-400">@{{ reg.username }}</span>
+                    </span>
+                    <!-- Значок роли -->
+                    <span
+                      v-if="reg.is_admin"
+                      class="text-yellow-600 flex-shrink-0"
+                      title="Администратор"
+                    >
+                      👑
+                    </span>
+                    <span
+                      v-else-if="reg.is_guest"
+                      class="text-purple-600 flex-shrink-0"
+                      title="Гость"
+                    >
+                      👤
+                    </span>
+                    <span v-else class="text-teal-600 flex-shrink-0" title="Участник"> ✅ </span>
+                  </div>
+                </div>
                 <!-- Кнопка удаления для админа -->
                 <button
                   v-if="isAdmin"
                   @click="removeUser(reg)"
-                  class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors"
+                  class="w-8 h-8 flex items-center justify-center rounded hover:bg-red-50 text-red-500 transition-colors flex-shrink-0"
                   title="Удалить участника"
                 >
                   <X class="w-4 h-4" />
@@ -122,9 +168,7 @@
           </div>
         </div>
 
-        <div v-else class="text-gray-500 text-center py-8">
-          Пока никто не записался
-        </div>
+        <div v-else class="text-gray-500 text-center py-8">Пока никто не записался</div>
 
         <!-- Кнопка удаления для админа -->
         <div v-if="isAdmin && training.is_one_time" class="mt-4 pt-4 border-t border-gray-200">
@@ -150,8 +194,8 @@ import { Link, X } from 'lucide-vue-next'
 const props = defineProps({
   training: {
     type: Object,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const emit = defineEmits(['close', 'register', 'unregister', 'remove-training', 'remove-user'])
@@ -163,11 +207,11 @@ const confirmStore = useConfirmStore()
 const isAdmin = computed(() => authStore.isAdmin)
 
 const registeredUsers = computed(() => {
-  return (props.training.registrations || []).filter(r => r.status === 'registered')
+  return (props.training.registrations || []).filter((r) => r.status === 'registered')
 })
 
 const waitlistUsers = computed(() => {
-  return (props.training.registrations || []).filter(r => r.status === 'waitlist')
+  return (props.training.registrations || []).filter((r) => r.status === 'waitlist')
 })
 
 const userStatusClass = computed(() => {
@@ -230,13 +274,30 @@ const handleAction = () => {
 }
 
 const shareTraining = () => {
-  // Генерируем ссылку на общий календарь (/dashboard)
-  const url = `${window.location.origin}/dashboard/calendar?date=${props.training.date}&chat_id=${props.training.chat_id}&time=${encodeURIComponent(props.training.time)}`
-  navigator.clipboard.writeText(url).then(() => {
-    notificationsStore.success('Ссылка скопирована в буфер обмена')
-  }).catch(() => {
-    notificationsStore.error('Не удалось скопировать ссылку')
-  })
+  // Генерируем ссылку на страницу гостя /guest/training/{uuid}
+  // Если у тренировки есть uuid, используем его, иначе генерируем ссылку на календарь
+  if (props.training.uuid) {
+    const url = `${window.location.origin}/guest/training/${props.training.uuid}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        notificationsStore.success('Ссылка скопирована в буфер обмена')
+      })
+      .catch(() => {
+        notificationsStore.error('Не удалось скопировать ссылку')
+      })
+  } else {
+    // Фоллбэк на старую ссылку если uuid нет
+    const url = `${window.location.origin}/dashboard/calendar?date=${props.training.date}&chat_id=${props.training.chat_id}&time=${encodeURIComponent(props.training.time)}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        notificationsStore.success('Ссылка скопирована в буфер обмена')
+      })
+      .catch(() => {
+        notificationsStore.error('Не удалось скопировать ссылку')
+      })
+  }
 }
 
 const formatDate = (dateStr) => {

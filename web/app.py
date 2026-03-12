@@ -1061,6 +1061,58 @@ async def guest_join_training(training_uuid: str, request: Request, response: Re
     }
 
 
+@app.post("/api/guest/leave/{training_uuid}")
+async def guest_leave_training(
+    training_uuid: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Отписка гостя от тренировки
+    """
+    require_auth(user)
+
+    telegram_id = user.get('telegram_id')
+    is_guest = user.get('is_guest', False)
+
+    if not is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Только гости могут использовать этот endpoint"
+        )
+
+    # Проверяем, что гость записан на эту тренировку
+    guest = db.get_guest_by_telegram(telegram_id)
+    if not guest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Гость не найден"
+        )
+
+    if guest.get('training_uuid') != training_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Вы не записаны на эту тренировку"
+        )
+
+    # Удаляем гостя
+    result = db.delete_guest(telegram_id)
+
+    if result.get('success'):
+        logger.info(f"Гость {telegram_id} отписался от тренировки {training_uuid}")
+        # Очищаем cookie
+        response = Response()
+        clear_auth_cookies(response)
+        return {
+            "success": True,
+            "message": "Вы успешно отписались от тренировки"
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get('error', 'Ошибка при отписке')
+        )
+
+
 # ==================== API для админки (управление гостями) ====================
 
 @app.get("/api/admin/guests")
