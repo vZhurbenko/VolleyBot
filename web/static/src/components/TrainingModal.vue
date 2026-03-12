@@ -326,10 +326,17 @@ const removeUser = async (reg) => {
 }
 
 const handleClose = () => {
+  console.log('[TrainingModal] handleClose вызван')
   // Очищаем параметр training из URL
   const newQuery = { ...route.query }
   delete newQuery.training
-  router.push({ query: newQuery })
+  console.log('[TrainingModal] Новый query:', newQuery)
+  
+  // Используем window.location.href для надёжности
+  const newPath = route.path + (Object.keys(newQuery).length ? '?' + new URLSearchParams(newQuery).toString() : '')
+  console.log('[TrainingModal] Редирект на:', newPath)
+  window.location.href = newPath
+  
   emit('close')
 }
 
