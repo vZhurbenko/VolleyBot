@@ -92,10 +92,10 @@ async def guest_access_middleware(request: Request, call_next):
     # Пропускаем без проверки
     if request.url.path in ["/health", "/api/auth/telegram", "/api/auth/refresh", "/api/invite/"]:
         return await call_next(request)
-    
+
     # Получаем пользователя из токена
-    user = await get_current_user_from_access_token(request)
-    
+    user = get_current_user_from_access_token(request)
+
     # Если пользователь не авторизован - пропускаем (авторизация проверится в endpoint)
     if not user:
         return await call_next(request)
@@ -974,8 +974,8 @@ async def guest_join_training(training_uuid: str, request: Request, response: Re
     Проверяет валидность UUID и добавляет в guests если не существует
     """
     # Получаем пользователя из токена (опционально)
-    user = await get_current_user_from_access_token(request)
-    
+    user = get_current_user_from_access_token(request)
+
     body = await request.json()
     telegram_id = body.get('telegram_id')
     first_name = body.get('first_name')
