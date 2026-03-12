@@ -274,10 +274,10 @@ const handleAction = () => {
 }
 
 const shareTraining = () => {
-  // Генерируем ссылку на страницу гостя /guest/training/{uuid}
-  // Если у тренировки есть uuid, используем его, иначе генерируем ссылку на календарь
+  // Генерируем универсальную ссылку /training/{uuid}
+  // Бэкенд сам определит куда редиректить: гостя на страницу гостя, пользователя в модалку
   if (props.training.uuid) {
-    const url = `${window.location.origin}/guest/training/${props.training.uuid}`
+    const url = `${window.location.origin}/training/${props.training.uuid}`
     navigator.clipboard
       .writeText(url)
       .then(() => {

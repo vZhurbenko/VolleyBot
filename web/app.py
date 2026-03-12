@@ -1533,7 +1533,47 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 
 
 
-# ==================== API для пользователей (Calendar) ====================
+# ==================== Универсальные ссылки на тренировки ====================
+
+@app.get("/training/{training_uuid}")
+async def get_training_redirect(training_uuid: str, response: Response = None):
+    """
+    Универсальная ссылка на тренировку
+    Перенаправляет:
+    - Гостей → на страницу гостя /guest/training/{uuid}
+    - Пользователей → на календарь /dashboard/calendar?training={uuid}
+    - Неавторизованных → на логин с редиректом
+    """
+    # Получаем пользователя из токена
+    user = get_current_user_from_access_token(Request(scope={"type": "http"}))
+    
+    # Проверяем тренировку
+    training = db.get_training_by_uuid(training_uuid)
+    if not training:
+        raise HTTPException(status_code=404, detail="Тренировка не найдена")
+    
+    # Если пользователь не авторизован → редирект на логин
+    if not user:
+        redirect_url = f"/login?redirect=/training/{training_uuid}"
+        return Response(
+            content=f"<html><head><meta http-equiv='refresh' content='0;url={redirect_url}'></head></html>",
+            media_type="text/html"
+        )
+    
+    # Проверяем, является ли пользователь гостем
+    is_guest = user.get('is_guest', False)
+    
+    if is_guest:
+        # Гость → страница гостя
+        redirect_url = f"/guest/training/{training_uuid}"
+    else:
+        # Пользователь → календарь с открытой модалкой
+        redirect_url = f"/dashboard/calendar?training={training_uuid}"
+    
+    return Response(
+        content=f"<html><head><meta http-equiv='refresh' content='0;url={redirect_url}'></head></html>",
+        media_type="text/html"
+    )
 
 @app.get("/api/user/calendar")
 async def get_calendar(year: int, month: int, user: dict = Depends(get_current_user_from_access_cookie)):

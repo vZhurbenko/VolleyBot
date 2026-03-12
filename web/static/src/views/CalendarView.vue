@@ -148,6 +148,11 @@ const loadCalendar = async () => {
     trainings.value = data.trainings || []
     games.value = data.games || []
 
+    // Проверяем, есть ли параметр для открытия тренировки по UUID
+    if (route.query.training) {
+      openTrainingByUuid(route.query.training)
+    }
+
     // Проверяем, есть ли параметры для открытия конкретной тренировки
     if (route.query.date && route.query.chat_id && route.query.time) {
       openTrainingByParams()
@@ -161,6 +166,17 @@ const loadCalendar = async () => {
     console.error('Error loading calendar:', error)
   } finally {
     loading.value = false
+  }
+}
+
+const openTrainingByUuid = (trainingUuid) => {
+  // Ищем тренировку по UUID
+  const training = trainings.value.find((t) => t.uuid === trainingUuid)
+
+  if (training) {
+    selectedTraining.value = { ...training }
+  } else {
+    notificationsStore.error('Тренировка не найдена')
   }
 }
 
