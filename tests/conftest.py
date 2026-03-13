@@ -84,3 +84,19 @@ def sample_template():
         "default_chat_id": "-1001234567890",
         "default_topic_id": None
     }
+
+
+@pytest.fixture
+def sample_training():
+    """Пример тренировки для тестов"""
+    return {
+        "id": "training-1",
+        "uuid": "test-training-uuid-1",
+        "name": "Тестовая тренировка",
+        "date": "2025-01-27",
+        "start_time": "18:00",
+        "end_time": "20:00",
+        "location": "ВГАФК",
+        "chat_id": "-1001234567890",
+        "topic_id": None
+    }

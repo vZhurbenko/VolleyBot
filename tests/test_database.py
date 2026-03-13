@@ -242,3 +242,228 @@ class TestDatabaseWithFixtures:
         schedule = db.get_poll_schedule(sample_schedule["id"])
         assert schedule["training_day"] == sample_schedule["training_day"]
         assert schedule["poll_day"] == sample_schedule["poll_day"]
+
+
+class TestGuestSignups:
+    """Тесты методов для работы с записями гостей"""
+
+    def test_add_guest(self, db):
+        """Тест добавления гостя"""
+        guest = db.add_guest(
+            telegram_id=123456789,
+            first_name="Test",
+            last_name="User",
+            username="testuser"
+        )
+        assert guest is not None
+        assert guest['telegram_id'] == 123456789
+        assert guest['first_name'] == "Test"
+
+    def test_add_guest_duplicate(self, db):
+        """Тест добавления дубликата гостя"""
+        guest1 = db.add_guest(
+            telegram_id=123456789,
+            first_name="Test",
+            last_name="User"
+        )
+        guest2 = db.add_guest(
+            telegram_id=123456789,
+            first_name="Test2",
+            last_name="User2"
+        )
+        # Должен вернуть существующего гостя
+        assert guest2 is not None
+        assert guest2['telegram_id'] == guest1['telegram_id']
+
+    def test_add_guest_signup(self, db, sample_training):
+        """Тест записи гостя на тренировку"""
+        # Добавляем тренировку
+        db.add_game(sample_training)
+        
+        # Записываем гостя
+        signup = db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        assert signup is not None
+        assert signup['guest_telegram_id'] == 123456789
+        assert signup['training_uuid'] == sample_training['uuid']
+
+    def test_add_guest_signup_multiple(self, db, sample_training):
+        """Тест множественной записи гостя на разные тренировки"""
+        # Создаём вторую тренировку
+        training2 = {
+            'id': 'training-2',
+            'uuid': 'uuid-training-2',
+            'name': 'Training 2',
+            'date': '2025-02-01',
+            'start_time': '19:00',
+            'end_time': '21:00',
+            'chat_id': '-1001234567890'
+        }
+        db.add_game(sample_training)
+        db.add_game(training2)
+        
+        # Записываем гостя на первую тренировку
+        signup1 = db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        # Записываем гостя на вторую тренировку
+        signup2 = db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=training2['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        assert signup1 is not None
+        assert signup2 is not None
+        
+        # Проверяем список тренировок гостя
+        trainings = db.get_guest_trainings(123456789)
+        assert len(trainings) == 2
+
+    def test_is_guest_signed_up(self, db, sample_training):
+        """Тест проверки записи гостя на тренировку"""
+        db.add_game(sample_training)
+        
+        # Гость ещё не записан
+        assert db.is_guest_signed_up(123456789, sample_training['uuid']) is False
+        
+        # Записываем гостя
+        db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Теперь записан
+        assert db.is_guest_signed_up(123456789, sample_training['uuid']) is True
+
+    def test_remove_guest_signup(self, db, sample_training):
+        """Тест отписки гостя от тренировки"""
+        db.add_game(sample_training)
+        
+        # Записываем гостя
+        db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Проверяем что записан
+        assert db.is_guest_signed_up(123456789, sample_training['uuid']) is True
+        
+        # Отписываем
+        result = db.remove_guest_signup(123456789, sample_training['uuid'])
+        assert result['success'] is True
+        
+        # Проверяем что отписан
+        assert db.is_guest_signed_up(123456789, sample_training['uuid']) is False
+
+    def test_get_guest_trainings(self, db, sample_training):
+        """Тест получения списка тренировок гостя"""
+        db.add_game(sample_training)
+        
+        # Записываем гостя
+        db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Получаем список тренировок
+        trainings = db.get_guest_trainings(123456789)
+        assert len(trainings) == 1
+        assert trainings[0]['training_uuid'] == sample_training['uuid']
+        assert trainings[0]['training_name'] == sample_training['name']
+
+    def test_get_guest_signup(self, db, sample_training):
+        """Тест получения информации о записи гостя"""
+        db.add_game(sample_training)
+        
+        # Записываем гостя
+        db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Получаем информацию о записи
+        signup = db.get_guest_signup(123456789, sample_training['uuid'])
+        assert signup is not None
+        assert signup['guest_telegram_id'] == 123456789
+        assert signup['first_name'] == "Test"
+
+    def test_get_guest_signup_count(self, db, sample_training):
+        """Тест получения количества записей гостя"""
+        db.add_game(sample_training)
+        
+        # Гость ещё не записан
+        assert db.get_guest_signup_count(123456789) == 0
+        
+        # Записываем гостя
+        db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Проверяем количество
+        assert db.get_guest_signup_count(123456789) == 1
+
+    def test_delete_guest_removes_signups(self, db, sample_training):
+        """Тест удаления гостя с удалением всех записей"""
+        db.add_game(sample_training)
+        
+        # Записываем гостя
+        db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Удаляем гостя
+        result = db.delete_guest(123456789)
+        assert result['success'] is True
+        
+        # Гость удалён
+        assert db.get_guest_by_telegram(123456789) is None
+        # Записи удалены
+        assert db.get_guest_trainings(123456789) == []
+
+    def test_convert_guest_to_user_removes_signups(self, db, sample_training):
+        """Тест конвертации гостя в пользователя с удалением записей"""
+        db.add_game(sample_training)
+        
+        # Записываем гостя
+        db.add_guest_signup(
+            telegram_id=123456789,
+            training_uuid=sample_training['uuid'],
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Конвертируем в пользователя
+        user = db.convert_guest_to_user(
+            telegram_id=123456789,
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Пользователь создан
+        assert user is not None
+        assert user['telegram_id'] == 123456789
+        # Гость удалён
+        assert db.get_guest_by_telegram(123456789) is None

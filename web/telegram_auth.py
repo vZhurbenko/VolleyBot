@@ -47,6 +47,9 @@ class TelegramAuth:
         # Копируем данные и извлекаем hash
         data_copy = data.copy()
         received_hash = data_copy.pop('hash', None)
+        
+        # Исключаем training_uuid из проверки - это наше поле, не от Telegram
+        data_copy.pop('training_uuid', None)
 
         if not received_hash:
             logger.warning("Hash отсутствует в данных")
@@ -59,6 +62,10 @@ class TelegramAuth:
                 items.append(f"{key}={value}")
 
         data_string = "\n".join(items)
+        
+        # Логируем для отладки
+        logger.info(f"Data string: {data_string}")
+        logger.info(f"Received hash: {received_hash}")
 
         # Вычисляем ожидаемый hash
         # Secret Key = SHA256(bot_token)
@@ -69,11 +76,14 @@ class TelegramAuth:
             msg=data_string.encode('utf-8'),
             digestmod=hashlib.sha256
         ).hexdigest()
+        
+        logger.info(f"Computed hash: {computed_hash}")
 
         # Сравниваем hash'и
         result = hmac.compare_digest(computed_hash, received_hash)
         if not result:
             logger.warning(f"Неверная подпись данных")
+            logger.warning(f"Bot token: {self.bot_token[:10]}...")
         return result
 
     def is_auth_date_valid(self, auth_date: int, max_age_seconds: int = 86400) -> bool:

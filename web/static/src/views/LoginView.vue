@@ -50,30 +50,39 @@ const telegramConfigLoaded = ref(false)
 
 // Проверяем, есть ли redirect на тренировку
 const hasTrainingRedirect = computed(() => {
-  return route.query.redirect && route.query.redirect.match(/\/t\/([a-f0-9-]+)/i)
+  const redirect = route.query.redirect
+  return redirect && (redirect.match(/\/t\/([a-f0-9-]+)/i) || redirect.match(/\/guest\/training\/([a-f0-9-]+)/i))
 })
 
 const trainingUuid = computed(() => {
-  const match = route.query.redirect?.match(/\/t\/([a-f0-9-]+)/i)
+  const redirect = route.query.redirect
+  // Проверяем /t/{uuid}
+  let match = redirect?.match(/\/t\/([a-f0-9-]+)/i)
+  if (match) return match[1]
+  // Проверяем /guest/training/{uuid}
+  match = redirect?.match(/\/guest\/training\/([a-f0-9-]+)/i)
   return match ? match[1] : null
 })
 
-// Автоматический редирект если авторизован и есть redirect на тренировку
-watch(() => authStore.isAuthenticated, (isAuth) => {
-  if (isAuth && hasTrainingRedirect.value && trainingUuid.value) {
-    console.log('[LoginView] Автоматический редирект на тренировку:', trainingUuid.value)
-    window.location.href = `/dashboard/calendar?training=${trainingUuid.value}`
-  }
-}, { immediate: true })
-
 // Обработка кнопки
 const handleRedirectOrAdmin = () => {
-  if (hasTrainingRedirect.value && trainingUuid.value) {
-    // Редирект на календарь с открытой модалкой
-    window.location.href = `/dashboard/calendar?training=${trainingUuid.value}`
+  const redirect = route.query.redirect
+  const trainingRedirectMatch = redirect ? redirect.match(/\/t\/([a-f0-9-]+)/i) : null
+  const trainingUuid = trainingRedirectMatch ? trainingRedirectMatch[1] : null
+  const isGuest = authStore.user?.is_guest ?? false
+  
+  if (redirect && trainingRedirectMatch) {
+    const uuid = trainingUuid
+    if (isGuest) {
+      console.log('[LoginView] Гость редиректится на страницу гостя:', `/guest/training/${uuid}`)
+      window.location.href = `/guest/training/${uuid}`
+    } else {
+      console.log('[LoginView] Пользователь редиректится на календарь:', `/dashboard/calendar?training=${uuid}`)
+      window.location.href = `/dashboard/calendar?training=${uuid}`
+    }
   } else {
-    // Переход в админку
-    router.push('/admin')
+    console.log('[LoginView] Переход на /admin')
+    window.location.href = '/admin'
   }
 }
 
@@ -132,12 +141,19 @@ const loadTelegramConfig = async () => {
 // Глобальная функция для Telegram виджета
 window.onTelegramAuth = async (user) => {
   const redirect = route.query.redirect
-  const trainingRedirectMatch = redirect ? redirect.match(/\/t\/([a-f0-9-]+)/i) : null
+  
+  // Проверяем /t/{uuid}
+  let trainingRedirectMatch = redirect ? redirect.match(/\/t\/([a-f0-9-]+)/i) : null
+  // Проверяем /guest/training/{uuid}
+  if (!trainingRedirectMatch) {
+    trainingRedirectMatch = redirect ? redirect.match(/\/guest\/training\/([a-f0-9-]+)/i) : null
+  }
   const trainingUuid = trainingRedirectMatch ? trainingRedirectMatch[1] : null
 
   const authData = { ...user }
   if (trainingUuid) {
     authData.training_uuid = trainingUuid
+    console.log('[LoginView] Авторизация с training_uuid:', trainingUuid)
   }
 
   try {
@@ -179,7 +195,44 @@ const goToAdmin = () => {
   router.push('/admin')
 }
 
-onMounted(() => {
+onMounted(async () => {
+  console.log('[LoginView] onMounted вызван')
+  console.log('[LoginView] route.query.redirect:', route.query.redirect)
+  
+  // Проверяем, авторизован ли уже пользователь
+  try {
+    const response = await fetch('/api/auth/me', {
+      credentials: 'include',
+    })
+    if (response.ok) {
+      const user = await response.json()
+      authStore.setUser(user)
+      console.log('[LoginView] Пользователь уже авторизован:', user)
+      
+      // Если это гость и есть redirect на тренировку — сразу перенаправляем
+      const isGuest = user?.is_guest ?? false
+      const redirect = route.query.redirect
+      
+      if (isGuest && redirect) {
+        // Проверяем /t/{uuid}
+        let trainingRedirectMatch = redirect.match(/\/t\/([a-f0-9-]+)/i)
+        // Проверяем /guest/training/{uuid}
+        if (!trainingRedirectMatch) {
+          trainingRedirectMatch = redirect.match(/\/guest\/training\/([a-f0-9-]+)/i)
+        }
+        
+        if (trainingRedirectMatch) {
+          const uuid = trainingRedirectMatch[1]
+          console.log('[LoginView] Гость перенаправляется на страницу гостя:', `/guest/training/${uuid}`)
+          window.location.href = `/guest/training/${uuid}`
+          return
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[LoginView] Ошибка проверки авторизации:', error)
+  }
+  
   loadTelegramConfig()
 })
 

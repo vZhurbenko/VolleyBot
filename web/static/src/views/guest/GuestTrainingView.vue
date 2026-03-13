@@ -3,21 +3,12 @@
     <!-- Header -->
     <div class="bg-white shadow">
       <div class="max-w-3xl mx-auto px-4 py-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <img :src="logo" alt="Team R Logo" class="w-10 h-10" />
-            <div>
-              <h1 class="text-xl font-bold text-gray-900">Team R</h1>
-              <p class="text-xs text-gray-500">Волейбольные тренировки</p>
-            </div>
+        <div class="flex items-center gap-3">
+          <img :src="logo" alt="Team R Logo" class="w-10 h-10" />
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">Team R</h1>
+            <p class="text-xs text-gray-500">Волейбольные тренировки</p>
           </div>
-          <button
-            v-if="isAuthenticated"
-            @click="logout"
-            class="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Выйти
-          </button>
         </div>
       </div>
     </div>
@@ -70,28 +61,6 @@
           </div>
         </div>
 
-        <!-- Статус гостя -->
-        <div v-if="isGuest" class="px-6 py-4 bg-yellow-50 border-b border-yellow-200">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-              <User class="w-5 h-5 text-yellow-700" />
-            </div>
-            <div class="flex-1">
-              <p class="font-medium text-yellow-900">Вы записаны как гость</p>
-              <p class="text-sm text-yellow-700">
-                {{ user?.first_name }} {{ user?.last_name || '' }}
-                <span v-if="user?.username" class="opacity-75">@{{ user.username }}</span>
-              </p>
-            </div>
-            <button
-              @click="unregister"
-              class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-            >
-              Отписаться
-            </button>
-          </div>
-        </div>
-
         <!-- Список участников -->
         <div class="px-6 py-4">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">
@@ -130,21 +99,21 @@
                 </div>
                 <div class="flex items-center gap-2 mt-0.5">
                   <!-- Значок роли -->
-                  <span
+                  <Shield
                     v-if="getParticipantRole(participant) === 'admin'"
-                    class="text-yellow-600"
+                    class="w-4 h-4 text-purple-600 flex-shrink-0"
                     title="Администратор"
-                  >
-                    👑
-                  </span>
-                  <span
+                  />
+                  <User
                     v-else-if="getParticipantRole(participant) === 'guest'"
-                    class="text-purple-600"
+                    class="w-4 h-4 text-blue-600 flex-shrink-0"
                     title="Гость"
-                  >
-                    👤
-                  </span>
-                  <span v-else class="text-teal-600" title="Участник"> ✅ </span>
+                  />
+                  <BadgeCheck
+                    v-else
+                    class="w-4 h-4 text-teal-600 flex-shrink-0"
+                    title="Участник"
+                  />
                   <span class="text-xs text-gray-500">
                     {{ getParticipantRoleText(participant) }}
                   </span>
@@ -156,14 +125,22 @@
           <div v-else class="text-center py-8 text-gray-500">Пока никто не записался</div>
         </div>
 
-        <!-- Кнопка поделиться -->
+        <!-- Кнопка записаться/отписаться -->
         <div class="px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
-            @click="shareLink"
+            v-if="isRegistered"
+            @click="unregister"
+            class="w-full text-center text-red-600 hover:text-red-700 transition-colors font-medium text-sm"
+          >
+            Отписаться
+          </button>
+          <button
+            v-else
+            @click="register"
             class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
           >
-            <Link class="w-5 h-5" />
-            Поделиться ссылкой
+            <Calendar class="w-5 h-5" />
+            Записаться на тренировку
           </button>
         </div>
       </div>
@@ -176,7 +153,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
-import { Calendar, Clock, MapPin, User, X, Link } from 'lucide-vue-next'
+import { Calendar, Clock, MapPin, X, Shield, BadgeCheck, User } from 'lucide-vue-next'
 import logo from '@/img/logo.svg'
 
 const route = useRoute()
@@ -188,6 +165,7 @@ const training = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const user = ref(null)
+const userTrainings = ref([])
 
 const trainingUuid = computed(() => route.params.uuid)
 const isAuthenticated = computed(() => authStore.isAuthenticated)
@@ -197,6 +175,13 @@ const participants = computed(() => training.value?.participants || [])
 
 const registeredCount = computed(() => {
   return (participants.value || []).filter((p) => !p.is_guest || p.is_active !== false).length
+})
+
+// Проверяем, записан ли текущий пользователь
+const isRegistered = computed(() => {
+  if (!user.value || !participants.value) return false
+  const userId = user.value.telegram_id
+  return participants.value.some(p => p.user_telegram_id === userId || p.telegram_id === userId)
 })
 
 const sortedParticipants = computed(() => {
@@ -210,30 +195,22 @@ const sortedParticipants = computed(() => {
 })
 
 onMounted(async () => {
-  // Проверяем авторизацию
-  if (authStore.isLoading) {
-    await authStore.checkAuth()
-  }
-
-  if (!authStore.isAuthenticated) {
-    // Редирект на страницу авторизации с redirect параметром
-    router.push(`/login?redirect=/guest/training/${trainingUuid.value}`)
-    return
-  }
-
-  user.value = authStore.user
-
-  // Если пользователь не гость и это не его тренировка - показываем полную версию
-  if (!isGuest.value) {
-    // Проверяем, имеет ли пользователь доступ к этой тренировке
-    const userTrainingUuid = authStore.user.training_uuid
-    if (userTrainingUuid && userTrainingUuid !== trainingUuid.value) {
-      // Это не его тренировка, но он не гость - показываем полную версию
-      router.push(`/dashboard/calendar?uuid=${trainingUuid.value}`)
-      return
+  // Загружаем данные пользователя через API для гостей
+  try {
+    const response = await fetch('/api/guest/me', {
+      credentials: 'include',
+    })
+    if (response.ok) {
+      const guestData = await response.json()
+      user.value = guestData
+      userTrainings.value = guestData.trainings || []
+      authStore.setUser(guestData)
     }
+  } catch (err) {
+    console.error('Error loading user data:', err)
   }
 
+  // Затем загружаем данные тренировки
   loadTraining()
 })
 
@@ -277,6 +254,8 @@ const unregister = async () => {
 
     if (response.ok && result.success) {
       notificationsStore.success('Вы успешно отписались от тренировки')
+      // Обновляем список тренировок
+      userTrainings.value = userTrainings.value.filter(t => t.training_uuid !== trainingUuid.value)
       loadTraining()
     } else {
       notificationsStore.error(result.detail || 'Ошибка отписки')
@@ -287,21 +266,48 @@ const unregister = async () => {
   }
 }
 
-const shareLink = () => {
-  const url = `${window.location.origin}/guest/training/${trainingUuid.value}`
-  navigator.clipboard
-    .writeText(url)
-    .then(() => {
-      notificationsStore.success('Ссылка скопирована в буфер обмена')
-    })
-    .catch(() => {
-      notificationsStore.error('Не удалось скопировать ссылку')
-    })
-}
+const register = async () => {
+  try {
+    // Получаем данные пользователя из authStore
+    const userData = authStore.user
 
-const logout = async () => {
-  await authStore.logout()
-  router.push('/login')
+    if (!userData) {
+      notificationsStore.error('Пользователь не авторизован')
+      return
+    }
+
+    const response = await fetch(`/api/guest/join/${trainingUuid.value}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        telegram_id: userData.telegram_id || userData.id,
+        first_name: userData.first_name,
+        last_name: userData.last_name || '',
+        username: userData.username || '',
+        photo_url: userData.photo_url || '',
+      }),
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      notificationsStore.success('Вы успешно записались на тренировку')
+      // Обновляем список тренировок
+      if (!userTrainings.value.find(t => t.training_uuid === trainingUuid.value)) {
+        userTrainings.value.push({ training_uuid: trainingUuid.value })
+      }
+      // Перезагружаем данные тренировки
+      loadTraining()
+    } else {
+      notificationsStore.error(result.detail || 'Ошибка записи')
+    }
+  } catch (err) {
+    console.error('Error registering:', err)
+    notificationsStore.error('Ошибка записи на тренировку')
+  }
 }
 
 const formatDate = (dateStr) => {
