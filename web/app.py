@@ -554,50 +554,63 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
         training_uuid = user_data.training_uuid
         invite_valid = False
 
-        # Проверяем приглашение, если оно было передано
-        if invite_code:
-            invite = db.get_invite_code(invite_code)
-            if invite and invite.get('enabled') and not invite.get('used_by'):
-                from datetime import datetime
-                if not invite.get('expires_at') or datetime.fromisoformat(invite['expires_at']) > datetime.now():
+        # СНАЧАЛА проверяем администратора (даже если есть training_uuid)
+        admin_ids = db.get_admin_ids()
+        is_admin = telegram_id in admin_ids
+
+        if is_admin:
+            # Создаём админа в БД
+            db.add_user(
+                telegram_id=telegram_id,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                username=user_data.username,
+                photo_url=user_data.photo_url,
+                is_admin=True
+            )
+            logger.info(f"Администратор {user_data.username or user_data.first_name} добавлен в БД")
+            existing_user = db.get_user_by_telegram_id(telegram_id)
+        else:
+            # Не администратор — проверяем приглашение или training_uuid
+            # Проверяем приглашение, если оно было передано
+            if invite_code:
+                invite = db.get_invite_code(invite_code)
+                if invite and invite.get('enabled') and not invite.get('used_by'):
+                    from datetime import datetime
+                    if not invite.get('expires_at') or datetime.fromisoformat(invite['expires_at']) > datetime.now():
+                        invite_valid = True
+                        logger.info(f"Валидное приглашение {invite_code} для пользователя {telegram_id}")
+
+            # Если нет валидного приглашения — проверяем training_uuid (гость)
+            if not invite_valid and training_uuid:
+                # Проверяем валидность тренировки
+                training = db.get_training_by_uuid(training_uuid)
+                if training:
                     invite_valid = True
-                    logger.info(f"Валидное приглашение {invite_code} для пользователя {telegram_id}")
+                    logger.info(f"Валидная тренировка {training_uuid} для пользователя {telegram_id}")
 
-        # Если нет валидного приглашения — проверяем training_uuid (гость)
-        if not invite_valid and training_uuid:
-            # Проверяем валидность тренировки
-            training = db.get_training_by_uuid(training_uuid)
-            if training:
-                invite_valid = True
-                logger.info(f"Валидная тренировка {training_uuid} для пользователя {telegram_id}")
-
-        # Если нет валидного приглашения или training_uuid — проверяем администратора
-        if not invite_valid:
-            admin_ids = db.get_admin_ids()
-            is_admin = telegram_id in admin_ids
-
-            # Если не администратор — запрещаем вход
-            if not is_admin:
+            # Если нет валидного приглашения или training_uuid — запрещаем вход
+            if not invite_valid:
                 logger.warning(f"Пользователь {telegram_id} не найден в БД, не имеет приглашения или training_uuid")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Вам недоступна авторизация. Обратитесь к администратору."
                 )
 
-        # Регистрируем как гостя если есть training_uuid
-        if training_uuid:
-            # Проверяем, существует ли уже гость
-            existing_guest = db.get_guest_by_telegram(telegram_id)
-            if not existing_guest:
-                # Создаём нового гостя
-                db.add_guest(
-                    telegram_id=telegram_id,
-                    first_name=user_data.first_name,
-                    last_name=user_data.last_name,
-                    username=user_data.username,
-                    photo_url=user_data.photo_url
-                )
-                logger.info(f"Новый гость создан: {user_data.username or user_data.first_name}")
+            # Регистрируем как гостя если есть training_uuid
+            if training_uuid:
+                # Проверяем, существует ли уже гость
+                existing_guest = db.get_guest_by_telegram(telegram_id)
+                if not existing_guest:
+                    # Создаём нового гостя
+                    db.add_guest(
+                        telegram_id=telegram_id,
+                        first_name=user_data.first_name,
+                        last_name=user_data.last_name,
+                        username=user_data.username,
+                        photo_url=user_data.photo_url
+                    )
+                    logger.info(f"Новый гость создан: {user_data.username or user_data.first_name}")
             
             # Записываем на тренировку (даже если гость уже существует)
             db.add_guest_signup(

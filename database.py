@@ -1986,7 +1986,7 @@ class Database:
         cursor.execute('''
             SELECT gs.guest_telegram_id as telegram_id, gs.training_uuid, gs.created_at,
                    gu.uuid as training_uuid, gu.name as training_name, gu.date as training_date, 
-                   gu.start_time, gu.end_time, gu.location, 'games' as source
+                   gu.start_time, NULL as end_time, gu.location, 'games' as source
             FROM guest_signups gs
             JOIN games gu ON gs.training_uuid = gu.uuid
             WHERE gs.guest_telegram_id = ?
