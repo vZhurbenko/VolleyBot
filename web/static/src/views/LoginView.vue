@@ -171,16 +171,27 @@ window.onTelegramAuth = async (user) => {
     if (response.ok && result.success) {
       authStore.setUser(result.user)
       const isGuest = result.user?.is_guest ?? false
+      const isAdmin = result.user?.is_admin ?? false
 
       if (redirect && trainingRedirectMatch) {
         const uuid = trainingUuid
         if (isGuest) {
+          console.log('[LoginView] Гость редиректится на страницу гостя:', `/guest/training/${uuid}`)
           window.location.href = `/guest/training/${uuid}`
         } else {
+          // Пользователь или админ → календарь с модалкой записи
+          console.log('[LoginView] Пользователь/админ редиректится на календарь:', `/dashboard/calendar?training=${uuid}`)
           window.location.href = `/dashboard/calendar?training=${uuid}`
         }
       } else {
-        window.location.href = '/admin'
+        // Нет redirect — админ идёт в админку, пользователь в календарь
+        if (isAdmin) {
+          console.log('[LoginView] Админ перенаправляется в админку')
+          window.location.href = '/admin'
+        } else {
+          console.log('[LoginView] Пользователь перенаправляется в календарь')
+          window.location.href = '/dashboard/calendar'
+        }
       }
     } else {
       errorMessage.value = result.detail || 'Ошибка авторизации'
@@ -208,23 +219,40 @@ onMounted(async () => {
       const user = await response.json()
       authStore.setUser(user)
       console.log('[LoginView] Пользователь уже авторизован:', user)
-      
-      // Если это гость и есть redirect на тренировку — сразу перенаправляем
+
       const isGuest = user?.is_guest ?? false
+      const isAdmin = user?.is_admin ?? false
       const redirect = route.query.redirect
-      
-      if (isGuest && redirect) {
+
+      if (redirect) {
         // Проверяем /t/{uuid}
         let trainingRedirectMatch = redirect.match(/\/t\/([a-f0-9-]+)/i)
         // Проверяем /guest/training/{uuid}
         if (!trainingRedirectMatch) {
           trainingRedirectMatch = redirect.match(/\/guest\/training\/([a-f0-9-]+)/i)
         }
-        
+
         if (trainingRedirectMatch) {
           const uuid = trainingRedirectMatch[1]
-          console.log('[LoginView] Гость перенаправляется на страницу гостя:', `/guest/training/${uuid}`)
-          window.location.href = `/guest/training/${uuid}`
+          if (isGuest) {
+            console.log('[LoginView] Гость перенаправляется на страницу гостя:', `/guest/training/${uuid}`)
+            window.location.href = `/guest/training/${uuid}`
+          } else {
+            // Пользователь или админ → календарь с модалкой
+            console.log('[LoginView] Пользователь/админ перенаправляется на календарь:', `/dashboard/calendar?training=${uuid}`)
+            window.location.href = `/dashboard/calendar?training=${uuid}`
+          }
+          return
+        }
+      } else {
+        // Нет redirect — админ идёт в админку, пользователь в календарь
+        if (isAdmin) {
+          console.log('[LoginView] Админ перенаправляется в админку')
+          window.location.href = '/admin'
+          return
+        } else if (!isGuest) {
+          console.log('[LoginView] Пользователь перенаправляется в календарь')
+          window.location.href = '/dashboard/calendar'
           return
         }
       }
