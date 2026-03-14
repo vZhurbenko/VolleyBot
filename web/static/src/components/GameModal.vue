@@ -15,7 +15,7 @@
           <h3 class="text-lg font-semibold text-gray-900">{{ game?.name || 'Игра' }}</h3>
           <p class="text-sm text-gray-500">
             {{ formatDate(game?.date)
-            }}<span v-if="game?.start_time"> • {{ game.start_time }}</span>
+            }}<span v-if="game?.start_time"> • {{ game.start_time }}{{ game.end_time ? ' - ' + game.end_time : '' }}</span>
           </p>
           <p v-if="game?.opponent" class="text-sm text-gray-600 mt-1">vs {{ game.opponent }}</p>
           <p v-if="game?.location" class="text-sm text-gray-600">{{ game.location }}</p>

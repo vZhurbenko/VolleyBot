@@ -13,7 +13,7 @@
       >
         <div>
           <h3 class="text-lg font-semibold text-gray-900">{{ training.name || 'Тренировка' }}</h3>
-          <p class="text-sm text-gray-500">{{ formatDate(training.date) }} • {{ training.time }}</p>
+          <p class="text-sm text-gray-500">{{ formatDate(training.date) }} • {{ training.time }}{{ training.end_time ? ' - ' + training.end_time : '' }}</p>
           <p v-if="training.location" class="text-sm text-gray-600 mt-1">{{ training.location }}</p>
         </div>
         <div class="flex items-center gap-2">
