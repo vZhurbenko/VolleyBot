@@ -2266,17 +2266,26 @@ class Database:
             WHERE gs.game_id = ? AND u.is_active = 1
             ORDER BY gs.created_at ASC
         ''', (game_id,))
-        
+
         rows.extend([dict(row) for row in cursor.fetchall()])
-        
-        # Преобразуем поля в bool
+
+        # Дедупликация по user_telegram_id (если пользователь есть в обеих таблицах)
+        seen = set()
+        unique_rows = []
         for row in rows:
+            telegram_id = row.get('user_telegram_id')
+            if telegram_id not in seen:
+                seen.add(telegram_id)
+                unique_rows.append(row)
+
+        # Преобразуем поля в bool
+        for row in unique_rows:
             if 'is_admin' in row:
                 row['is_admin'] = bool(row['is_admin'])
             if 'is_guest' in row:
                 row['is_guest'] = bool(row['is_guest'])
-        
-        return rows
+
+        return unique_rows
 
     def get_training_participants(self, training_uuid: str) -> List[Dict[str, Any]]:
         """
