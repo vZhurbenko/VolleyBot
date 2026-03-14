@@ -1,8 +1,10 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4">
+  <div
+    class="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4"
+  >
     <div class="bg-white rounded shadow p-6 lg:p-10 w-full max-w-md">
       <img :src="logo" alt="Team R Logo" class="w-20 h-20 mx-auto mb-4" />
-      
+
       <div v-if="loading" class="text-center py-8">
         <p class="text-gray-500">Загрузка...</p>
       </div>
@@ -72,10 +74,10 @@ onMounted(async () => {
   await checkInvite()
 
   loading.value = false
-  
+
   // Ждём рендера DOM
   await nextTick()
-  
+
   // Загружаем конфиг Telegram только если нет ошибки и не авторизован
   if (!error.value && !isAuthenticated.value) {
     await loadTelegramConfig()
@@ -85,13 +87,13 @@ onMounted(async () => {
 const checkInvite = async () => {
   try {
     const response = await fetch(`/api/invite/${inviteCode.value}`)
-    
+
     if (!response.ok) {
       const err = await response.json()
       error.value = err.detail || 'Приглашение не найдено'
       return
     }
-    
+
     const data = await response.json()
     inviteInfo.value = data
   } catch (error) {
@@ -136,7 +138,7 @@ const onTelegramAuth = async (user) => {
   console.log('=== onTelegramAuth вызвана ===')
   console.log('inviteCode.value:', inviteCode.value)
   console.log('user:', user)
-  
+
   try {
     // Проверяем, что invite_code установлен
     if (!inviteCode.value) {
@@ -144,23 +146,23 @@ const onTelegramAuth = async (user) => {
       error.value = 'Код приглашения не найден'
       return
     }
-  
+
     // Добавляем invite_code к данным пользователя
     const authData = {
       ...user,
-      invite_code: inviteCode.value
+      invite_code: inviteCode.value,
     }
-    
+
     console.log('Авторизация с приглашением:', inviteCode.value)
     console.log('authData:', authData)
 
     const response = await fetch('/api/auth/telegram', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(authData),
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()
@@ -191,11 +193,11 @@ const acceptInvite = async () => {
       error.value = 'Пользователь не авторизован'
       return
     }
-    
+
     const response = await fetch(`/api/invite/${inviteCode.value}/accept`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
@@ -205,8 +207,8 @@ const acceptInvite = async () => {
         username: user.username,
         photo_url: user.photo_url,
         auth_date: Math.floor(Date.now() / 1000),
-        hash: '' // Хеш не нужен для этого эндпоинта
-      })
+        hash: '', // Хеш не нужен для этого эндпоинта
+      }),
     })
 
     const result = await response.json()

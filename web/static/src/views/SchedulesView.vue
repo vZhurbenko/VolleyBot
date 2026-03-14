@@ -34,7 +34,7 @@
           class="px-4 lg:px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white"
         >
           <h2 class="text-lg font-semibold">
-            {{ editingSchedule ? "Редактировать расписание" : "Новое расписание" }}
+            {{ editingSchedule ? 'Редактировать расписание' : 'Новое расписание' }}
           </h2>
           <button
             @click="closeModal"
@@ -60,70 +60,70 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { useSettingsStore } from "@/stores/settings";
-import { useNotificationsStore } from "@/stores/notifications";
-import { useConfirmStore } from "@/stores/confirm";
-import ScheduleItem from "@/components/ScheduleItem.vue";
-import ScheduleForm from "@/components/ScheduleForm.vue";
+import { ref, onMounted } from 'vue'
+import { useSettingsStore } from '@/stores/settings'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
+import ScheduleItem from '@/components/ScheduleItem.vue'
+import ScheduleForm from '@/components/ScheduleForm.vue'
 
-const settingsStore = useSettingsStore();
-const notificationsStore = useNotificationsStore();
-const confirmStore = useConfirmStore();
+const settingsStore = useSettingsStore()
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
-const showForm = ref(false);
-const editingSchedule = ref(null);
-const defaultChatId = ref("");
-const defaultTopicId = ref(null);
+const showForm = ref(false)
+const editingSchedule = ref(null)
+const defaultChatId = ref('')
+const defaultTopicId = ref(null)
 
 onMounted(async () => {
-  await Promise.all([settingsStore.loadSchedules(), settingsStore.loadTemplate()]);
+  await Promise.all([settingsStore.loadSchedules(), settingsStore.loadTemplate()])
 
   // Загружаем значения по умолчанию из шаблона
-  const template = settingsStore.template;
+  const template = settingsStore.template
   if (template) {
-    defaultChatId.value = template.default_chat_id || "";
+    defaultChatId.value = template.default_chat_id || ''
     defaultTopicId.value =
-      template.default_topic_id !== undefined ? template.default_topic_id : null;
+      template.default_topic_id !== undefined ? template.default_topic_id : null
   }
-});
+})
 
 const handleEdit = (schedule) => {
-  editingSchedule.value = schedule;
-  showForm.value = true;
-};
+  editingSchedule.value = schedule
+  showForm.value = true
+}
 
 const handleDelete = async (id) => {
-  const confirmed = await confirmStore.danger("Удалить это расписание?");
-  if (!confirmed) return;
-  const success = await settingsStore.deleteSchedule(id);
+  const confirmed = await confirmStore.danger('Удалить это расписание?')
+  if (!confirmed) return
+  const success = await settingsStore.deleteSchedule(id)
   if (success) {
-    notificationsStore.success("Расписание удалено");
+    notificationsStore.success('Расписание удалено')
   } else {
-    notificationsStore.error("Ошибка удаления");
+    notificationsStore.error('Ошибка удаления')
   }
-};
+}
 
 const handleSubmit = async (scheduleData) => {
-  let success;
-  const isEdit = !!editingSchedule.value;
-  
+  let success
+  const isEdit = !!editingSchedule.value
+
   if (editingSchedule.value) {
-    success = await settingsStore.updateSchedule(editingSchedule.value.id, scheduleData);
+    success = await settingsStore.updateSchedule(editingSchedule.value.id, scheduleData)
   } else {
-    success = await settingsStore.addSchedule(scheduleData);
+    success = await settingsStore.addSchedule(scheduleData)
   }
 
   if (success) {
-    closeModal();
-    notificationsStore.success(isEdit ? "Расписание обновлено" : "Расписание создано");
+    closeModal()
+    notificationsStore.success(isEdit ? 'Расписание обновлено' : 'Расписание создано')
   } else {
-    notificationsStore.error("Ошибка сохранения");
+    notificationsStore.error('Ошибка сохранения')
   }
-};
+}
 
 const closeModal = () => {
-  showForm.value = false;
-  editingSchedule.value = null;
-};
+  showForm.value = false
+  editingSchedule.value = null
+}
 </script>

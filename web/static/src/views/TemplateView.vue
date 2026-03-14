@@ -1,14 +1,9 @@
 <template>
   <div class="flex flex-col gap-4">
     <div v-if="settingsStore.template">
-      <TemplateForm 
-        :template="settingsStore.template" 
-        @save="handleSave" 
-      />
+      <TemplateForm :template="settingsStore.template" @save="handleSave" />
     </div>
-    <div v-else class="text-gray-500 text-center py-8">
-      Загрузка...
-    </div>
+    <div v-else class="text-gray-500 text-center py-8">Загрузка...</div>
   </div>
 </template>
 

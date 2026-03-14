@@ -12,7 +12,7 @@ import {
   X,
   LogOut,
   Trophy,
-  Radio
+  Radio,
 } from 'lucide-vue-next'
 import logo from '@/img/logo.svg'
 
@@ -26,19 +26,19 @@ const isOpen = ref(false)
 const user = computed(() => authStore.user)
 
 const userName = computed(() => {
-  if (!user.value) return '';
-  return user.value.first_name || '';
-});
+  if (!user.value) return ''
+  return user.value.first_name || ''
+})
 
 const userUsername = computed(() => {
-  if (!user.value) return '';
-  return user.value.username || '';
-});
+  if (!user.value) return ''
+  return user.value.username || ''
+})
 
 const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/');
-};
+  await authStore.logout()
+  router.push('/')
+}
 
 const handleToggleMenu = () => {
   isOpen.value = !isOpen.value
@@ -64,17 +64,13 @@ onUnmounted(() => {
 
 <template>
   <!-- Overlay для мобильных -->
-  <div
-    v-if="isOpen"
-    class="fixed inset-0 bg-black/50 z-40 lg:hidden"
-    @click="isOpen = false"
-  ></div>
+  <div v-if="isOpen" class="fixed inset-0 bg-black/50 z-40 lg:hidden" @click="isOpen = false"></div>
 
   <!-- Sidebar -->
   <aside
     :class="[
       'fixed lg:relative inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:transform-none lg:h-full',
-      isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
     ]"
   >
     <div class="p-4 flex items-center justify-between flex-shrink-0">
@@ -83,10 +79,7 @@ onUnmounted(() => {
         <span class="text-xl font-bold text-gray-900">Team R</span>
       </div>
       <!-- Кнопка закрытия для мобильных -->
-      <button
-        @click="isOpen = false"
-        class="lg:hidden p-2 rounded hover:bg-gray-100"
-      >
+      <button @click="isOpen = false" class="lg:hidden p-2 rounded hover:bg-gray-100">
         <X class="w-5 h-5" />
       </button>
     </div>
@@ -228,9 +221,7 @@ onUnmounted(() => {
           <p class="text-sm font-medium text-gray-900 truncate">
             {{ userName }}
           </p>
-          <p v-if="userUsername" class="text-xs text-gray-500 truncate">
-            @{{ userUsername }}
-          </p>
+          <p v-if="userUsername" class="text-xs text-gray-500 truncate">@{{ userUsername }}</p>
         </div>
         <button
           @click="handleLogout"

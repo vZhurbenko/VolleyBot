@@ -72,6 +72,93 @@ security = HTTPBearer(auto_error=False)
 scheduler = AsyncIOScheduler()
 
 
+# ==================== Middleware для ограничения доступа гостей ====================
+
+@app.middleware("http")
+async def guest_access_middleware(request: Request, call_next):
+    """
+    Middleware для ограничения доступа гостей
+    
+    Гости могут accessing только:
+    - /api/guest/*
+    - /api/trainings/{uuid} (только своя тренировка)
+    
+    Заблокировать доступ к:
+    - /api/users/*
+    - /api/trainings (список всех тренировок)
+    - /api/calendar/*
+    - /api/profile/*
+    """
+    # Пропускаем без проверки
+    if request.url.path in ["/health", "/api/auth/telegram", "/api/auth/refresh", "/api/invite/"]:
+        return await call_next(request)
+
+    # Получаем пользователя из токена
+    user = get_current_user_from_access_token(request)
+
+    # Если пользователь не авторизован - пропускаем (авторизация проверится в endpoint)
+    if not user:
+        return await call_next(request)
+    
+    # Проверяем, является ли пользователь гостем
+    is_guest = user.get('is_guest', False)
+
+    if is_guest:
+        path = request.url.path
+
+        # Разрешённые пути для гостей
+        allowed_paths = [
+            '/api/guest/me',
+            '/api/guest/auth',
+            '/api/guest/join/',
+            '/api/guest/leave/',
+        ]
+
+        # Проверяем точное совпадение или начало пути
+        is_allowed = any(
+            path == allowed or path.startswith(allowed)
+            for allowed in allowed_paths
+        )
+        
+        # Разрешаем гостям доступ к странице гостя /guest/training/{uuid}
+        if path.startswith('/guest/training/'):
+            is_allowed = True
+        
+        # Разрешаем гостям доступ к конкретной тренировке по UUID
+        if path.startswith('/api/trainings/'):
+            is_allowed = True
+        
+        # Разрешаем гостям доступ к календарю с параметром training
+        if path == '/api/user/calendar':
+            from urllib.parse import parse_qs
+            query_string = request.url.query
+            query_params = parse_qs(query_string)
+            if 'training' in query_params:
+                is_allowed = True
+
+        # Блокируем доступ к админским и пользовательским endpoint'ам
+        blocked_prefixes = [
+            '/api/admin/',
+            '/api/users/',
+            '/api/profile/',
+        ]
+
+        is_blocked = any(path.startswith(prefix) for prefix in blocked_prefixes)
+
+        # Блокируем получение списка всех тренировок
+        if path == '/api/trainings':
+            is_blocked = True
+        
+        if is_blocked:
+            logger.warning(f"Гость {user.get('telegram_id')} попытался получить доступ к {path}")
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Доступ запрещён. У вас нет прав для просмотра этого раздела."}
+            )
+    
+    return await call_next(request)
+
+
 # ==================== Планировщик задач ====================
 
 async def add_trainings_and_polls_from_schedules():
@@ -199,6 +286,7 @@ class TelegramUserData(BaseModel):
     auth_date: int
     hash: str
     invite_code: Optional[str] = None
+    training_uuid: Optional[str] = None  # UUID тренировки для гостей
 
 
 class AuthResponse(BaseModel):
@@ -218,12 +306,42 @@ class UserInfo(BaseModel):
     photo_url: Optional[str] = None
     is_admin: bool
     is_active: bool
+    is_guest: bool = False
     last_login: Optional[str] = None
 
 
 class TokenRefreshRequest(BaseModel):
     """Модель запроса на обновление токена"""
     pass
+
+
+class GuestAuthRequest(BaseModel):
+    """Модель запроса авторизации гостя"""
+    id: int
+    first_name: str
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    auth_date: int
+    hash: str
+    training_uuid: Optional[str] = None
+
+
+class GuestResponse(BaseModel):
+    """Модель ответа информации о госте"""
+    telegram_id: int
+    first_name: str
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    training_uuid: str
+    is_active: bool
+    is_guest: bool
+
+
+class GuestStatusUpdate(BaseModel):
+    """Модель обновления статуса гостя"""
+    is_active: bool
 
 
 # ==================== Вспомогательные функции ====================
@@ -277,6 +395,29 @@ def decode_token(token: str, expected_type: str) -> dict:
         )
 
 
+def get_current_user_from_access_token(request: Request) -> Optional[dict]:
+    """
+    Получение текущего пользователя из access token cookie
+    Возвращает None если токен не валиден (для опциональной авторизации)
+    """
+    access_token = request.cookies.get("access_token")
+
+    if not access_token:
+        return None
+
+    try:
+        payload = decode_token(access_token, "access")
+        telegram_id = payload.get("sub")
+
+        if not telegram_id:
+            return None
+
+        user = db.get_user_by_telegram_id(int(telegram_id))
+        return user
+    except HTTPException:
+        return None
+
+
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> Response:
     """Установка HttpOnly cookie с токенами"""
     # Access token - 30 минут
@@ -287,54 +428,54 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str) 
         httponly=True,      # JavaScript не имеет доступа
         secure=True,        # Только HTTPS
         samesite="lax",     # Защита от CSRF
-        path="/api"         # Только для API endpoints
+        path="/"            # Доступно на всех страницах
     )
-    
+
     # Refresh token - 7 дней
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         httponly=True,
-        secure=True,
+        secure=True,        # Только HTTPS
         samesite="lax",
-        path="/api"
+        path="/"            # Доступно на всех страницах
     )
-    
+
     return response
 
 
 def clear_auth_cookies(response: Response) -> Response:
     """Удаление cookie с токенами"""
-    response.delete_cookie(key="access_token", path="/api")
-    response.delete_cookie(key="refresh_token", path="/api")
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/")
     return response
 
 
 async def get_current_user_from_access_cookie(request: Request) -> dict:
     """Получение текущего пользователя из access token cookie"""
     access_token = request.cookies.get("access_token")
-    
+
     if not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Access token не найден",
         )
-    
+
     payload = decode_token(access_token, "access")
     telegram_id = payload.get("sub")
-    
+
     if not telegram_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Невалидный токен",
         )
-    
+
     # Получаем пользователя из БД
     user = db.get_user_by_telegram_id(int(telegram_id))
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Пользователь не найден",
         )
 
@@ -407,12 +548,16 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
     # 3. Проверяем, существует ли пользователь в БД
     existing_user = db.get_user_by_telegram_id(telegram_id)
 
-    # Если пользователя нет в БД — проверяем, есть ли приглашение или он администратор
+    # Если пользователя нет в БД — проверяем, есть ли приглашение, training_uuid
     if not existing_user:
         invite_code = user_data.invite_code
+        training_uuid = user_data.training_uuid
         invite_valid = False
-        
-        # Проверяем приглашение, если оно было передано
+
+        # Новый пользователь без приглашения и training_uuid — запрещаем вход
+        logger.info(f"Пользователь {telegram_id} не найден в БД, проверяем приглашение/training_uuid")
+
+        # Проверяем приглашение
         if invite_code:
             invite = db.get_invite_code(invite_code)
             if invite and invite.get('enabled') and not invite.get('used_by'):
@@ -420,36 +565,75 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
                 if not invite.get('expires_at') or datetime.fromisoformat(invite['expires_at']) > datetime.now():
                     invite_valid = True
                     logger.info(f"Валидное приглашение {invite_code} для пользователя {telegram_id}")
-        
-        # Если нет валидного приглашения — проверяем администратора
+
+        # Если нет валидного приглашения — проверяем training_uuid (гость)
+        if not invite_valid and training_uuid:
+            # Проверяем валидность тренировки
+            training = db.get_training_by_uuid(training_uuid)
+            if training:
+                invite_valid = True
+                logger.info(f"Валидная тренировка {training_uuid} для пользователя {telegram_id}")
+
+        # Если нет валидного приглашения или training_uuid — запрещаем вход
         if not invite_valid:
-            admin_ids = db.get_admin_ids()
-            is_admin = telegram_id in admin_ids
+            logger.warning(f"Пользователь {telegram_id} не найден в БД, не имеет приглашения или training_uuid")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Вам недоступна авторизация. Обратитесь к администратору."
+            )
 
-            # Если не администратор — запрещаем вход
-            if not is_admin:
-                logger.warning(f"Пользователь {telegram_id} не найден в БД, не является администратором и не имеет приглашения")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Вам недоступна авторизация. Обратитесь к администратору."
-                )
+        # Создаём пользователя (гостя или с приглашением)
+        if training_uuid:
+            # Создаём гостя для записи на тренировку
+            db.add_guest(
+                telegram_id=telegram_id,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                username=user_data.username,
+                photo_url=user_data.photo_url
+            )
+            logger.info(f"Гость создан: {user_data.username or user_data.first_name}")
 
-        # Регистрируем пользователя с приглашением или как администратора
-        db.add_user(
-            telegram_id=telegram_id,
-            first_name=user_data.first_name,
-            last_name=user_data.last_name,
-            username=user_data.username,
-            photo_url=user_data.photo_url,
-            is_admin=False  # Приглашение не даёт прав админа
-        )
-        logger.info(f"Новый пользователь зарегистрирован: {user_data.username or user_data.first_name}")
-        existing_user = db.get_user_by_telegram_id(telegram_id)
-        
-        # Если было приглашение — используем его
-        if invite_code and invite_valid:
-            db.use_invite_code(invite_code, telegram_id)
-            logger.info(f"Пользователь {telegram_id} принял приглашение {invite_code}")
+            # Записываем на тренировку
+            db.add_guest_signup(
+                telegram_id=telegram_id,
+                training_uuid=training_uuid,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                username=user_data.username,
+                photo_url=user_data.photo_url
+            )
+            logger.info(f"Гость записан на тренировку {training_uuid}")
+
+            # Получаем обновлённый список тренировок
+            trainings = db.get_guest_trainings(telegram_id)
+            training_uuids = [t['training_uuid'] for t in trainings]
+
+            existing_user = {
+                'telegram_id': telegram_id,
+                'first_name': user_data.first_name,
+                'last_name': user_data.last_name,
+                'username': user_data.username,
+                'photo_url': user_data.photo_url,
+                'is_guest': True,
+                'trainings': training_uuids
+            }
+        elif invite_valid:
+            # Создаём пользователя с приглашением
+            db.add_user(
+                telegram_id=telegram_id,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                username=user_data.username,
+                photo_url=user_data.photo_url,
+                is_admin=False
+            )
+            logger.info(f"Пользователь зарегистрирован по приглашению: {user_data.username or user_data.first_name}")
+            existing_user = db.get_user_by_telegram_id(telegram_id)
+
+            if invite_code:
+                db.use_invite_code(invite_code, telegram_id)
+                logger.info(f"Пользователь {telegram_id} принял приглашение {invite_code}")
     else:
         # Проверяем, активен ли пользователь
         if not existing_user.get('is_active', True):
@@ -469,12 +653,9 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
         )
         logger.info(f"Пользователь обновил данные: {user_data.username or user_data.first_name}")
 
-        # Обновляем статус админа, если он был изменён
-        admin_ids = db.get_admin_ids()
-        is_admin = telegram_id in admin_ids
-        if existing_user.get('is_admin') != is_admin:
-            db.set_user_admin(telegram_id, is_admin)
-            logger.info(f"Статус админа обновлён для {telegram_id}: {is_admin}")
+        # НЕ обновляем статус админа автоматически из настроек
+        # Статус админа управляется только через явное добавление/удаление админа
+        # existing_user уже содержит актуальный is_admin из БД
 
     # 4. Создаём токены
     is_admin = existing_user.get('is_admin', False)
@@ -499,6 +680,13 @@ async def auth_telegram(user_data: TelegramUserData, response: Response):
 
     # 6. Возвращаем данные пользователя (без токенов)
     user = db.get_user_by_telegram_id(telegram_id)
+
+    # Добавляем список тренировок для гостя
+    if user and user.get('is_guest'):
+        trainings = db.get_guest_trainings(telegram_id)
+        training_uuids = [t['training_uuid'] for t in trainings] if trainings else []
+        user['trainings'] = training_uuids
+
     return {
         "success": True,
         "message": "Авторизация успешна",
@@ -568,6 +756,8 @@ async def get_current_user_info(user: dict = Depends(get_current_user_from_acces
     """
     Получение данных текущего пользователя
     """
+    # Добавляем is_guest в ответ
+    user['is_guest'] = user.get('is_guest', False)
     return user
 
 
@@ -591,6 +781,559 @@ async def get_telegram_config():
         "button_size": "large",
         "lang": "ru"
     }
+
+
+# ==================== API для гостей ====================
+
+@app.post("/api/guest/auth")
+async def guest_auth(user_data: GuestAuthRequest, response: Response):
+    """
+    Авторизация гостя через Telegram
+
+    Логика:
+    - Если пользователь есть в users → вернуть токен с is_guest: false
+    - Если есть в guests → вернуть токен с is_guest: true и списком тренировок
+    - Если нет нигде → проверить training_uuid:
+      - Если есть → добавить в guests и guest_signups, вернуть токен
+      - Если нет → ошибка
+    """
+    logger.info(f"Попытка авторизации гостя: {user_data.username or user_data.first_name}")
+
+    # 1. Проверяем валидность hash
+    if not telegram_auth.validate(user_data.dict(exclude={'training_uuid'}, exclude_none=True)):
+        logger.warning(f"Неверная подпись данных для гостя {user_data.id}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Неверная подпись данных"
+        )
+
+    # 2. Проверяем время авторизации
+    if not telegram_auth.is_auth_date_valid(user_data.auth_date, max_age_seconds=300):
+        logger.warning(f"Данные авторизации устарели для гостя {user_data.id}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Данные авторизации устарели"
+        )
+
+    telegram_id = user_data.id
+    training_uuid = user_data.training_uuid
+
+    # 3. Проверяем, существует ли пользователь в users
+    existing_user = db.get_user_by_telegram_id(telegram_id)
+
+    if existing_user:
+        # Пользователь существует в users - возвращаем токен как обычный пользователь
+        logger.info(f"Гость {telegram_id} найден как пользователь")
+
+        # Проверяем активен ли пользователь
+        if not existing_user.get('is_active', True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Ваш аккаунт деактивирован"
+            )
+
+        # Обновляем данные пользователя
+        db.update_user(
+            telegram_id=telegram_id,
+            first_name=user_data.first_name,
+            last_name=user_data.last_name,
+            username=user_data.username,
+            photo_url=user_data.photo_url
+        )
+
+        # Создаём токены
+        token_data = {
+            "sub": str(telegram_id),
+            "username": user_data.username,
+            "is_admin": existing_user.get('is_admin', False),
+            "is_guest": False
+        }
+
+        access_token = create_access_token(
+            data=token_data,
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+
+        refresh_token = create_refresh_token(
+            data=token_data,
+            expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+
+        set_auth_cookies(response, access_token, refresh_token)
+
+        return {
+            "success": True,
+            "message": "Авторизация успешна",
+            "user": existing_user,
+            "is_guest": False,
+            "trainings": []
+        }
+
+    # 4. Проверяем, существует ли пользователь в guests
+    existing_guest = db.get_guest_by_telegram(telegram_id)
+
+    if existing_guest:
+        # Гость существует - проверяем активен ли
+        if not existing_guest.get('is_active', True):
+            logger.warning(f"Гость {telegram_id} деактивирован")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Ваш аккаунт гостя деактивирован"
+            )
+
+        # Обновляем данные гостя
+        cursor = db.conn.cursor()
+        cursor.execute('''
+            UPDATE guests
+            SET first_name = ?, last_name = ?, username = ?, photo_url = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE telegram_id = ?
+        ''', (user_data.first_name, user_data.last_name, user_data.username, user_data.photo_url, telegram_id))
+        db.conn.commit()
+
+        # Получаем обновлённые данные
+        guest = db.get_guest_by_telegram(telegram_id)
+
+        # Получаем список тренировок гостя
+        trainings = db.get_guest_trainings(telegram_id)
+
+        # Создаём токены
+        token_data = {
+            "sub": str(telegram_id),
+            "username": user_data.username,
+            "is_guest": True
+        }
+
+        access_token = create_access_token(
+            data=token_data,
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+
+        refresh_token = create_refresh_token(
+            data=token_data,
+            expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+
+        set_auth_cookies(response, access_token, refresh_token)
+
+        logger.info(f"Гость {telegram_id} авторизован, тренировок: {len(trainings)}")
+        return {
+            "success": True,
+            "message": "Авторизация успешна",
+            "user": guest,
+            "is_guest": True,
+            "trainings": trainings
+        }
+
+    # 5. Пользователь не найден ни в users, ни в guests
+    # Проверяем, есть ли training_uuid
+    if not training_uuid:
+        logger.warning(f"Гость {telegram_id} не имеет training_uuid")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Требуется training_uuid для регистрации гостя"
+        )
+
+    # Проверяем, существует ли тренировка с таким UUID
+    training = db.get_training_by_uuid(training_uuid)
+    if not training:
+        logger.warning(f"Тренировка {training_uuid} не найдена")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Тренировка не найдена"
+        )
+
+    # Добавляем гостя и записываем на тренировку
+    signup = db.add_guest_signup(
+        telegram_id=telegram_id,
+        training_uuid=training_uuid,
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        username=user_data.username,
+        photo_url=user_data.photo_url
+    )
+
+    if not signup:
+        logger.error(f"Ошибка добавления гостя {telegram_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при регистрации гостя"
+        )
+
+    # Получаем данные гостя
+    guest = db.get_guest_by_telegram(telegram_id)
+
+    # Создаём токены
+    token_data = {
+        "sub": str(telegram_id),
+        "username": user_data.username,
+        "is_guest": True
+    }
+
+    access_token = create_access_token(
+        data=token_data,
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    refresh_token = create_refresh_token(
+        data=token_data,
+        expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+
+    set_auth_cookies(response, access_token, refresh_token)
+
+    logger.info(f"Гость {telegram_id} зарегистрирован на тренировку {training_uuid}")
+    return {
+        "success": True,
+        "message": "Авторизация успешна",
+        "user": guest,
+        "is_guest": True,
+        "trainings": [signup]
+    }
+
+
+@app.get("/api/guest/me")
+async def get_guest_me(request: Request):
+    """
+    Получение текущей информации о госте (требует авторизации)
+    Возвращает список тренировок гостя
+    """
+    # Получаем пользователя из токена
+    user = get_current_user_from_access_token(request)
+
+    # Если не получилось, проверяем cookie напрямую
+    if not user:
+        access_token = request.cookies.get("access_token")
+        if access_token:
+            try:
+                payload = decode_token(access_token, "access")
+                telegram_id = payload.get("sub")
+                if telegram_id:
+                    # Проверяем, гость ли это
+                    if db.is_guest(int(telegram_id)):
+                        guest = db.get_guest_by_telegram(int(telegram_id))
+                        user = {**guest, 'is_guest': True, 'telegram_id': int(telegram_id)}
+            except:
+                pass
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Необходима авторизация"
+        )
+
+    telegram_id = user.get('telegram_id')
+    is_guest = user.get('is_guest', False)
+
+    if not is_guest:
+        # Если не гость, возвращаем информацию как обычный пользователь
+        return {
+            "telegram_id": telegram_id,
+            "first_name": user.get('first_name'),
+            "last_name": user.get('last_name'),
+            "username": user.get('username'),
+            "photo_url": user.get('photo_url'),
+            "trainings": [],
+            "is_active": user.get('is_active', True),
+            "is_guest": False
+        }
+
+    # Получаем информацию о госте
+    guest = db.get_guest_by_telegram(telegram_id)
+
+    if not guest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Гость не найден"
+        )
+
+    # Получаем список тренировок гостя
+    trainings = db.get_guest_trainings(telegram_id)
+
+    return {
+        "telegram_id": guest['telegram_id'],
+        "first_name": guest['first_name'],
+        "last_name": guest.get('last_name'),
+        "username": guest.get('username'),
+        "photo_url": guest.get('photo_url'),
+        "trainings": trainings,
+        "is_active": guest['is_active'],
+        "is_guest": True
+    }
+
+
+@app.post("/api/guest/join/{training_uuid}")
+async def guest_join_training(training_uuid: str, request: Request, response: Response):
+    """
+    Запись гостя на тренировку по ссылке-приглашению
+
+    Проверяет валидность UUID и добавляет запись в guest_signups
+    """
+    # Получаем пользователя из токена (опционально)
+    user = get_current_user_from_access_token(request)
+
+    body = await request.json()
+    telegram_id = body.get('telegram_id')
+    first_name = body.get('first_name')
+    last_name = body.get('last_name')
+    username = body.get('username')
+    photo_url = body.get('photo_url')
+
+    if not all([telegram_id, first_name]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Требуется telegram_id и first_name"
+        )
+
+    # Проверяем валидность UUID
+    training = db.get_training_by_uuid(training_uuid)
+    if not training:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Тренировка не найдена"
+        )
+
+    # Проверяем, существует ли уже пользователь в users
+    existing_user = db.get_user_by_telegram_id(telegram_id)
+    if existing_user and not existing_user.get('is_guest', False):
+        logger.info(f"Пользователь {telegram_id} уже существует в users как не-гость")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Вы уже зарегистрированы как пользователь. Используйте обычную авторизацию."
+        )
+    
+    # Если пользователь уже есть как гость (is_guest=1) — просто записываем на тренировку
+    if existing_user and existing_user.get('is_guest', False):
+        logger.info(f"Гость {telegram_id} уже существует, записываем на тренировку")
+
+    # Проверяем, записан ли уже гость на эту тренировку
+    is_signed_up = db.is_guest_signed_up(telegram_id, training_uuid)
+    if is_signed_up:
+        logger.info(f"Гость {telegram_id} уже записан на эту тренировку")
+        return {
+            "success": True,
+            "message": "Вы уже записаны на эту тренировку",
+            "is_guest": True,
+            "training_uuid": training_uuid
+        }
+
+    # Добавляем запись гостя на тренировку
+    signup = db.add_guest_signup(
+        telegram_id=telegram_id,
+        training_uuid=training_uuid,
+        first_name=first_name,
+        last_name=last_name,
+        username=username,
+        photo_url=photo_url
+    )
+
+    if not signup:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при записи гостя"
+        )
+
+    logger.info(f"Гость {telegram_id} записан на тренировку {training_uuid}")
+    return {
+        "success": True,
+        "message": "Вы успешно записаны на тренировку",
+        "is_guest": True,
+        "training_uuid": training_uuid
+    }
+
+
+@app.post("/api/guest/leave/{training_uuid}")
+async def guest_leave_training(
+    training_uuid: str,
+    request: Request
+):
+    """
+    Отписка гостя от тренировки
+    """
+    # Получаем пользователя из токена
+    user = get_current_user_from_access_token(request)
+
+    # Если не получилось, проверяем cookie напрямую
+    if not user:
+        access_token = request.cookies.get("access_token")
+        if access_token:
+            try:
+                payload = decode_token(access_token, "access")
+                telegram_id = payload.get("sub")
+                if telegram_id:
+                    # Проверяем, гость ли это
+                    if db.is_guest(int(telegram_id)):
+                        guest = db.get_guest_by_telegram(int(telegram_id))
+                        user = {**guest, 'is_guest': True, 'telegram_id': int(telegram_id)}
+            except:
+                pass
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Необходима авторизация"
+        )
+
+    telegram_id = user.get('telegram_id')
+    is_guest = user.get('is_guest', False)
+
+    if not is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Только гости могут использовать этот endpoint"
+        )
+
+    # Проверяем, что гость записан на эту тренировку
+    is_signed_up = db.is_guest_signed_up(telegram_id, training_uuid)
+    if not is_signed_up:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Вы не записаны на эту тренировку"
+        )
+
+    # Удаляем запись
+    result = db.remove_guest_signup(telegram_id, training_uuid)
+
+    if result.get('success'):
+        logger.info(f"Гость {telegram_id} отписался от тренировки {training_uuid}")
+        return {
+            "success": True,
+            "message": "Вы успешно отписались от тренировки"
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get('error', 'Ошибка при отписке')
+        )
+
+
+# ==================== API для админки (управление гостями) ====================
+
+@app.get("/api/admin/guests")
+async def get_all_guests(
+    limit: int = 100,
+    offset: int = 0,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение списка всех гостей с пагинацией (только для администраторов)
+    """
+    require_admin(user)
+    
+    guests = db.get_all_guests(limit=limit, offset=offset)
+    
+    return {
+        "guests": guests,
+        "total": len(guests),
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@app.patch("/api/admin/guests/{telegram_id}/status")
+async def update_guest_status(
+    telegram_id: int,
+    status_update: GuestStatusUpdate,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Активация/деактивация гостя (только для администраторов)
+    """
+    require_admin(user)
+    
+    # Проверяем, существует ли гость
+    guest = db.get_guest_by_telegram(telegram_id)
+    if not guest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Гость не найден"
+        )
+    
+    result = db.update_guest_status(telegram_id, status_update.is_active)
+    
+    if result.get('success'):
+        return {
+            "success": True,
+            "message": f"Гость {'активирован' if status_update.is_active else 'деактивирован'}",
+            "is_active": status_update.is_active
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get('error', 'Ошибка обновления статуса')
+        )
+
+
+@app.post("/api/admin/guests/{telegram_id}/convert")
+async def convert_guest_to_user(
+    telegram_id: int,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Конвертация гостя в пользователя (только для администраторов)
+    """
+    require_admin(user)
+    
+    # Проверяем, существует ли гость
+    guest = db.get_guest_by_telegram(telegram_id)
+    if not guest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Гость не найден"
+        )
+    
+    # Конвертируем
+    new_user = db.convert_guest_to_user(
+        telegram_id=telegram_id,
+        first_name=guest.get('first_name'),
+        last_name=guest.get('last_name'),
+        username=guest.get('username'),
+        photo_url=guest.get('photo_url')
+    )
+    
+    if not new_user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при конвертации гостя"
+        )
+    
+    logger.info(f"Гость {telegram_id} конвертирован в пользователя")
+    return {
+        "success": True,
+        "message": "Гость конвертирован в пользователя",
+        "user": new_user
+    }
+
+
+@app.delete("/api/admin/guests/{telegram_id}")
+async def delete_guest(
+    telegram_id: int,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Удаление гостя (только для администраторов)
+    """
+    require_admin(user)
+    
+    # Проверяем, существует ли гость
+    guest = db.get_guest_by_telegram(telegram_id)
+    if not guest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Гость не найден"
+        )
+    
+    result = db.delete_guest(telegram_id)
+    
+    if result.get('success'):
+        return {
+            "success": True,
+            "message": "Гость удалён"
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get('error', 'Ошибка удаления гостя')
+        )
 
 
 @app.get("/api/admin/users", response_model=List[UserInfo])
@@ -883,125 +1626,269 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 
 
 
-# ==================== API для пользователей (Calendar) ====================
+# ==================== Универсальные ссылки на тренировки ====================
+
+@app.get("/training/{training_uuid}")
+async def get_training_redirect(training_uuid: str, request: Request):
+    """
+    Универсальная ссылка на тренировку
+    Возвращает JSON с редиректом для обработки на фронте
+    Логика:
+    1. Если не авторизован → redirect на /login?redirect=/t/{uuid}
+    2. Если гость → redirect на /guest/training/{uuid}
+    3. Если пользователь → redirect на /dashboard/calendar?training={uuid}
+    """
+    # Получаем пользователя из токена
+    user = get_current_user_from_access_token(request)
+
+    # Проверяем тренировку
+    training = db.get_training_by_uuid(training_uuid)
+    if not training:
+        raise HTTPException(status_code=404, detail="Тренировка не найдена")
+
+    # Если пользователь не авторизован → редирект на логин с /t/{uuid} (не /guest/training/{uuid}!)
+    if not user:
+        return {"redirect": f"/login?redirect=/t/{training_uuid}"}
+
+    # Проверяем, является ли пользователь гостем
+    is_guest = db.is_guest(user.get('telegram_id'))
+
+    if is_guest:
+        # Гость → страница гостя
+        return {"redirect": f"/guest/training/{training_uuid}"}
+    else:
+        # Пользователь → календарь с открытой модалкой
+        return {"redirect": f"/dashboard/calendar?training={training_uuid}"}
 
 @app.get("/api/user/calendar")
 async def get_calendar(year: int, month: int, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Получение календаря тренировок на месяц
-    Возвращает все тренировки месяца с записями
+    Получение календаря событий на месяц (новая архитектура events)
+    Возвращает все события месяца с записями
     """
-    from datetime import datetime, timedelta
-    import calendar
+    # Получаем все события из новой таблицы events
+    events = db.get_events(year, month)
+    
+    # Группируем события по типу
+    trainings = []
+    games_list = []
+    
+    for event in events:
+        event_id = event['id']
+        event_uuid = event.get('uuid')
+        event_type = event['event_type']
+        
+        # Получаем участников события
+        participants = db.get_event_participants(event_id)
+        
+        # Формируем структуру данных
+        event_data = {
+            'id': event_id,
+            'uuid': event_uuid,
+            'event_type': event_type,
+            'name': event.get('name', ''),
+            'date': event.get('date'),
+            'time': event.get('start_time'),  # Для обратной совместимости
+            'start_time': event.get('start_time'),
+            'end_time': event.get('end_time'),
+            'location': event.get('location', ''),
+            'chat_id': event.get('chat_id'),  # Нужно для записи
+            'topic_id': event.get('topic_id'),  # Нужно для записи
+            'opponent': event.get('opponent'),
+            'result': event.get('result'),
+            'score': event.get('score'),
+            'participants': participants,
+            'registrations': participants,  # Для обратной совместимости с модалкой
+            'registered_count': len([p for p in participants if p.get('status') == 'registered']),
+            'waitlist_count': len([p for p in participants if p.get('status') == 'waitlist']),
+        }
+        
+        # Проверяем записан ли текущий пользователь
+        if user:
+            user_telegram_id = user.get('telegram_id')
+            user_participant = next((p for p in participants if p.get('telegram_id') == user_telegram_id), None)
+            event_data['user_status'] = user_participant['status'] if user_participant else None
+            event_data['is_guest'] = user_participant.get('is_guest', False) if user_participant else False
+        else:
+            event_data['user_status'] = None
+            event_data['is_guest'] = False
+        
+        # Распределяем по типам
+        if event_type in ['training', 'scheduled_training', 'one_time_training']:
+            trainings.append(event_data)
+        elif event_type == 'game':
+            games_list.append(event_data)
+    
+    # Для обратной совместимости добавляем данные из старых таблиц
+    # (если есть события которые ещё не перенесены в events)
+    # И используем старый формат для фронтенда
 
-    # Получаем разовые тренировки на месяц
-    one_time_trainings = db.get_one_time_trainings(year, month)
-
-    # Получаем тренировки из расписаний на месяц (добавленные автоматически за 3 дня)
+    # Старые тренировки из scheduled_trainings
     scheduled_trainings = db.get_scheduled_trainings(year, month)
-
-    # Генерируем все даты тренировок на месяц
-    trainings = {}
-
-    # Добавляем разовые тренировки
-    for training in one_time_trainings:
-        date_str = training.get('training_date', '')
-        time = training.get('training_time', '')
-        start_time = training.get('start_time', '')
-        end_time = training.get('end_time', '')
-        chat_id = training.get('chat_id', '')
-        topic_id = training.get('topic_id')
-        name = training.get('name', '')
-        location = training.get('location', '')
-        training_id = training.get('id', '')
-
-        # Используем id как key для уникальности
-        key = training_id or f"{date_str}_{time}_{chat_id}"
-        if key not in trainings:
-            trainings[key] = {
-                'id': training_id,
-                'date': date_str,
-                'time': time,
-                'start_time': start_time,
-                'end_time': end_time,
-                'chat_id': chat_id,
-                'topic_id': topic_id,
-                'is_one_time': True,
-                'is_scheduled': False,
-                'name': name,
-                'location': location,
-                'registrations': []
-            }
-
-    # Добавляем тренировки из расписаний
     for training in scheduled_trainings:
-        date_str = training.get('training_date', '')
-        time = training.get('training_time', '')
-        start_time = training.get('start_time', '')
-        end_time = training.get('end_time', '')
-        chat_id = training.get('chat_id', '')
-        topic_id = training.get('topic_id')
-        name = training.get('name', '') or training.get('schedule_name', 'Тренировка')
-        location = training.get('location', '')
-        training_id = training.get('id', '')
-        schedule_id = training.get('schedule_id', '')
-
-        key = training_id or f"{date_str}_{time}_{chat_id}"
-        if key not in trainings:
-            trainings[key] = {
+        training_uuid = training.get('uuid')
+        training_id = training.get('id')
+        
+        # Проверяем, есть ли уже в events
+        existing = next((t for t in trainings if t.get('uuid') == training_uuid), None)
+        if not existing:
+            participants = db.get_training_registrations(
+                training.get('training_date', ''),
+                training.get('training_time', ''),
+                training.get('chat_id', '')
+            )
+            trainings.append({
                 'id': training_id,
-                'schedule_id': schedule_id,
-                'date': date_str,
-                'time': time,
-                'start_time': start_time,
-                'end_time': end_time,
-                'chat_id': chat_id,
-                'topic_id': topic_id,
-                'is_one_time': False,
-                'is_scheduled': True,
-                'name': name,
-                'location': location,
-                'registrations': []
-            }
-    
-    # Для каждой тренировки получаем записи
-    for key, training in trainings.items():
-        registrations = db.get_training_registrations(
-            training['date'], training['time'], training['chat_id']
-        )
-        training['registrations'] = registrations
-        training['registered_count'] = len([r for r in registrations if r.get('status') == 'registered'])
-        training['waitlist_count'] = len([r for r in registrations if r.get('status') == 'waitlist'])
-        
-        # Проверяем записан ли текущий пользователь
-        user_telegram_id = user.get('telegram_id')
-        user_registration = next((r for r in registrations if r.get('user_telegram_id') == user_telegram_id), None)
-        training['user_status'] = user_registration['status'] if user_registration else None
+                'uuid': training_uuid,
+                'event_type': 'scheduled_training',
+                'name': training.get('name', 'Тренировка'),
+                'date': training.get('training_date'),
+                'time': training.get('training_time'),
+                'start_time': training.get('start_time'),
+                'end_time': training.get('end_time'),
+                'location': training.get('location', ''),
+                'chat_id': training.get('chat_id'),
+                'topic_id': training.get('topic_id'),
+                'registrations': participants,  # Старый формат
+                'participants': participants,   # Новый формат
+                'registered_count': len([p for p in participants if p.get('status') == 'registered']),
+                'waitlist_count': len([p for p in participants if p.get('status') == 'waitlist']),
+                'user_status': None
+            })
+        else:
+            # Добавляем старый формат для совместимости
+            existing['time'] = existing.get('start_time')
+            existing['registrations'] = existing.get('participants', [])
 
-    # Получаем игры на этот месяц
-    games = db.get_all_games(year, month)
-    
-    # Для каждой игры получаем записи
-    for game in games:
-        signups = db.get_game_signups(game['id'])
-        game['signups'] = signups
-        game['registered_count'] = len(signups)
-        
-        # Проверяем записан ли текущий пользователь
-        user_telegram_id = user.get('telegram_id')
-        user_signup = next((s for s in signups if s.get('user_telegram_id') == user_telegram_id), None)
-        game['user_status'] = user_signup['status'] if user_signup else None
+    # Старые игры из games
+    old_games = db.get_all_games(year, month)
+    for game in old_games:
+        game_id = game.get('id')
+        game_uuid = game.get('uuid')
+
+        # Проверяем, есть ли уже в events
+        existing = next((g for g in games_list if g.get('uuid') == game_uuid), None)
+        if not existing:
+            signups = db.get_game_signups(game_id)
+            
+            # Проверяем записан ли текущий пользователь
+            user_status = None
+            if user:
+                user_telegram_id = user.get('telegram_id')
+                user_signup = next((s for s in signups if s.get('user_telegram_id') == user_telegram_id), None)
+                user_status = user_signup['status'] if user_signup else None
+            
+            games_list.append({
+                'id': game_id,
+                'uuid': game_uuid,
+                'event_type': 'game',
+                'name': game.get('name', ''),
+                'date': game.get('date'),
+                'time': game.get('start_time'),
+                'start_time': game.get('start_time'),
+                'end_time': game.get('end_time'),
+                'location': game.get('location', ''),
+                'opponent': game.get('opponent'),
+                'result': game.get('result'),
+                'score': game.get('score'),
+                'signups': signups,         # Старый формат
+                'participants': signups,    # Новый формат
+                'registered_count': len(signups),
+                'waitlist_count': 0,
+                'user_status': user_status
+            })
+        else:
+            # Добавляем старый формат для совместимости
+            existing['time'] = existing.get('start_time')
+            existing['signups'] = existing.get('participants', [])
     
     return {
-        "trainings": list(trainings.values()),
-        "games": games
+        "trainings": trainings,
+        "games": games_list
     }
 
+
+# ==================== Новая архитектура: API для events ====================
+
+@app.post("/api/events/{event_id}/signup")
+async def signup_for_event(event_id: int, request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Запись на событие (новая архитектура events)
+    """
+    require_auth(user)
+    
+    # Получаем ID пользователя
+    user_telegram_id = user.get('telegram_id')
+    user_row = db.get_user_by_telegram_id(user_telegram_id)
+    if not user_row:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    user_id = user_row['id']
+    is_guest = user_row.get('is_guest', False)
+    
+    result = db.add_event_signup(event_id, user_id, is_guest)
+    
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Запись не удалась'))
+
+
+@app.delete("/api/events/{event_id}/signup")
+async def cancel_signup_for_event(event_id: int, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Отмена записи на событие (новая архитектура events)
+    """
+    require_auth(user)
+    
+    # Получаем ID пользователя
+    user_telegram_id = user.get('telegram_id')
+    user_row = db.get_user_by_telegram_id(user_telegram_id)
+    if not user_row:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    user_id = user_row['id']
+    
+    result = db.remove_event_signup(event_id, user_id)
+    
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Отмена не удалась'))
+
+
+@app.get("/api/events/{event_uuid}")
+async def get_event(event_uuid: str, request: Request):
+    """
+    Получение события по UUID (новая архитектура events)
+    """
+    event = db.get_event_by_uuid(event_uuid)
+    if not event:
+        raise HTTPException(status_code=404, detail="Событие не найдено")
+    
+    # Получаем участников
+    participants = db.get_event_participants(event['id'])
+    event['participants'] = participants
+    event['registered_count'] = len([p for p in participants if p.get('status') == 'registered'])
+    event['waitlist_count'] = len([p for p in participants if p.get('status') == 'waitlist'])
+    
+    # Проверяем авторизацию
+    user = get_current_user_from_access_token(request)
+    if user:
+        user_telegram_id = user.get('telegram_id')
+        user_participant = next((p for p in participants if p.get('telegram_id') == user_telegram_id), None)
+        event['user_status'] = user_participant['status'] if user_participant else None
+        event['is_guest'] = user_participant.get('is_guest', False) if user_participant else False
+    
+    return event
+
+
+# ==================== Старая архитектура: API для тренировок ====================
 
 @app.post("/api/user/calendar/register")
 async def register_for_training(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Запись на тренировку
+    Запись на тренировку (старая архитектура, для обратной совместимости)
     """
     require_auth(user)
 
@@ -1021,7 +1908,7 @@ async def register_for_training(request: Request, user: dict = Depends(get_curre
     result = db.register_for_training(
         training_id, training_date, training_time, chat_id, topic_id, user_telegram_id
     )
-    
+
     if result.get('success'):
         return {"success": True, "status": result.get('status')}
     else:
@@ -1031,22 +1918,22 @@ async def register_for_training(request: Request, user: dict = Depends(get_curre
 @app.post("/api/user/calendar/unregister")
 async def unregister_from_training(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Отписка от тренировки
+    Отписка от тренировки (старая архитектура, для обратной совместимости)
     """
     require_auth(user)
-    
+
     body = await request.json()
     training_date = body.get('training_date')
     training_time = body.get('training_time')
     chat_id = body.get('chat_id')
-    
+
     if not all([training_date, training_time, chat_id]):
         raise HTTPException(status_code=400, detail="Missing required fields")
-    
+
     user_telegram_id = user.get('telegram_id')
-    
+
     result = db.unregister_from_training(training_date, training_time, chat_id, user_telegram_id)
-    
+
     if result.get('success'):
         return {"success": True}
     else:
@@ -1243,13 +2130,28 @@ async def remove_one_time_training(training_id: str, user: dict = Depends(get_cu
     Удаление разовой тренировки (только админы)
     """
     require_admin(user)
-    
+
     result = db.remove_one_time_training(training_id)
-    
+
     if result.get('success'):
         return result
     else:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove training'))
+
+
+@app.delete("/api/admin/events/{event_id}")
+async def remove_event(event_id: int, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Удаление события (только админы)
+    """
+    require_admin(user)
+
+    result = db.remove_event(event_id)
+
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove event'))
 
 
 @app.get("/api/admin/trainings")
@@ -1478,16 +2380,97 @@ async def get_game(
     Получение информации об игре
     """
     require_auth(user)
-    
+
     game = db.get_game(game_id)
     if not game:
         raise HTTPException(status_code=404, detail="Игра не найдена")
-    
-    # Добавляем список записавшихся
+
+    # Проверяем, является ли пользователь гостем и имеет ли доступ к этой тренировке
+    is_guest = user.get('is_guest', False)
+    if is_guest:
+        telegram_id = user.get('telegram_id')
+        game_uuid = game.get('uuid')
+        # Проверяем, записан ли гость на эту тренировку
+        is_signed_up = db.is_guest_signed_up(telegram_id, game_uuid)
+        if not is_signed_up:
+            logger.warning(f"Гость {telegram_id} попытался получить доступ к тренировке {game_uuid}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Доступ запрещён. Вы можете просматривать только тренировки, на которые записаны."
+            )
+
+    # Добавляем список записавшихся с флагом is_guest
     signups = db.get_game_signups(game_id)
+
+    # Добавляем is_guest для каждого участника
+    for signup in signups:
+        signup_telegram_id = signup.get('user_telegram_id')
+        signup['is_guest'] = db.is_guest(signup_telegram_id) if signup_telegram_id else False
+
     game['signups'] = signups
     
+    # Проверяем записан ли текущий пользователь
+    if user:
+        user_telegram_id = user.get('telegram_id')
+        user_signup = next((s for s in signups if s.get('user_telegram_id') == user_telegram_id), None)
+        game['user_status'] = user_signup['status'] if user_signup else None
+    else:
+        game['user_status'] = None
+
     return {"game": game}
+
+
+@app.get("/api/trainings/{training_uuid}")
+async def get_training_by_uuid(
+    training_uuid: str,
+    request: Request
+):
+    """
+    Получение тренировки по UUID
+
+    Гости могут просматривать любую тренировку по UUID (UUID случайный, его нельзя подобрать)
+    """
+    # Получаем пользователя из токена (опционально)
+    user = get_current_user_from_access_token(request)
+    
+    # Если пользователь не авторизован — проверяем, гость ли это
+    if not user:
+        # Проверяем cookie напрямую
+        from fastapi import Cookie
+        access_token = request.cookies.get("access_token")
+        if access_token:
+            try:
+                payload = decode_token(access_token, "access")
+                telegram_id = payload.get("sub")
+                if telegram_id:
+                    user = db.get_user_by_telegram_id(int(telegram_id))
+                    # Проверяем, гость ли это
+                    if not user and db.is_guest(int(telegram_id)):
+                        guest = db.get_guest_by_telegram(int(telegram_id))
+                        user = {**guest, 'is_guest': True}
+            except:
+                pass
+    
+    # Гости могут видеть любую тренировку по UUID (без ограничений)
+    # UUID случайный, его нельзя подобрать
+    
+    # Получаем тренировку по UUID
+    training = db.get_training_by_uuid(training_uuid)
+    if not training:
+        raise HTTPException(status_code=404, detail="Тренировка не найдена")
+
+    # Нормализуем поля для фронтенда
+    # Для scheduled_trainings и one_time_trainings
+    if 'training_date' in training:
+        training['date'] = training['training_date']
+    if 'training_time' in training:
+        training['time'] = training['training_time']
+
+    # Добавляем список участников с флагом is_guest
+    participants = db.get_training_participants(training_uuid)
+    training['participants'] = participants
+
+    return {"training": training}
 
 
 @app.post("/api/admin/games")

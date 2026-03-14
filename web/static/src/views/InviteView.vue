@@ -37,12 +37,14 @@
               {{ formatDate(code.created_at) }}
             </td>
             <td class="py-3 px-4 text-sm text-gray-700">
-              {{ code.expires_at ? formatDate(code.expires_at) : "∞" }}
+              {{ code.expires_at ? formatDate(code.expires_at) : '∞' }}
             </td>
             <td class="py-3 px-4 text-sm text-gray-700">
               <div v-if="code.used_by" class="flex flex-col gap-1">
                 <span class="font-medium text-gray-900">{{ getUserName(code) }}</span>
-                <span v-if="code.used_user_username" class="text-xs text-gray-500">@{{ code.used_user_username }}</span>
+                <span v-if="code.used_user_username" class="text-xs text-gray-500"
+                  >@{{ code.used_user_username }}</span
+                >
               </div>
               <span v-else class="text-gray-400">—</span>
             </td>
@@ -118,160 +120,162 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { useNotificationsStore } from "@/stores/notifications";
-import { useConfirmStore } from "@/stores/confirm";
+import { ref, onMounted } from 'vue'
+import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirmStore } from '@/stores/confirm'
 
-const codes = ref([]);
-const loading = ref(false);
-const showCreateModal = ref(false);
-const selectedExpiresIn = ref(null);
+const codes = ref([])
+const loading = ref(false)
+const showCreateModal = ref(false)
+const selectedExpiresIn = ref(null)
 
-const notificationsStore = useNotificationsStore();
-const confirmStore = useConfirmStore();
+const notificationsStore = useNotificationsStore()
+const confirmStore = useConfirmStore()
 
 onMounted(() => {
-  loadCodes();
-});
+  loadCodes()
+})
 
 const loadCodes = async () => {
-  loading.value = true;
+  loading.value = true
 
   try {
-    const response = await fetch("/api/admin/invite", {
-      credentials: "include",
-    });
+    const response = await fetch('/api/admin/invite', {
+      credentials: 'include',
+    })
 
     if (!response.ok) {
-      throw new Error("Failed to load codes");
+      throw new Error('Failed to load codes')
     }
 
-    const data = await response.json();
-    codes.value = data.codes || [];
+    const data = await response.json()
+    codes.value = data.codes || []
   } catch (error) {
-    console.error("Error loading codes:", error);
+    console.error('Error loading codes:', error)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const createInviteCode = async () => {
   try {
-    const response = await fetch("/api/admin/invite", {
-      method: "POST",
+    const response = await fetch('/api/admin/invite', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
-      credentials: "include",
+      credentials: 'include',
       body: JSON.stringify({
         expires_in_days: selectedExpiresIn.value,
       }),
-    });
+    })
 
-    const result = await response.json();
+    const result = await response.json()
 
     if (response.ok && result.success) {
-      showCreateModal.value = false;
-      selectedExpiresIn.value = null;
-      loadCodes();
-      notificationsStore.success("Приглашение создано");
+      showCreateModal.value = false
+      selectedExpiresIn.value = null
+      loadCodes()
+      notificationsStore.success('Приглашение создано')
     } else {
-      notificationsStore.error(result.detail || "Ошибка создания");
+      notificationsStore.error(result.detail || 'Ошибка создания')
     }
   } catch (error) {
-    console.error("Error creating code:", error);
-    notificationsStore.error("Ошибка создания приглашения");
+    console.error('Error creating code:', error)
+    notificationsStore.error('Ошибка создания приглашения')
   }
-};
+}
 
 const deactivateCode = async (code) => {
-  const confirmed = await confirmStore.danger("Отозвать это приглашение?", { confirmText: 'Отозвать' });
-  if (!confirmed) return;
+  const confirmed = await confirmStore.danger('Отозвать это приглашение?', {
+    confirmText: 'Отозвать',
+  })
+  if (!confirmed) return
 
   try {
     const response = await fetch(`/api/admin/invite/${code}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+      method: 'DELETE',
+      credentials: 'include',
+    })
 
-    const result = await response.json();
+    const result = await response.json()
 
     if (response.ok && result.success) {
-      loadCodes();
-      notificationsStore.success("Приглашение отозвано");
+      loadCodes()
+      notificationsStore.success('Приглашение отозвано')
     } else {
-      notificationsStore.error(result.detail || "Ошибка отзыва");
+      notificationsStore.error(result.detail || 'Ошибка отзыва')
     }
   } catch (error) {
-    console.error("Error deactivating code:", error);
-    notificationsStore.error("Ошибка отзыва приглашения");
+    console.error('Error deactivating code:', error)
+    notificationsStore.error('Ошибка отзыва приглашения')
   }
-};
+}
 
 const copyLink = async (code) => {
-  const url = `${window.location.origin}/invite/${code}`;
+  const url = `${window.location.origin}/invite/${code}`
   try {
-    await navigator.clipboard.writeText(url);
-    notificationsStore.success("Ссылка скопирована в буфер обмена");
+    await navigator.clipboard.writeText(url)
+    notificationsStore.success('Ссылка скопирована в буфер обмена')
   } catch (error) {
-    console.error("Error copying link:", error);
-    notificationsStore.error("Не удалось скопировать ссылку");
+    console.error('Error copying link:', error)
+    notificationsStore.error('Не удалось скопировать ссылку')
   }
-};
+}
 
 const formatDate = (dateStr) => {
-  if (!dateStr) return "—";
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 const getStatusClass = (code) => {
   if (!code.enabled) {
-    return "bg-gray-100 text-gray-700";
+    return 'bg-gray-100 text-gray-700'
   }
   if (code.used_by) {
-    return "bg-gray-100 text-gray-700";
+    return 'bg-gray-100 text-gray-700'
   }
   if (code.expires_at) {
-    const expires = new Date(code.expires_at);
+    const expires = new Date(code.expires_at)
     if (expires < new Date()) {
-      return "bg-red-100 text-red-700";
+      return 'bg-red-100 text-red-700'
     }
   }
-  return "bg-teal-100 text-teal-700";
-};
+  return 'bg-teal-100 text-teal-700'
+}
 
 const isExpired = (code) => {
-  if (!code.expires_at) return false;
-  return new Date(code.expires_at) < new Date();
-};
+  if (!code.expires_at) return false
+  return new Date(code.expires_at) < new Date()
+}
 
 const getStatusText = (code) => {
   if (code.used_by) {
-    return "Принят";
+    return 'Принят'
   }
   if (!code.enabled) {
-    return "Отозван";
+    return 'Отозван'
   }
   if (code.expires_at) {
-    const expires = new Date(code.expires_at);
+    const expires = new Date(code.expires_at)
     if (expires < new Date()) {
-      return "Истёк";
+      return 'Истёк'
     }
   }
-  return "Активен";
-};
+  return 'Активен'
+}
 
 const getUserName = (code) => {
-  if (!code) return '';
-  const first = code.used_user_first_name || '';
-  const last = code.used_user_last_name || '';
-  return `${first} ${last}`.trim() || 'Аноним';
-};
+  if (!code) return ''
+  const first = code.used_user_first_name || ''
+  const last = code.used_user_last_name || ''
+  return `${first} ${last}`.trim() || 'Аноним'
+}
 </script>

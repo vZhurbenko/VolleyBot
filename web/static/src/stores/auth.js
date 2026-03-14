@@ -11,7 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function checkAuth() {
     try {
       const response = await fetch('/api/auth/me', {
-        credentials: 'include'
+        credentials: 'include',
       })
       if (response.ok) {
         user.value = await response.json()
@@ -26,11 +26,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Автоматическая проверка при создании store
+  checkAuth()
+
   async function logout() {
     try {
       await fetch('/api/auth/logout', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
       })
       user.value = null
     } catch (error) {
@@ -49,6 +52,6 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     checkAuth,
     logout,
-    setUser
+    setUser,
   }
 })

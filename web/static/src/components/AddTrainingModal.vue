@@ -1,10 +1,18 @@
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="$emit('close')">
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click="$emit('close')"
+  >
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
       <!-- Заголовок -->
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+      <div
+        class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white"
+      >
         <h3 class="text-lg font-semibold text-gray-900">Добавить тренировку</h3>
-        <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
+        <button
+          @click="$emit('close')"
+          class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+        >
           ✕
         </button>
       </div>
@@ -112,16 +120,16 @@ import { useNotificationsStore } from '@/stores/notifications'
 const props = defineProps({
   date: {
     type: String,
-    default: ''
+    default: '',
   },
   defaultChatId: {
     type: String,
-    default: ''
+    default: '',
   },
   defaultTopicId: {
     type: Number,
-    default: null
-  }
+    default: null,
+  },
 })
 
 const emit = defineEmits(['close', 'add'])
@@ -138,11 +146,17 @@ const formData = ref({
   topic_id: props.defaultTopicId !== undefined ? props.defaultTopicId : null,
   start_time: '',
   end_time: '',
-  location: 'ВГАФК'
+  location: 'ВГАФК',
 })
 
 const handleSubmit = () => {
-  if (!formData.value.training_date || !formData.value.name || !formData.value.chat_id || !formData.value.start_time || !formData.value.end_time) {
+  if (
+    !formData.value.training_date ||
+    !formData.value.name ||
+    !formData.value.chat_id ||
+    !formData.value.start_time ||
+    !formData.value.end_time
+  ) {
     notificationsStore.error('Заполните обязательные поля')
     return
   }
@@ -154,7 +168,7 @@ const handleSubmit = () => {
     ...formData.value,
     training_time,
     location: formData.value.location || 'ВГАФК',
-    topic_id: formData.value.topic_id ? parseInt(formData.value.topic_id) : null
+    topic_id: formData.value.topic_id ? parseInt(formData.value.topic_id) : null,
   })
 }
 </script>

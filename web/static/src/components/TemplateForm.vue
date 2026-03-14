@@ -77,7 +77,9 @@
         </div>
 
         <div class="flex flex-col gap-2">
-          <label class="block text-sm font-medium text-gray-700">Topic ID по умолчанию (опционально)</label>
+          <label class="block text-sm font-medium text-gray-700"
+            >Topic ID по умолчанию (опционально)</label
+          >
           <input
             v-model.number="form.default_topic_id"
             type="number"
@@ -88,7 +90,10 @@
       </div>
 
       <div class="pt-6 border-t border-gray-200 flex justify-end gap-2">
-        <button @click="handleSave" class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700">
+        <button
+          @click="handleSave"
+          class="h-11 px-6 rounded font-medium transition-colors bg-teal-600 text-white hover:bg-teal-700"
+        >
           Сохранить
         </button>
       </div>
@@ -102,8 +107,8 @@ import { ref, watch } from 'vue'
 const props = defineProps({
   template: {
     type: Object,
-    default: null
-  }
+    default: null,
+  },
 })
 
 const emit = defineEmits(['save'])
@@ -117,26 +122,31 @@ const defaultForm = {
   options: ['Буду', '50/50', 'Не буду'],
   enabled: true,
   default_chat_id: '',
-  default_topic_id: null
+  default_topic_id: null,
 }
 
 const form = ref({ ...defaultForm })
 
-watch(() => props.template, (newTemplate) => {
-  if (newTemplate) {
-    form.value = {
-      name: newTemplate.name || '',
-      description: newTemplate.description || '',
-      training_day: newTemplate.training_day || '',
-      poll_day: newTemplate.poll_day || '',
-      training_time: newTemplate.training_time || '',
-      options: newTemplate.options || ['Буду', '50/50', 'Не буду'],
-      enabled: newTemplate.enabled !== false,
-      default_chat_id: newTemplate.default_chat_id || '',
-      default_topic_id: newTemplate.default_topic_id !== undefined ? newTemplate.default_topic_id : null
+watch(
+  () => props.template,
+  (newTemplate) => {
+    if (newTemplate) {
+      form.value = {
+        name: newTemplate.name || '',
+        description: newTemplate.description || '',
+        training_day: newTemplate.training_day || '',
+        poll_day: newTemplate.poll_day || '',
+        training_time: newTemplate.training_time || '',
+        options: newTemplate.options || ['Буду', '50/50', 'Не буду'],
+        enabled: newTemplate.enabled !== false,
+        default_chat_id: newTemplate.default_chat_id || '',
+        default_topic_id:
+          newTemplate.default_topic_id !== undefined ? newTemplate.default_topic_id : null,
+      }
     }
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 const handleSave = () => {
   emit('save', { ...form.value })

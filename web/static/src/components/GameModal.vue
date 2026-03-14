@@ -1,11 +1,22 @@
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="$emit('close')">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-auto" @click.stop>
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click="handleClose"
+  >
+    <div
+      class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-auto"
+      @click.stop
+    >
       <!-- Заголовок -->
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+      <div
+        class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white"
+      >
         <div>
           <h3 class="text-lg font-semibold text-gray-900">{{ game?.name || 'Игра' }}</h3>
-          <p class="text-sm text-gray-500">{{ formatDate(game?.date) }}<span v-if="game?.start_time"> • {{ game.start_time }}</span></p>
+          <p class="text-sm text-gray-500">
+            {{ formatDate(game?.date)
+            }}<span v-if="game?.start_time"> • {{ game.start_time }}{{ game.end_time ? ' - ' + game.end_time : '' }}</span>
+          </p>
           <p v-if="game?.opponent" class="text-sm text-gray-600 mt-1">vs {{ game.opponent }}</p>
           <p v-if="game?.location" class="text-sm text-gray-600">{{ game.location }}</p>
         </div>
@@ -17,7 +28,10 @@
           >
             <Link class="w-4 h-4 text-gray-600" />
           </button>
-          <button @click="$emit('close')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100">
+          <button
+            @click="handleClose"
+            class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+          >
             <X class="w-4 h-4 text-gray-600" />
           </button>
         </div>
@@ -70,37 +84,54 @@
                 {{ signup.first_name }} {{ signup.last_name || '' }}
                 <span v-if="signup.username" class="text-gray-400">@{{ signup.username }}</span>
               </span>
+              <!-- Значок роли -->
+              <Shield
+                v-if="signup.is_admin"
+                class="w-4 h-4 text-purple-600 flex-shrink-0"
+                title="Администратор"
+              />
+              <BadgeCheck
+                v-else-if="!signup.is_guest"
+                class="w-4 h-4 text-teal-600 flex-shrink-0"
+                title="Участник"
+              />
+              <User
+                v-else
+                class="w-4 h-4 text-blue-600 flex-shrink-0"
+                title="Гость"
+              />
             </div>
           </div>
         </div>
-        <div v-else class="text-gray-500 text-sm text-center py-4">
-          Пока никто не записался
-        </div>
+        <div v-else class="text-gray-500 text-sm text-center py-4">Пока никто не записался</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { X, Trophy, Link } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { X, Trophy, Link, Shield, User, BadgeCheck } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
 
 const props = defineProps({
   game: {
     type: Object,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const emit = defineEmits(['close', 'signup', 'update-game'])
 
+const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
 
 const isSignedUp = computed(() => {
-  return props.game?.signups?.some(s => s.user_telegram_id === authStore.user?.telegram_id)
+  return props.game?.signups?.some((s) => s.user_telegram_id === authStore.user?.telegram_id)
 })
 
 const actionButtonClass = computed(() => {
@@ -120,25 +151,33 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
-    weekday: 'short'
+    weekday: 'short',
   })
 }
 
 const getResultClass = (result) => {
   switch (result) {
-    case 'win': return 'bg-green-100 text-green-800 border border-green-200'
-    case 'loss': return 'bg-red-100 text-red-800 border border-red-200'
-    case 'draw': return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-    default: return 'bg-gray-100 text-gray-800 border border-gray-200'
+    case 'win':
+      return 'bg-green-100 text-green-800 border border-green-200'
+    case 'loss':
+      return 'bg-red-100 text-red-800 border border-red-200'
+    case 'draw':
+      return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+    default:
+      return 'bg-gray-100 text-gray-800 border border-gray-200'
   }
 }
 
 const getResultText = (result) => {
   switch (result) {
-    case 'win': return 'Победа'
-    case 'loss': return 'Поражение'
-    case 'draw': return 'Ничья'
-    default: return result
+    case 'win':
+      return 'Победа'
+    case 'loss':
+      return 'Поражение'
+    case 'draw':
+      return 'Ничья'
+    default:
+      return result
   }
 }
 
@@ -153,12 +192,64 @@ const handleSignup = () => {
 }
 
 const shareGame = () => {
-  // Генерируем ссылку на игру в календаре
-  const url = `${window.location.origin}/dashboard/calendar?game_id=${props.game?.id}`
-  navigator.clipboard.writeText(url).then(() => {
-    notificationsStore.success('Ссылка скопирована в буфер обмена')
-  }).catch(() => {
-    notificationsStore.error('Не удалось скопировать ссылку')
-  })
+  // Генерируем универсальную ссылку /t/{uuid}
+  // Бэкенд сам определит куда редиректить: гостя на страницу гостя, пользователя в модалку
+  if (props.game?.uuid) {
+    const url = `${window.location.origin}/t/${props.game.uuid}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        notificationsStore.success('Ссылка скопирована в буфер обмена')
+      })
+      .catch(() => {
+        notificationsStore.error('Не удалось скопировать ссылку')
+      })
+  } else {
+    // Фоллбэк на старую ссылку если uuid нет
+    const url = `${window.location.origin}/dashboard/calendar?game_id=${props.game?.id}`
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        notificationsStore.success('Ссылка скопирована в буфер обмена')
+      })
+      .catch(() => {
+        notificationsStore.error('Не удалось скопировать ссылку')
+      })
+  }
 }
+
+const handleClose = () => {
+  console.log('[GameModal] handleClose вызван')
+  console.log('[GameModal] route.query:', route.query)
+  
+  // Сначала закрываем модалку
+  emit('close')
+  console.log('[GameModal] emit(close) вызван')
+  
+  // Затем очищаем параметр training из URL (не game_id!)
+  const newQuery = { ...route.query }
+  delete newQuery.training
+  console.log('[GameModal] Новый query:', newQuery)
+  
+  // Используем router.replace для обновления URL
+  router.replace({ query: newQuery })
+  console.log('[GameModal] router.replace вызван')
+}
+
+// Обработчик нажатия клавиш
+const handleKeydown = (e) => {
+  if (e.key === 'Escape') {
+    handleClose()
+  }
+}
+
+// Подписка на события клавиатуры при монтировании
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+// Очистка при размонтировании
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>

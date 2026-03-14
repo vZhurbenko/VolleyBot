@@ -8,9 +8,7 @@
       >
         <ChevronLeft class="w-5 h-5" />
       </button>
-      <h2 class="text-lg font-semibold text-gray-900">
-        {{ monthName }} {{ currentYear }}
-      </h2>
+      <h2 class="text-lg font-semibold text-gray-900">{{ monthName }} {{ currentYear }}</h2>
       <button
         @click="nextMonth"
         class="p-2 rounded hover:bg-gray-200 transition-colors font-medium"
@@ -33,11 +31,7 @@
     <!-- Дни месяца -->
     <div class="grid grid-cols-7 gap-px bg-gray-200">
       <!-- Пустые ячейки для дней предыдущего месяца -->
-      <div
-        v-for="n in firstDayOffset"
-        :key="'empty-' + n"
-        class="min-h-[100px] bg-gray-50"
-      ></div>
+      <div v-for="n in firstDayOffset" :key="'empty-' + n" class="min-h-[100px] bg-gray-50"></div>
 
       <!-- Дни месяца -->
       <div
@@ -47,7 +41,10 @@
         :class="{ 'bg-gray-50': isWeekend(day) }"
       >
         <div class="flex items-center justify-between mb-1 min-h-[20px]">
-          <div class="text-sm font-semibold" :class="isWeekend(day) ? 'text-red-600' : 'text-gray-900'">
+          <div
+            class="text-sm font-semibold"
+            :class="isWeekend(day) ? 'text-red-600' : 'text-gray-900'"
+          >
             {{ day }}
           </div>
           <!-- Кнопка добавления для админов -->
@@ -84,8 +81,12 @@
             :class="getGameClass(game, day)"
           >
             <div class="font-medium truncate">{{ game.name }}</div>
-            <div v-if="game.opponent" class="text-[10px] truncate opacity-75">vs {{ game.opponent }}</div>
-            <div v-if="game.start_time" class="text-[10px] truncate opacity-75">{{ game.start_time }}</div>
+            <div v-if="game.opponent" class="text-[10px] truncate opacity-75">
+              vs {{ game.opponent }}
+            </div>
+            <div v-if="game.start_time" class="text-[10px] truncate opacity-75">
+              {{ game.start_time }}
+            </div>
             <div class="text-[10px] truncate opacity-75">{{ game.registered_count }} запис.</div>
           </div>
         </div>
@@ -101,43 +102,57 @@ import { Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 const props = defineProps({
   trainings: {
     type: Array,
-    default: () => []
+    default: () => [],
   },
   games: {
     type: Array,
-    default: () => []
+    default: () => [],
   },
   year: {
     type: Number,
-    required: true
+    required: true,
   },
   month: {
     type: Number,
-    required: true
+    required: true,
   },
   isAdmin: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 })
 
 const emit = defineEmits(['click-training', 'click-game', 'update-month', 'add-training'])
 
 // Следим за изменением пропсов year и month
-watch([() => props.year, () => props.month], ([newYear, newMonth]) => {
-  // Проверяем, что год корректный (не 1900-е годы)
-  if (newYear && newYear > 2000 && newMonth >= 1 && newMonth <= 12) {
-    // Props уже обновлены через v-model, watch нужен для валидации
-  }
-}, { immediate: true })
+watch(
+  [() => props.year, () => props.month],
+  ([newYear, newMonth]) => {
+    // Проверяем, что год корректный (не 1900-е годы)
+    if (newYear && newYear > 2000 && newMonth >= 1 && newMonth <= 12) {
+      // Props уже обновлены через v-model, watch нужен для валидации
+    }
+  },
+  { immediate: true },
+)
 
 const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
 // Используем props напрямую для реактивности
 const monthName = computed(() => {
   const months = [
-    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+    'Январь',
+    'Февраль',
+    'Март',
+    'Апрель',
+    'Май',
+    'Июнь',
+    'Июль',
+    'Август',
+    'Сентябрь',
+    'Октябрь',
+    'Ноябрь',
+    'Декабрь',
   ]
   return months[props.month - 1]
 })
@@ -160,12 +175,12 @@ const previousMonth = () => {
   // Вычисляем предыдущий месяц на основе props
   let prevYear = props.year
   let prevMonth = props.month - 1
-  
+
   if (prevMonth < 1) {
     prevMonth = 12
     prevYear = props.year - 1
   }
-  
+
   emit('update-month', { year: prevYear, month: prevMonth })
 }
 
@@ -173,12 +188,12 @@ const nextMonth = () => {
   // Вычисляем следующий месяц на основе props
   let nextYear = props.year
   let nextMonth = props.month + 1
-  
+
   if (nextMonth > 12) {
     nextMonth = 1
     nextYear = props.year + 1
   }
-  
+
   emit('update-month', { year: nextYear, month: nextMonth })
 }
 
@@ -206,7 +221,13 @@ const isPastTraining = (training) => {
   // Если есть start_time, сравниваем по времени
   if (training.start_time) {
     const [hours, minutes] = training.start_time.split(':').map(Number)
-    const trainingDateTime = new Date(props.year, props.month - 1, getDayFromTraining(training), hours, minutes)
+    const trainingDateTime = new Date(
+      props.year,
+      props.month - 1,
+      getDayFromTraining(training),
+      hours,
+      minutes,
+    )
     return trainingDateTime < now
   }
   // Если времени нет, сравниваем по дате (конец дня)
@@ -243,12 +264,12 @@ const isWeekend = (day) => {
 
 const getTrainingsForDay = (day) => {
   const dateStr = `${props.year}-${String(props.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-  return props.trainings.filter(t => t.date === dateStr)
+  return props.trainings.filter((t) => t.date === dateStr)
 }
 
 const getGamesForDay = (day) => {
   const dateStr = `${props.year}-${String(props.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-  return props.games.filter(g => g.date === dateStr)
+  return props.games.filter((g) => g.date === dateStr)
 }
 
 const getTrainingClass = (training, day) => {

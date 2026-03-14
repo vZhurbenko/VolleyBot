@@ -6,10 +6,7 @@
     </div>
 
     <!-- Календарь -->
-    <Calendar
-      :trainings="trainings"
-      @click-training="openTrainingModal"
-    />
+    <Calendar :trainings="trainings" @click-training="openTrainingModal" />
 
     <!-- Модалка тренировки -->
     <TrainingModal
@@ -47,24 +44,27 @@ onMounted(() => {
 })
 
 // Следим за изменением query параметров (месяц/год)
-watch(() => route.query, () => {
-  loadCalendar()
-})
+watch(
+  () => route.query,
+  () => {
+    loadCalendar()
+  },
+)
 
 const loadCalendar = async () => {
   loading.value = true
-  
+
   const now = new Date()
   const year = route.query.year || now.getFullYear()
   const month = route.query.month || now.getMonth() + 1
-  
+
   try {
     const response = await fetch(`/api/user/calendar?year=${year}&month=${month}`)
-    
+
     if (!response.ok) {
       throw new Error('Failed to load calendar')
     }
-    
+
     const data = await response.json()
     trainings.value = data.trainings || []
   } catch (error) {
@@ -85,29 +85,30 @@ const closeTrainingModal = () => {
 
 const registerForTraining = async () => {
   if (!selectedTraining.value) return
-  
+
   try {
     const response = await fetch('/api/user/calendar/register', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
         training_date: selectedTraining.value.date,
         training_time: selectedTraining.value.time,
         chat_id: selectedTraining.value.chat_id,
-        topic_id: selectedTraining.value.topic_id
-      })
+        topic_id: selectedTraining.value.topic_id,
+      }),
     })
-    
+
     const result = await response.json()
 
     if (response.ok && result.success) {
       selectedTraining.value.user_status = result.status
-      selectedTraining.value.registered_count = result.status === 'registered'
-        ? selectedTraining.value.registered_count + 1
-        : selectedTraining.value.registered_count
+      selectedTraining.value.registered_count =
+        result.status === 'registered'
+          ? selectedTraining.value.registered_count + 1
+          : selectedTraining.value.registered_count
       loadCalendar()
     } else {
       notificationsStore.error(result.detail || 'Ошибка записи')
@@ -125,28 +126,32 @@ const unregisterFromTraining = async () => {
     const response = await fetch('/api/user/calendar/unregister', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       credentials: 'include',
       body: JSON.stringify({
         training_date: selectedTraining.value.date,
         training_time: selectedTraining.value.time,
-        chat_id: selectedTraining.value.chat_id
-      })
+        chat_id: selectedTraining.value.chat_id,
+      }),
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
       selectedTraining.value.user_status = null
-      selectedTraining.value.registered_count = Math.max(0, selectedTraining.value.registered_count - 1)
+      selectedTraining.value.registered_count = Math.max(
+        0,
+        selectedTraining.value.registered_count - 1,
+      )
       // Перезагружаем календарь для обновления списка записавшихся
       await loadCalendar()
       // Находим обновлённую тренировку и обновляем selectedTraining
-      const updatedTraining = trainings.value.find(t =>
-        t.date === selectedTraining.value.date &&
-        t.time === selectedTraining.value.time &&
-        t.chat_id === selectedTraining.value.chat_id
+      const updatedTraining = trainings.value.find(
+        (t) =>
+          t.date === selectedTraining.value.date &&
+          t.time === selectedTraining.value.time &&
+          t.chat_id === selectedTraining.value.chat_id,
       )
       if (updatedTraining) {
         selectedTraining.value = { ...updatedTraining }
@@ -168,10 +173,13 @@ const removeOneTimeTraining = async () => {
   if (!confirmed) return
 
   try {
-    const response = await fetch(`/api/admin/calendar/remove-training/${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    })
+    const response = await fetch(
+      `/api/admin/calendar/remove-training/${selectedTraining.value.date}_${selectedTraining.value.time}_${selectedTraining.value.chat_id}`,
+      {
+        method: 'DELETE',
+        credentials: 'include',
+      },
+    )
 
     const result = await response.json()
 

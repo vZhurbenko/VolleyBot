@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import sys
+import uuid as uuid_module
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -83,10 +84,31 @@ class Database:
             )
         ''')
 
+        # Таблица пользователей для веб-авторизации
+        # is_admin: пользователь является администратором
+        # is_guest: пользователь является гостем (только для записи на тренировки)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_id INTEGER UNIQUE NOT NULL,
+                first_name TEXT NOT NULL,
+                last_name TEXT,
+                username TEXT,
+                photo_url TEXT,
+                is_admin INTEGER DEFAULT 0,
+                is_guest INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP
+            )
+        ''')
+
         # Таблица игр
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS games (
                 id TEXT PRIMARY KEY,
+                uuid TEXT UNIQUE NOT NULL,
                 name TEXT NOT NULL,
                 date TEXT NOT NULL,
                 location TEXT,
@@ -102,6 +124,47 @@ class Database:
             )
         ''')
 
+        # Таблица гостей
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS guests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_id INTEGER UNIQUE NOT NULL,
+                first_name TEXT NOT NULL,
+                last_name TEXT,
+                username TEXT,
+                photo_url TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Таблица записей гостей на тренировки (множественная запись)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS guest_signups (
+                id TEXT PRIMARY KEY,
+                user_telegram_id INTEGER NOT NULL,
+                training_uuid TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_telegram_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (training_uuid) REFERENCES games(uuid) ON DELETE CASCADE
+            )
+        ''')
+
+        # Индексы для guest_signups
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_guest_signups_telegram
+            ON guest_signups(user_telegram_id)
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_guest_signups_training
+            ON guest_signups(training_uuid)
+        ''')
+        cursor.execute('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_guest_signups_unique
+            ON guest_signups(user_telegram_id, training_uuid)
+        ''')
+
         # Таблица записей на игры
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS game_signups (
@@ -113,6 +176,42 @@ class Database:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Таблица регулярных тренировок
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scheduled_trainings (
+                id TEXT PRIMARY KEY,
+                uuid TEXT UNIQUE,
+                schedule_id TEXT NOT NULL,
+                training_date DATE NOT NULL,
+                training_time TEXT NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                chat_id TEXT NOT NULL,
+                topic_id INTEGER,
+                name TEXT,
+                location TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (schedule_id) REFERENCES poll_schedules(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Таблица разовых тренировок
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS one_time_trainings (
+                id TEXT PRIMARY KEY,
+                uuid TEXT UNIQUE,
+                training_date DATE NOT NULL,
+                training_time TEXT NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                chat_id TEXT NOT NULL,
+                topic_id INTEGER,
+                name TEXT,
+                location TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
@@ -154,39 +253,55 @@ class Database:
         self.conn.commit()
 
     def get_admin_ids(self) -> List[int]:
-        """Получение списка ID администраторов"""
-        admin_ids = self.get_setting('admin_user_ids', [])
-        return [int(id) for id in admin_ids]
+        """Получение списка ID администраторов из таблицы users"""
+        if not self.conn:
+            return []
+        
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT telegram_id FROM users WHERE is_admin = 1')
+        return [row['telegram_id'] for row in cursor.fetchall()]
 
     def set_admin_ids(self, admin_ids: List[int]):
-        """Сохранение списка ID администраторов"""
-        self.set_setting('admin_user_ids', [int(id) for id in admin_ids])
+        """Установка списка ID администраторов (полная замена)"""
+        if not self.conn:
+            return
+        
+        cursor = self.conn.cursor()
+        
+        # Снимаем статус админа со всех
+        cursor.execute('UPDATE users SET is_admin = 0')
+        
+        # Устанавливаем статус админа указанным пользователям
+        for admin_id in admin_ids:
+            cursor.execute('''
+                INSERT OR IGNORE INTO users (telegram_id, first_name, is_admin) 
+                VALUES (?, ?, 1)
+                ON CONFLICT(telegram_id) DO UPDATE SET is_admin = 1, updated_at = CURRENT_TIMESTAMP
+            ''', (admin_id, f'Admin {admin_id}'))
+        
+        self.conn.commit()
 
     def add_admin_id(self, admin_id: int):
         """Добавление ID администратора"""
-        admin_ids = self.get_admin_ids()
-        if admin_id not in admin_ids:
-            admin_ids.append(admin_id)
-            self.set_admin_ids(admin_ids)
+        if not self.conn:
+            return
         
-        # Обновляем is_admin в таблице users
-        if self.conn:
-            cursor = self.conn.cursor()
-            cursor.execute('UPDATE users SET is_admin = 1 WHERE telegram_id = ?', (admin_id,))
-            self.conn.commit()
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR IGNORE INTO users (telegram_id, first_name, is_admin) 
+            VALUES (?, ?, 1)
+            ON CONFLICT(telegram_id) DO UPDATE SET is_admin = 1, updated_at = CURRENT_TIMESTAMP
+        ''', (admin_id, f'Admin {admin_id}'))
+        self.conn.commit()
 
     def remove_admin_id(self, admin_id: int):
         """Удаление ID администратора"""
-        admin_ids = self.get_admin_ids()
-        if admin_id in admin_ids:
-            admin_ids.remove(admin_id)
-            self.set_admin_ids(admin_ids)
+        if not self.conn:
+            return
         
-        # Обновляем is_admin в таблице users
-        if self.conn:
-            cursor = self.conn.cursor()
-            cursor.execute('UPDATE users SET is_admin = 0 WHERE telegram_id = ?', (admin_id,))
-            self.conn.commit()
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE users SET is_admin = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?', (admin_id,))
+        self.conn.commit()
 
     def update_user_admin_status(self, telegram_id: int, is_admin: bool):
         """Обновление статуса администратора пользователя"""
@@ -360,6 +475,40 @@ class Database:
 
     # ==================== Методы миграции ====================
 
+    def migrate_games_uuid(self) -> Dict[str, Any]:
+        """
+        Миграция: добавление UUID для существующих записей в таблице games
+        
+        Returns:
+            Dict с результатом миграции (количество обновлённых записей)
+        """
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        try:
+            # Находим записи без UUID
+            cursor.execute('''
+                SELECT id FROM games WHERE uuid IS NULL
+            ''')
+            games_without_uuid = cursor.fetchall()
+            
+            updated_count = 0
+            for game in games_without_uuid:
+                game_id = game['id']
+                new_uuid = str(uuid_module.uuid4())
+                cursor.execute('''
+                    UPDATE games SET uuid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+                ''', (new_uuid, game_id))
+                updated_count += 1
+            
+            self.conn.commit()
+            logger.info(f"Миграция UUID завершена: обновлено {updated_count} записей")
+            return {"success": True, "updated_count": updated_count}
+        except Exception as e:
+            logger.error(f"Ошибка миграции UUID: {e}")
+            return {"success": False, "error": str(e)}
+
     def migrate_from_json(self, json_path: str = "data.json"):
         """Миграция данных из JSON файла в базу данных"""
         try:
@@ -414,73 +563,6 @@ class Database:
 
     # ==================== Методы для работы с пользователями (web auth) ====================
 
-    def create_tables(self):
-        """Создание таблиц если они не существуют"""
-        # Если БД не существует, создаём её
-        if not self.conn:
-            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.conn.row_factory = sqlite3.Row
-            logger.info(f"Создана база данных: {self.db_path}")
-
-        cursor = self.conn.cursor()
-
-        # Таблица настроек бота
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Таблица расписаний опросов
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS poll_schedules (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                chat_id TEXT NOT NULL,
-                message_thread_id INTEGER,
-                training_day TEXT NOT NULL,
-                start_time TEXT,
-                end_time TEXT,
-                location TEXT,
-                enabled INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Таблица активных опросов
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS active_polls (
-                id TEXT PRIMARY KEY,
-                chat_id TEXT NOT NULL,
-                message_id INTEGER NOT NULL,
-                message_thread_id INTEGER,
-                template_id TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Таблица пользователей для веб-авторизации
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                telegram_id INTEGER UNIQUE NOT NULL,
-                first_name TEXT NOT NULL,
-                last_name TEXT,
-                username TEXT,
-                photo_url TEXT,
-                is_admin INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP
-            )
-        ''')
-
-        self.conn.commit()
-        logger.info("Таблицы базы данных созданы/проверены")
-
     def add_user(
         self,
         telegram_id: int,
@@ -527,7 +609,8 @@ class Database:
         if row:
             user = dict(row)
             user['is_admin'] = bool(user['is_admin'])
-            user['is_active'] = bool(user['is_active']) if 'is_active' in user else True
+            user['is_guest'] = bool(user.get('is_guest', 0))
+            user['is_active'] = bool(user.get('is_active', 1))
             return user
         return None
 
@@ -610,6 +693,8 @@ class Database:
             user = dict(row)
             user['is_admin'] = bool(user['is_admin'])
             user['is_active'] = bool(user['is_active']) if 'is_active' in user else True
+            # Проверяем является ли пользователь гостем
+            user['is_guest'] = self.is_guest(user['telegram_id'])
             users.append(user)
 
         return users
@@ -626,24 +711,66 @@ class Database:
     # ==================== Методы для работы с тренировками ====================
 
     def get_training_registrations(self, training_date: str, training_time: str, chat_id: str) -> List[Dict[str, Any]]:
-        """Получение всех записей на тренировку"""
+        """Получение всех записей на тренировку (из training_registrations + guest_signups)"""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT tr.*, u.first_name, u.last_name, u.username, u.photo_url
-            FROM training_registrations tr
-            LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
-            WHERE tr.training_date = ? AND tr.training_time = ? AND tr.chat_id = ?
-            ORDER BY tr.registered_at ASC
-        ''', (training_date, training_time, chat_id))
         
-        return [dict(row) for row in cursor.fetchall()]
+        # Получаем UUID тренировки по дате, времени и chat_id
+        cursor.execute('''
+            SELECT uuid FROM one_time_trainings
+            WHERE training_date = ? AND training_time = ? AND chat_id = ?
+            LIMIT 1
+        ''', (training_date, training_time, chat_id))
+        row = cursor.fetchone()
+        
+        training_uuid = row['uuid'] if row else None
+        
+        # Если тренировка не найдена, пробуем scheduled_trainings
+        if not training_uuid:
+            cursor.execute('''
+                SELECT uuid FROM scheduled_trainings
+                WHERE training_date = ? AND training_time = ? AND chat_id = ?
+                LIMIT 1
+            ''', (training_date, training_time, chat_id))
+            row = cursor.fetchone()
+            training_uuid = row['uuid'] if row else None
+        
+        # Если UUID не найден, возвращаем пустой список
+        if not training_uuid:
+            return []
+        
+        # Получаем участников из guest_signups (новая архитектура)
+        cursor.execute('''
+            SELECT 
+                u.telegram_id as user_telegram_id,
+                gs.created_at as registered_at,
+                u.first_name,
+                u.last_name,
+                u.username,
+                u.photo_url,
+                u.is_admin,
+                u.is_guest,
+                'registered' as status
+            FROM guest_signups gs
+            JOIN users u ON gs.user_telegram_id = u.id
+            WHERE gs.training_uuid = ? AND u.is_active = 1
+            ORDER BY gs.created_at ASC
+        ''', (training_uuid,))
+
+        rows = [dict(row) for row in cursor.fetchall()]
+        # Преобразуем поля в bool
+        for row in rows:
+            if 'is_admin' in row:
+                row['is_admin'] = bool(row['is_admin'])
+            if 'is_guest' in row:
+                row['is_guest'] = bool(row['is_guest'])
+        return rows
 
     def register_for_training(self, training_id: str, training_date: str, training_time: str,
                               chat_id: str, topic_id: Optional[int], user_telegram_id: int) -> Dict[str, Any]:
-        """Запись на тренировку с проверкой лимита (12 человек)"""
+        """Запись на тренировку с проверкой лимита (12 человек) + дублирование в event_signups"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
 
@@ -688,6 +815,48 @@ class Database:
                     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ''', (training_id, training_date, training_time, chat_id, topic_id, user_telegram_id, status))
 
+            # НАХОДИМ event по uuid (для дублирования в event_signups)
+            cursor.execute('''
+                SELECT id FROM events
+                WHERE source_table IN ('scheduled_trainings', 'one_time_trainings')
+                  AND date = ? AND start_time = ? AND chat_id = ?
+                LIMIT 1
+            ''', (training_date, training_time, chat_id))
+            
+            event_row = cursor.fetchone()
+            if event_row:
+                event_id = dict(event_row)['id']
+
+                # Получаем user_id
+                cursor.execute('SELECT id, is_guest FROM users WHERE telegram_id = ?', (user_telegram_id,))
+                user_row = cursor.fetchone()
+                if user_row:
+                    user_row_dict = dict(user_row)
+                    user_id = user_row_dict['id']
+                    is_guest = bool(user_row_dict.get('is_guest', 0))
+
+                    # Проверяем существующую запись в event_signups
+                    cursor.execute('''
+                        SELECT id, status FROM event_signups
+                        WHERE event_id = ? AND user_id = ?
+                    ''', (event_id, user_id))
+
+                    event_signup = cursor.fetchone()
+                    if event_signup:
+                        event_signup_dict = dict(event_signup)
+                        # Обновляем статус
+                        cursor.execute('''
+                            UPDATE event_signups
+                            SET status = ?, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = ?
+                        ''', (status, event_signup_dict['id']))
+                    else:
+                        # Создаём новую запись
+                        cursor.execute('''
+                            INSERT INTO event_signups (event_id, user_id, status, is_guest, created_at)
+                            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        ''', (event_id, user_id, status, 1 if is_guest else 0))
+
             self.conn.commit()
 
             return {"success": True, "status": status}
@@ -695,23 +864,59 @@ class Database:
             logger.error(f"Ошибка записи на тренировку: {e}")
             return {"success": False, "error": str(e)}
 
-    def unregister_from_training(self, training_date: str, training_time: str, 
+    def unregister_from_training(self, training_date: str, training_time: str,
                                  chat_id: str, user_telegram_id: int) -> Dict[str, Any]:
-        """Отписка от тренировки с автоматическим зачислением из waitlist"""
+        """Отписка от тренировки с автоматическим зачислением из waitlist + удаление из event_signups"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
-        
+
         try:
-            # Удаляем запись
+            # Удаляем запись из training_registrations
             cursor.execute('''
                 DELETE FROM training_registrations
                 WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
             ''', (training_date, training_time, chat_id, user_telegram_id))
+
+            # НАХОДИМ event для удаления из event_signups
+            cursor.execute('''
+                SELECT id FROM events
+                WHERE source_table IN ('scheduled_trainings', 'one_time_trainings')
+                  AND date = ? AND start_time = ? AND chat_id = ?
+                LIMIT 1
+            ''', (training_date, training_time, chat_id))
             
+            event_row = cursor.fetchone()
+            if event_row:
+                event_id = dict(event_row)['id']
+
+                # Получаем user_id
+                cursor.execute('SELECT id FROM users WHERE telegram_id = ?', (user_telegram_id,))
+                user_row = cursor.fetchone()
+                if user_row:
+                    user_id = dict(user_row)['id']
+
+                    # Удаляем из event_signups
+                    cursor.execute('''
+                        DELETE FROM event_signups
+                        WHERE event_id = ? AND user_id = ?
+                    ''', (event_id, user_id))
+            
+            # Также удаляем из guest_signups (для обратной совместимости)
+            cursor.execute('''
+                DELETE FROM guest_signups
+                WHERE user_telegram_id = (SELECT id FROM users WHERE telegram_id = ?)
+                  AND training_uuid = (
+                    SELECT uuid FROM events 
+                    WHERE source_table IN ('scheduled_trainings', 'one_time_trainings')
+                      AND date = ? AND start_time = ? AND chat_id = ?
+                    LIMIT 1
+                  )
+            ''', (user_telegram_id, training_date, training_time, chat_id))
+
             self.conn.commit()
-            
+
             # Находим первого в waitlist и переводим в registered
             cursor.execute('''
                 SELECT id FROM training_registrations
@@ -719,7 +924,7 @@ class Database:
                 ORDER BY registered_at ASC
                 LIMIT 1
             ''', (training_date, training_time, chat_id))
-            
+
             waitlist_user = cursor.fetchone()
             if waitlist_user:
                 cursor.execute('''
@@ -728,7 +933,7 @@ class Database:
                     WHERE id = ?
                 ''', (waitlist_user['id'],))
                 self.conn.commit()
-            
+
             return {"success": True}
         except Exception as e:
             logger.error(f"Ошибка отписки от тренировки: {e}")
@@ -784,17 +989,43 @@ class Database:
             return {"success": False, "error": str(e)}
 
     def get_user_trainings(self, user_telegram_id: int) -> List[Dict[str, Any]]:
-        """Получение всех записей пользователя"""
+        """Получение всех записей пользователя на тренировки (из event_signups + training_registrations)"""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
+        
+        # Сначала получаем из event_signups (новая архитектура)
+        cursor.execute('''
+            SELECT 
+                e.date as training_date,
+                e.start_time as training_time,
+                e.end_time,
+                e.name as training_name,
+                e.location,
+                e.chat_id,
+                e.topic_id,
+                e.uuid,
+                es.status,
+                es.created_at as registered_at,
+                es.is_guest
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE u.telegram_id = ? AND e.event_type IN ('training', 'scheduled_training', 'one_time_training')
+            ORDER BY e.date ASC, e.start_time ASC
+        ''', (user_telegram_id,))
+        
+        rows = cursor.fetchall()
+        
+        # Дополняем из training_registrations (старая архитектура)
         cursor.execute('''
             SELECT tr.*,
                    tr.training_date,
                    ot.name as training_name,
                    ot.location,
-                   ps.name as schedule_name
+                   ps.name as schedule_name,
+                   0 as is_guest
             FROM training_registrations tr
             LEFT JOIN one_time_trainings ot
                 ON tr.training_date = ot.training_date
@@ -804,29 +1035,42 @@ class Database:
                 ON tr.chat_id = ps.chat_id
                 AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
             WHERE tr.user_telegram_id = ?
+              AND tr.registered_at > (SELECT COALESCE(MAX(created_at), 0) FROM event_signups)
             ORDER BY tr.training_date ASC, tr.training_time ASC
         ''', (user_telegram_id,))
-
-        return [dict(row) for row in cursor.fetchall()]
+        
+        rows.extend([dict(row) for row in cursor.fetchall()])
+        
+        return [dict(row) for row in rows]
 
     def add_one_time_training(self, training_id: str, training_date: str, training_time: str,
                               chat_id: str, topic_id: Optional[int], name: str,
                               start_time: Optional[str] = None, end_time: Optional[str] = None,
                               location: Optional[str] = None) -> Dict[str, Any]:
-        """Добавление разовой тренировки"""
+        """Добавление разовой тренировки + создание в events"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
 
         try:
+            import uuid as uuid_module
+            training_uuid = str(uuid_module.uuid4())
+
+            # Создаём в one_time_trainings
             cursor.execute('''
-                INSERT INTO one_time_trainings (id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (training_id, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location))
+                INSERT INTO one_time_trainings (id, uuid, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_uuid, training_date, training_time, chat_id, topic_id, name, start_time, end_time, location))
+
+            # Создаём в events
+            cursor.execute('''
+                INSERT INTO events (uuid, event_type, name, date, start_time, end_time, location, chat_id, topic_id, source_id, source_table, created_at)
+                VALUES (?, 'one_time_training', ?, ?, ?, ?, ?, ?, ?, ?, 'one_time_trainings', CURRENT_TIMESTAMP)
+            ''', (training_uuid, name, training_date, start_time, end_time, location, chat_id, topic_id, training_id))
 
             self.conn.commit()
-            return {"success": True}
+            return {"success": True, "uuid": training_uuid}
         except Exception as e:
             logger.error(f"Ошибка добавления разовой тренировки: {e}")
             return {"success": False, "error": str(e)}
@@ -909,16 +1153,19 @@ class Database:
         cursor = self.conn.cursor()
 
         try:
+            import uuid as uuid_module
+            training_uuid = str(uuid_module.uuid4())
+            
             cursor.execute('''
                 INSERT INTO scheduled_trainings
-                (id, schedule_id, training_date, training_time, start_time, end_time,
+                (id, uuid, schedule_id, training_date, training_time, start_time, end_time,
                  chat_id, topic_id, name, location, added_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (training_id, schedule_id, training_date, training_time,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (training_id, training_uuid, schedule_id, training_date, training_time,
                   start_time, end_time, chat_id, topic_id, name, location))
 
             self.conn.commit()
-            return {"success": True}
+            return {"success": True, "uuid": training_uuid}
         except Exception as e:
             logger.error(f"Ошибка добавления тренировки из расписания: {e}")
             return {"success": False, "error": str(e)}
@@ -965,16 +1212,47 @@ class Database:
         return dict(row) if row else None
 
     def get_all_trainings(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        """Получение всех записей на тренировки за период (для админа)"""
+        """Получение всех записей на тренировки за период (для админа) - из event_signups + training_registrations"""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
+        
+        # Сначала получаем из event_signups (новая архитектура)
+        cursor.execute('''
+            SELECT 
+                e.date as training_date,
+                e.start_time as training_time,
+                e.end_time,
+                e.chat_id,
+                e.topic_id,
+                e.name as training_name,
+                e.location,
+                es.status,
+                es.created_at as registered_at,
+                u.first_name,
+                u.last_name,
+                u.username,
+                NULL as schedule_name,
+                es.is_guest
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE e.event_type IN ('training', 'scheduled_training', 'one_time_training')
+              AND e.date BETWEEN ? AND ?
+              AND u.is_active = 1
+            ORDER BY e.date ASC, e.start_time ASC, es.created_at ASC
+        ''', (start_date, end_date))
+        
+        rows = [dict(row) for row in cursor.fetchall()]
+        
+        # Дополняем из training_registrations (старая архитектура)
         cursor.execute('''
             SELECT tr.*, u.first_name, u.last_name, u.username,
                    ot.name as training_name,
                    ot.location as location,
-                   ps.name as schedule_name
+                   ps.name as schedule_name,
+                   0 as is_guest
             FROM training_registrations tr
             LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
             LEFT JOIN one_time_trainings ot
@@ -985,28 +1263,62 @@ class Database:
                 ON tr.chat_id = ps.chat_id
                 AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
             WHERE tr.training_date BETWEEN ? AND ?
+              AND tr.registered_at > (SELECT COALESCE(MAX(created_at), 0) FROM event_signups)
             ORDER BY tr.training_date ASC, tr.training_time ASC, tr.registered_at ASC
         ''', (start_date, end_date))
-
-        return [dict(row) for row in cursor.fetchall()]
+        
+        rows.extend([dict(row) for row in cursor.fetchall()])
+        
+        return rows
 
     def get_all_game_signups(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        """Получение всех записей на игры за период (для админа)"""
+        """Получение всех записей на игры за период (для админа) - из event_signups + game_signups"""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
+        
+        # Сначала получаем из event_signups (новая архитектура)
+        cursor.execute('''
+            SELECT 
+                e.name as game_name,
+                e.date,
+                e.location,
+                e.start_time,
+                e.opponent,
+                es.status,
+                es.created_at,
+                u.first_name,
+                u.last_name,
+                u.username,
+                es.is_guest
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE e.event_type = 'game'
+              AND e.date BETWEEN ? AND ?
+              AND u.is_active = 1
+            ORDER BY e.date ASC, e.start_time ASC, es.created_at ASC
+        ''', (start_date, end_date))
+        
+        rows = [dict(row) for row in cursor.fetchall()]
+        
+        # Дополняем из game_signups (старая архитектура)
         cursor.execute('''
             SELECT gs.*, u.first_name, u.last_name, u.username,
-                   g.name as game_name, g.date, g.location, g.start_time, g.opponent
+                   g.name as game_name, g.date, g.location, g.start_time, g.opponent,
+                   0 as is_guest
             FROM game_signups gs
             LEFT JOIN users u ON gs.user_telegram_id = u.telegram_id
             LEFT JOIN games g ON gs.game_id = g.id
             WHERE g.date BETWEEN ? AND ?
+              AND gs.created_at > (SELECT COALESCE(MAX(created_at), 0) FROM event_signups)
             ORDER BY g.date ASC, g.start_time ASC, gs.created_at ASC
         ''', (start_date, end_date))
-
-        return [dict(row) for row in cursor.fetchall()]
+        
+        rows.extend([dict(row) for row in cursor.fetchall()])
+        
+        return rows
 
     # ==================== Методы для работы с пользователями (admin) ====================
 
@@ -1348,58 +1660,358 @@ class Database:
         return training_count + game_count
 
     def get_recent_activities(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Получение последних активностей (записи на тренировки и игры)"""
+        """Получение последних активностей (записи на тренировки и игры из event_signups)"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+
+        # Получаем последние записи из event_signups (новая архитектура)
+        cursor.execute('''
+            SELECT
+                e.date as activity_date,
+                e.start_time as activity_time,
+                e.chat_id,
+                es.status,
+                es.created_at as registered_at,
+                u.telegram_id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                CASE 
+                    WHEN e.event_type = 'game' THEN 'game'
+                    ELSE 'training'
+                END as activity_type,
+                e.name as event_name
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE u.is_active = 1
+            ORDER BY es.created_at DESC
+            LIMIT ?
+        ''', (limit,))
+
+        rows = cursor.fetchall()
+        
+        # Если записей мало, дополняем из старых таблиц (для обратной совместимости)
+        if len(rows) < limit:
+            # Дополняем из training_registrations
+            cursor.execute('''
+                SELECT
+                    tr.training_date as activity_date,
+                    tr.training_time as activity_time,
+                    tr.chat_id,
+                    tr.status,
+                    tr.registered_at,
+                    u.telegram_id,
+                    u.first_name,
+                    u.last_name,
+                    u.username,
+                    'training' as activity_type,
+                    COALESCE(ot.name, ps.name, 'Тренировка') as event_name
+                FROM training_registrations tr
+                LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
+                LEFT JOIN one_time_trainings ot
+                    ON tr.training_date = ot.training_date
+                    AND tr.training_time = ot.training_time
+                    AND tr.chat_id = ot.chat_id
+                LEFT JOIN poll_schedules ps
+                    ON tr.chat_id = ps.chat_id
+                    AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
+                WHERE u.is_active = 1
+                  AND tr.registered_at > (SELECT COALESCE(MAX(created_at), 0) FROM event_signups)
+                ORDER BY tr.registered_at DESC
+                LIMIT ?
+            ''', (limit - len(rows),))
+
+            rows.extend([dict(row) for row in cursor.fetchall()])
+
+        return [dict(row) for row in rows]
+
+    # ==================== Методы для работы с events (новая архитектура) ====================
+
+    def get_events(self, year: Optional[int] = None, month: Optional[int] = None,
+                   event_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Получение всех событий за месяц"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+
+        query = 'SELECT * FROM events WHERE 1=1'
+        params = []
+
+        if year and month:
+            query += ' AND strftime("%Y", date) = ? AND strftime("%m", date) = ?'
+            # Преобразуем в int и затем в строку с ведущим нулём
+            params.extend([str(int(year)), str(int(month)).zfill(2)])
+
+        if event_type:
+            query += ' AND event_type = ?'
+            params.append(event_type)
+
+        query += ' ORDER BY date ASC, start_time ASC'
+
+        cursor.execute(query, params)
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_event_by_uuid(self, event_uuid: str) -> Optional[Dict[str, Any]]:
+        """Получение события по UUID"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM events WHERE uuid = ?', (event_uuid,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def get_event_by_id(self, event_id: int) -> Optional[Dict[str, Any]]:
+        """Получение события по ID"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM events WHERE id = ?', (event_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def get_event_participants(self, event_id: int) -> List[Dict[str, Any]]:
+        """Получение всех участников события"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT es.*, u.telegram_id, u.first_name, u.last_name, u.username, u.photo_url, 
+                   u.is_admin, u.is_guest
+            FROM event_signups es
+            JOIN users u ON es.user_id = u.id
+            WHERE es.event_id = ? AND u.is_active = 1
+            ORDER BY es.created_at ASC
+        ''', (event_id,))
+        
+        participants = []
+        for row in cursor.fetchall():
+            participant = dict(row)
+            participant['is_admin'] = bool(participant.get('is_admin', 0))
+            participant['is_guest'] = bool(participant.get('is_guest', 0))
+            participants.append(participant)
+        
+        return participants
+
+    def add_event_signup(self, event_id: int, user_id: int, is_guest: bool = False) -> Dict[str, Any]:
+        """Запись пользователя на событие"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        
+        try:
+            # Проверяем, есть ли уже запись
+            cursor.execute('''
+                SELECT id, status FROM event_signups
+                WHERE event_id = ? AND user_id = ?
+            ''', (event_id, user_id))
+            
+            existing = cursor.fetchone()
+            if existing:
+                return {"success": True, "status": existing['status'], "message": "Уже записан"}
+            
+            # Получаем событие для проверки лимита
+            cursor.execute('SELECT * FROM events WHERE id = ?', (event_id,))
+            event = cursor.fetchone()
+            if not event:
+                return {"success": False, "error": "Событие не найдено"}
+            
+            # Считаем количество записанных (не включая waitlist)
+            cursor.execute('''
+                SELECT COUNT(*) as count FROM event_signups
+                WHERE event_id = ? AND status = 'registered'
+            ''', (event_id,))
+            
+            result = cursor.fetchone()
+            registered_count = result['count'] if result else 0
+            
+            # Определяем статус (лимит 12 человек)
+            status = 'registered' if registered_count < 12 else 'waitlist'
+            
+            # Создаём запись
+            cursor.execute('''
+                INSERT INTO event_signups (event_id, user_id, status, is_guest, created_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (event_id, user_id, status, 1 if is_guest else 0))
+            
+            self.conn.commit()
+            
+            return {"success": True, "status": status, "message": "Запись успешна"}
+            
+        except Exception as e:
+            logger.error(f"Ошибка записи на событие: {e}")
+            return {"success": False, "error": str(e)}
+
+    def remove_event_signup(self, event_id: int, user_id: int) -> Dict[str, Any]:
+        """Отмена записи на событие + удаление из старых таблиц"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Получаем информацию о событии
+            cursor.execute('SELECT event_type, source_table, source_id, date, start_time, chat_id FROM events WHERE id = ?', (event_id,))
+            event = cursor.fetchone()
+            
+            if not event:
+                return {"success": False, "error": "Событие не найдено"}
+
+            # Получаем telegram_id пользователя
+            cursor.execute('SELECT telegram_id FROM users WHERE id = ?', (user_id,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                return {"success": False, "error": "Пользователь не найден"}
+
+            telegram_id = dict(user_row)['telegram_id']
+            event_dict = dict(event)
+
+            # Удаляем из event_signups
+            cursor.execute('''
+                DELETE FROM event_signups
+                WHERE event_id = ? AND user_id = ?
+            ''', (event_id, user_id))
+
+            # Удаляем из старых таблиц в зависимости от типа события
+            if event_dict['event_type'] in ('training', 'scheduled_training', 'one_time_training'):
+                # Удаляем из training_registrations
+                cursor.execute('''
+                    DELETE FROM training_registrations
+                    WHERE user_telegram_id = ? AND training_date = ? AND training_time = ? AND chat_id = ?
+                ''', (telegram_id, event_dict['date'], event_dict['start_time'], event_dict['chat_id']))
+
+                # Удаляем из guest_signups
+                cursor.execute('''
+                    DELETE FROM guest_signups
+                    WHERE user_telegram_id = ? AND training_uuid = (SELECT uuid FROM events WHERE id = ?)
+                ''', (telegram_id, event_id))
+
+            elif event_dict['event_type'] == 'game':
+                # Удаляем из game_signups
+                cursor.execute('''
+                    DELETE FROM game_signups
+                    WHERE user_telegram_id = ? AND game_id = ?
+                ''', (telegram_id, event_dict['source_id']))
+
+            # Также удаляем напрямую из guest_signups по training_uuid если есть
+            if event_dict['source_table'] in ('scheduled_trainings', 'one_time_trainings'):
+                cursor.execute('''
+                    DELETE FROM guest_signups
+                    WHERE user_telegram_id = ? AND training_uuid = (SELECT uuid FROM events WHERE id = ?)
+                ''', (telegram_id, event_id))
+
+            self.conn.commit()
+
+            if cursor.rowcount > 0:
+                return {"success": True, "message": "Запись отменена"}
+            else:
+                return {"success": False, "error": "Запись не найдена"}
+
+        except Exception as e:
+            logger.error(f"Ошибка отмены записи: {e}")
+            return {"success": False, "error": str(e)}
+
+    def remove_event(self, event_id: int) -> Dict[str, Any]:
+        """Удаление события (только для администратора)"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Получаем информацию о событии
+            cursor.execute('SELECT event_type, uuid FROM events WHERE id = ?', (event_id,))
+            event = cursor.fetchone()
+
+            if not event:
+                # Событие не найдено в таблице events - пробуем удалить как старую тренировку
+                # Ищем в one_time_trainings по UUID
+                cursor.execute('''
+                    SELECT id FROM one_time_trainings WHERE uuid = ?
+                ''', (str(event_id),))
+                ottp = cursor.fetchone()
+                if ottp:
+                    return self.remove_one_time_training(ottp['id'])
+                
+                # Ищем в scheduled_trainings по UUID
+                cursor.execute('''
+                    SELECT id FROM scheduled_trainings WHERE uuid = ?
+                ''', (str(event_id),))
+                st = cursor.fetchone()
+                if st:
+                    return self.remove_scheduled_training(st['id'])
+                
+                return {"success": False, "error": "Тренировка не найдена"}
+
+            event_dict = dict(event)
+
+            # Удаляем все записи на это событие
+            cursor.execute('DELETE FROM event_signups WHERE event_id = ?', (event_id,))
+
+            # Удаляем из старых таблиц в зависимости от типа события
+            if event_dict['event_type'] in ('training', 'scheduled_training', 'one_time_training'):
+                # Удаляем из training_registrations
+                cursor.execute('''
+                    DELETE FROM training_registrations
+                    WHERE training_date = (SELECT date FROM events WHERE id = ?)
+                    AND training_time = (SELECT start_time FROM events WHERE id = ?)
+                    AND chat_id = (SELECT chat_id FROM events WHERE id = ?)
+                ''', (event_id, event_id, event_id))
+
+                # Удаляем из guest_signups по training_uuid
+                cursor.execute('''
+                    DELETE FROM guest_signups
+                    WHERE training_uuid = ?
+                ''', (event_dict['uuid'],))
+
+            elif event_dict['event_type'] == 'game':
+                # Удаляем из game_signups
+                cursor.execute('''
+                    DELETE FROM game_signups
+                    WHERE game_id = ?
+                ''', (event_dict['uuid'],))
+
+            # Удаляем само событие
+            cursor.execute('DELETE FROM events WHERE id = ?', (event_id,))
+
+            self.conn.commit()
+
+            return {"success": True, "message": "Событие удалено"}
+
+        except Exception as e:
+            logger.error(f"Ошибка удаления события: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_user_events(self, user_id: int, year: Optional[int] = None, 
+                        month: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Получение всех событий, на которые записан пользователь"""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
         
-        # Получаем последние записи на тренировки и игры
-        cursor.execute('''
-            SELECT
-                tr.training_date as activity_date,
-                tr.training_time as activity_time,
-                tr.chat_id,
-                tr.status,
-                tr.registered_at,
-                u.telegram_id,
-                u.first_name,
-                u.last_name,
-                u.username,
-                'training' as activity_type,
-                COALESCE(ot.name, ps.name, 'Тренировка') as event_name
-            FROM training_registrations tr
-            LEFT JOIN users u ON tr.user_telegram_id = u.telegram_id
-            LEFT JOIN one_time_trainings ot
-                ON tr.training_date = ot.training_date
-                AND tr.training_time = ot.training_time
-                AND tr.chat_id = ot.chat_id
-            LEFT JOIN poll_schedules ps
-                ON tr.chat_id = ps.chat_id
-                AND tr.training_time = (ps.start_time || ' - ' || ps.end_time)
-            
-            UNION ALL
-            
-            SELECT
-                g.date as activity_date,
-                g.start_time as activity_time,
-                g.chat_id,
-                gs.status,
-                gs.created_at as registered_at,
-                u.telegram_id,
-                u.first_name,
-                u.last_name,
-                u.username,
-                'game' as activity_type,
-                g.name as event_name
-            FROM game_signups gs
-            INNER JOIN games g ON gs.game_id = g.id
-            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
-            
-            ORDER BY registered_at DESC
-            LIMIT ?
-        ''', (limit,))
-
+        query = '''
+            SELECT e.*, es.status, es.is_guest as signup_as_guest
+            FROM events e
+            JOIN event_signups es ON e.id = es.event_id
+            WHERE es.user_id = ?
+        '''
+        params = [user_id]
+        
+        if year and month:
+            query += ' AND strftime("%Y", e.date) = ? AND strftime("%m", e.date) = ?'
+            params.extend([str(year), str(month).zfill(2)])
+        
+        query += ' ORDER BY e.date ASC, e.start_time ASC'
+        
+        cursor.execute(query, params)
         return [dict(row) for row in cursor.fetchall()]
 
     # ==================== Методы для работы с играми ====================
@@ -1423,14 +2035,118 @@ class Database:
         return [dict(row) for row in cursor.fetchall()]
 
     def get_game(self, game_id: str) -> Optional[Dict[str, Any]]:
-        """Получение игры по ID"""
+        """Получение игры по ID (из games или events)"""
         if not self.conn:
             return None
 
         cursor = self.conn.cursor()
+        
+        # Сначала пробуем найти в events (новая архитектура)
+        cursor.execute("SELECT * FROM events WHERE id = ? AND event_type = 'game'", (game_id,))
+        event_row = cursor.fetchone()
+        if event_row:
+            event = dict(event_row)
+            # Нормализуем поля для обратной совместимости
+            return {
+                'id': event['id'],
+                'uuid': event.get('uuid'),
+                'name': event.get('name', ''),
+                'date': event.get('date'),
+                'location': event.get('location', ''),
+                'start_time': event.get('start_time'),
+                'end_time': event.get('end_time'),
+                'opponent': event.get('opponent'),
+                'result': event.get('result'),
+                'score': event.get('score'),
+                'chat_id': event.get('chat_id'),
+                'topic_id': event.get('topic_id'),
+                'from_events': True
+            }
+        
+        # Если не найдено, пробуем в games (старая архитектура)
         cursor.execute('SELECT * FROM games WHERE id = ?', (game_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
+
+    def get_training_by_uuid(self, training_uuid: str) -> Optional[Dict[str, Any]]:
+        """Получение тренировки по UUID (из games, scheduled_trainings или one_time_trainings)"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        
+        # Пробуем найти в games
+        cursor.execute('SELECT * FROM games WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            result = dict(row)
+            result['source'] = 'games'
+            return result
+        
+        # Пробуем найти в scheduled_trainings
+        cursor.execute('SELECT * FROM scheduled_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            result = dict(row)
+            result['source'] = 'scheduled_trainings'
+            return result
+        
+        # Пробуем найти в one_time_trainings
+        cursor.execute('SELECT * FROM one_time_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            result = dict(row)
+            result['source'] = 'one_time_trainings'
+            return result
+        
+        return None
+
+    def get_training_id_by_uuid(self, training_uuid: str) -> Optional[str]:
+        """
+        Получение ID тренировки по UUID (из games, scheduled_trainings или one_time_trainings)
+
+        Args:
+            training_uuid: UUID тренировки
+
+        Returns:
+            ID тренировки или None если не найдена
+        """
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        
+        # Пробуем найти в games
+        cursor.execute('SELECT id FROM games WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            return row['id']
+        
+        # Пробуем найти в scheduled_trainings
+        cursor.execute('SELECT id FROM scheduled_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            return row['id']
+        
+        # Пробуем найти в one_time_trainings
+        cursor.execute('SELECT id FROM one_time_trainings WHERE uuid = ?', (training_uuid,))
+        row = cursor.fetchone()
+        if row:
+            return row['id']
+        
+        return None
+
+    def get_training_uuid_by_id(self, training_id: str) -> Optional[str]:
+        """Получение UUID тренировки по ID"""
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT uuid FROM games WHERE id = ?', (training_id,))
+        row = cursor.fetchone()
+        if row:
+            return row['uuid']
+        return None
 
     def add_game(self, game: Dict[str, Any]) -> Dict[str, Any]:
         """Добавление игры"""
@@ -1439,13 +2155,16 @@ class Database:
 
         cursor = self.conn.cursor()
         game_id = game.get('id', str(datetime.now().timestamp()))
+        # Генерируем UUID если не предоставлен
+        game_uuid = game.get('uuid', str(uuid_module.uuid4()))
 
         try:
             cursor.execute('''
-                INSERT INTO games (id, name, date, location, start_time, opponent, chat_id, topic_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO games (id, uuid, name, date, location, start_time, opponent, chat_id, topic_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 game_id,
+                game_uuid,
                 game['name'],
                 game['date'],
                 game.get('location', ''),
@@ -1455,7 +2174,7 @@ class Database:
                 game.get('topic_id')
             ))
             self.conn.commit()
-            return {"success": True, "id": game_id}
+            return {"success": True, "id": game_id, "uuid": game_uuid}
         except Exception as e:
             logger.error(f"Ошибка добавления игры: {e}")
             return {"success": False, "error": str(e)}
@@ -1504,57 +2223,242 @@ class Database:
             return {"success": False, "error": str(e)}
 
     def get_game_signups(self, game_id: str) -> List[Dict[str, Any]]:
-        """Получение всех записей на игру"""
+        """Получение всех записей на игру (из event_signups + game_signups)"""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
+        
+        # Сначала пробуем найти event для этой игры
+        cursor.execute("SELECT id FROM events WHERE source_table = 'games' AND source_id = ?", (game_id,))
+        event_row = cursor.fetchone()
+        
+        if event_row:
+            # Получаем из event_signups (новая архитектура)
+            event_id = event_row['id']
+            cursor.execute('''
+                SELECT 
+                    es.user_id,
+                    u.telegram_id as user_telegram_id,
+                    u.first_name,
+                    u.last_name,
+                    u.username,
+                    u.photo_url,
+                    u.is_admin,
+                    es.status,
+                    es.created_at,
+                    es.is_guest
+                FROM event_signups es
+                INNER JOIN users u ON es.user_id = u.id
+                WHERE es.event_id = ? AND u.is_active = 1
+                ORDER BY es.created_at ASC
+            ''', (event_id,))
+            
+            rows = [dict(row) for row in cursor.fetchall()]
+        else:
+            rows = []
+        
+        # Дополняем из game_signups (старая архитектура)
         cursor.execute('''
-            SELECT gs.*, u.first_name, u.last_name, u.username, u.photo_url
+            SELECT gs.*, u.first_name, u.last_name, u.username, u.photo_url, u.is_admin, 0 as is_guest
             FROM game_signups gs
             LEFT JOIN users u ON gs.user_telegram_id = u.telegram_id
-            WHERE gs.game_id = ?
+            WHERE gs.game_id = ? AND u.is_active = 1
             ORDER BY gs.created_at ASC
         ''', (game_id,))
 
-        return [dict(row) for row in cursor.fetchall()]
+        rows.extend([dict(row) for row in cursor.fetchall()])
+
+        # Дедупликация по user_telegram_id (если пользователь есть в обеих таблицах)
+        seen = set()
+        unique_rows = []
+        for row in rows:
+            telegram_id = row.get('user_telegram_id')
+            if telegram_id not in seen:
+                seen.add(telegram_id)
+                unique_rows.append(row)
+
+        # Преобразуем поля в bool
+        for row in unique_rows:
+            if 'is_admin' in row:
+                row['is_admin'] = bool(row['is_admin'])
+            if 'is_guest' in row:
+                row['is_guest'] = bool(row['is_guest'])
+
+        return unique_rows
+
+    def get_training_participants(self, training_uuid: str) -> List[Dict[str, Any]]:
+        """
+        Получение всех участников тренировки по UUID
+
+        Возвращает как пользователей, так и гостей с флагом is_guest
+
+        Args:
+            training_uuid: UUID тренировки
+
+        Returns:
+            Список участников с флагом is_guest
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+
+        # Сначала находим event по uuid
+        cursor.execute("SELECT id FROM events WHERE uuid = ?", (training_uuid,))
+        event_row = cursor.fetchone()
+        
+        if event_row:
+            event_id = dict(event_row)['id']
+            
+            # Получаем участников из event_signups (новая архитектура)
+            cursor.execute('''
+                SELECT
+                    u.telegram_id as user_telegram_id,
+                    es.created_at as registered_at,
+                    u.first_name,
+                    u.last_name,
+                    u.username,
+                    u.photo_url,
+                    CASE WHEN u.is_guest = 1 THEN 1 ELSE 0 END as is_guest,
+                    u.is_admin,
+                    u.is_guest,
+                    es.status
+                FROM event_signups es
+                JOIN users u ON es.user_id = u.id
+                WHERE es.event_id = ? AND u.is_active = 1
+                ORDER BY es.created_at ASC
+            ''', (event_id,))
+            
+            participants = [dict(row) for row in cursor.fetchall()]
+        else:
+            participants = []
+
+        return participants
 
     def signup_for_game(self, game_id: str, user_telegram_id: int) -> Dict[str, Any]:
-        """Запись на игру (без ограничения количества)"""
+        """Запись на игру (из events или games)"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
-        signup_id = f"{game_id}_{user_telegram_id}_{datetime.now().timestamp()}"
 
-        try:
-            # Проверяем, есть ли уже запись
+        # Проверяем, является ли game_id event_id
+        cursor.execute("SELECT id, event_type FROM events WHERE id = ?", (game_id,))
+        event_row = cursor.fetchone()
+
+        if event_row:
+            # Это event из новой таблицы
+            event_id = dict(event_row)['id']
+            
+            # Получаем user_id
+            cursor.execute('SELECT id, is_guest FROM users WHERE telegram_id = ?', (user_telegram_id,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                return {"success": False, "error": "Пользователь не найден"}
+            
+            user_id = dict(user_row)['id']
+            is_guest = bool(dict(user_row).get('is_guest', 0))
+            
+            # Проверяем существующую запись
             cursor.execute('''
-                SELECT id, status FROM game_signups
-                WHERE game_id = ? AND user_telegram_id = ?
-            ''', (game_id, user_telegram_id))
-
+                SELECT id, status FROM event_signups
+                WHERE event_id = ? AND user_id = ?
+            ''', (event_id, user_id))
+            
             existing = cursor.fetchone()
-
+            
             if existing:
                 # Если уже записан - отменяем запись (удаляем)
                 cursor.execute('''
-                    DELETE FROM game_signups
-                    WHERE game_id = ? AND user_telegram_id = ?
-                ''', (game_id, user_telegram_id))
+                    DELETE FROM event_signups
+                    WHERE event_id = ? AND user_id = ?
+                ''', (event_id, user_id))
                 self.conn.commit()
                 return {"success": True, "action": "removed"}
             else:
                 # Создаём новую запись
                 cursor.execute('''
-                    INSERT INTO game_signups (id, game_id, user_telegram_id, status, created_at, updated_at)
-                    VALUES (?, ?, ?, 'registered', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (signup_id, game_id, user_telegram_id))
+                    INSERT INTO event_signups (event_id, user_id, status, is_guest, created_at)
+                    VALUES (?, ?, 'registered', ?, CURRENT_TIMESTAMP)
+                ''', (event_id, user_id, 1 if is_guest else 0))
                 self.conn.commit()
                 return {"success": True, "action": "registered", "status": "registered"}
-        except Exception as e:
-            logger.error(f"Ошибка записи на игру: {e}")
-            return {"success": False, "error": str(e)}
+        else:
+            # Старая архитектура: game_signups + дублирование в event_signups
+            signup_id = f"{game_id}_{user_telegram_id}_{datetime.now().timestamp()}"
+
+            try:
+                # Проверяем, есть ли уже запись
+                cursor.execute('''
+                    SELECT id, status FROM game_signups
+                    WHERE game_id = ? AND user_telegram_id = ?
+                ''', (game_id, user_telegram_id))
+
+                existing = cursor.fetchone()
+
+                if existing:
+                    # Если уже записан - отменяем запись (удаляем)
+                    cursor.execute('''
+                        DELETE FROM game_signups
+                        WHERE game_id = ? AND user_telegram_id = ?
+                    ''', (game_id, user_telegram_id))
+
+                    # Также удаляем из event_signups
+                    cursor.execute('''
+                        SELECT id FROM events WHERE source_table = 'games' AND source_id = ?
+                    ''', (game_id,))
+                    event_row2 = cursor.fetchone()
+                    if event_row2:
+                        event_id = dict(event_row2)['id']
+                        cursor.execute('SELECT id FROM users WHERE telegram_id = ?', (user_telegram_id,))
+                        user_row2 = cursor.fetchone()
+                        if user_row2:
+                            user_id = dict(user_row2)['id']
+                            cursor.execute('''
+                                DELETE FROM event_signups
+                                WHERE event_id = ? AND user_id = ?
+                            ''', (event_id, user_id))
+
+                    self.conn.commit()
+                    return {"success": True, "action": "removed"}
+                else:
+                    # Создаём новую запись
+                    cursor.execute('''
+                        INSERT INTO game_signups (id, game_id, user_telegram_id, status, created_at, updated_at)
+                        VALUES (?, ?, ?, 'registered', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ''', (signup_id, game_id, user_telegram_id))
+
+                    # Дублируем в event_signups
+                    cursor.execute('''
+                        SELECT id FROM events WHERE source_table = 'games' AND source_id = ?
+                    ''', (game_id,))
+                    event_row3 = cursor.fetchone()
+                    if event_row3:
+                        event_id = dict(event_row3)['id']
+                        cursor.execute('SELECT id, is_guest FROM users WHERE telegram_id = ?', (user_telegram_id,))
+                        user_row3 = cursor.fetchone()
+                        if user_row3:
+                            user_id = dict(user_row3)['id']
+                            is_guest = bool(dict(user_row3).get('is_guest', 0))
+
+                            # Проверяем существующую запись
+                            cursor.execute('''
+                                SELECT id FROM event_signups
+                                WHERE event_id = ? AND user_id = ?
+                            ''', (event_id, user_id))
+
+                            if not cursor.fetchone():
+                                cursor.execute('''
+                                    INSERT INTO event_signups (event_id, user_id, status, is_guest, created_at)
+                                    VALUES (?, ?, 'registered', ?, CURRENT_TIMESTAMP)
+                                ''', (event_id, user_id, 1 if is_guest else 0))
+
+                    self.conn.commit()
+                    return {"success": True, "action": "registered", "status": "registered"}
+            except Exception as e:
+                logger.error(f"Ошибка записи на игру: {e}")
+                return {"success": False, "error": str(e)}
 
     def unregister_from_game(self, game_id: str, user_telegram_id: int) -> Dict[str, Any]:
         """Отписка от игры"""
@@ -1594,17 +2498,593 @@ class Database:
             return {"success": False, "error": str(e)}
 
     def get_user_games(self, user_telegram_id: int) -> List[Dict[str, Any]]:
-        """Получение всех игр, на которые записан пользователь"""
+        """Получение всех игр, на которые записан пользователь (из event_signups + game_signups)"""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        
+        # Сначала получаем из event_signups (новая архитектура)
+        cursor.execute('''
+            SELECT 
+                e.*,
+                es.status as signup_status,
+                es.created_at as registered_at,
+                es.is_guest
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE u.telegram_id = ? AND e.event_type = 'game'
+            ORDER BY e.date ASC, e.start_time ASC
+        ''', (user_telegram_id,))
+        
+        rows = cursor.fetchall()
+        
+        # Дополняем из game_signups (старая архитектура)
+        cursor.execute('''
+            SELECT g.*, gs.status as signup_status, gs.created_at as registered_at, 0 as is_guest
+            FROM games g
+            INNER JOIN game_signups gs ON g.id = gs.game_id
+            WHERE gs.user_telegram_id = ?
+              AND gs.created_at > (SELECT COALESCE(MAX(created_at), 0) FROM event_signups)
+            ORDER BY g.date ASC, g.start_time ASC
+        ''', (user_telegram_id,))
+        
+        rows.extend([dict(row) for row in cursor.fetchall()])
+        
+        return [dict(row) for row in rows]
+
+    # ==================== Методы для работы с гостями ====================
+
+    def add_guest(
+        self,
+        telegram_id: int,
+        first_name: str,
+        last_name: Optional[str] = None,
+        username: Optional[str] = None,
+        photo_url: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Добавление гостя (создание записи в таблице users с is_guest=1)
+
+        Args:
+            telegram_id: Telegram ID пользователя
+            first_name: Имя пользователя
+            last_name: Фамилия (опционально)
+            username: Username (опционально)
+            photo_url: URL фото профиля (опционально)
+
+        Returns:
+            Dict с информацией о госте или None если ошибка
+        """
+        if not self.conn:
+            logger.error("Нельзя добавить гостя: база данных не подключена")
+            return None
+
+        cursor = self.conn.cursor()
+        try:
+            # Проверяем существует ли уже пользователь с таким telegram_id
+            cursor.execute('''
+                SELECT * FROM users WHERE telegram_id = ?
+            ''', (telegram_id,))
+            existing = cursor.fetchone()
+
+            if existing:
+                # Обновляем существующего пользователя как гостя
+                cursor.execute('''
+                    UPDATE users 
+                    SET is_guest = 1,
+                        first_name = ?,
+                        last_name = COALESCE(?, last_name),
+                        username = COALESCE(?, username),
+                        photo_url = COALESCE(?, photo_url),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE telegram_id = ?
+                ''', (first_name, last_name, username, photo_url, telegram_id))
+                self.conn.commit()
+                logger.info(f"Гость обновлён: {telegram_id}")
+                return self.get_guest_by_telegram(telegram_id)
+
+            # Создаём нового пользователя-гостя
+            cursor.execute('''
+                INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, is_guest, is_admin, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ''', (telegram_id, first_name, last_name, username, photo_url))
+            self.conn.commit()
+            logger.info(f"Гость добавлен: {telegram_id}")
+            return self.get_guest_by_telegram(telegram_id)
+        except sqlite3.IntegrityError as e:
+            logger.error(f"Ошибка добавления гостя (нарушение целостности): {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка добавления гостя: {e}")
+            return None
+
+    def add_guest_signup(
+        self,
+        telegram_id: int,
+        training_uuid: str,
+        first_name: str,
+        last_name: Optional[str] = None,
+        username: Optional[str] = None,
+        photo_url: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Запись гостя на тренировку
+        
+        Создаёт гостя если не существует, и добавляет запись в guest_signups
+
+        Args:
+            telegram_id: Telegram ID пользователя
+            training_uuid: UUID тренировки
+            first_name: Имя пользователя
+            last_name: Фамилия (опционально)
+            username: Username (опционально)
+            photo_url: URL фото профиля (опционально)
+
+        Returns:
+            Dict с информацией о записи или None если ошибка
+        """
+        if not self.conn:
+            logger.error("Нельзя записать гостя: база данных не подключена")
+            return None
+
+        cursor = self.conn.cursor()
+        try:
+            # Создаём гостя если не существует
+            guest = self.add_guest(telegram_id, first_name, last_name, username, photo_url)
+            if not guest:
+                return None
+
+            # Получаем ID пользователя
+            user = self.get_user_by_telegram_id(telegram_id)
+            if not user:
+                logger.error(f"Пользователь {telegram_id} не найден после создания")
+                return None
+            
+            user_id = user['id']
+
+            # Проверяем, существует ли уже запись
+            cursor.execute('''
+                SELECT * FROM guest_signups
+                WHERE user_telegram_id = ? AND training_uuid = ?
+            ''', (user_id, training_uuid))
+            existing = cursor.fetchone()
+
+            if existing:
+                logger.info(f"Гость {telegram_id} уже записан на тренировку {training_uuid}")
+                return dict(existing)
+
+            # Добавляем запись в guest_signups
+            signup_id = f"signup_{user_id}_{training_uuid}"
+            cursor.execute('''
+                INSERT INTO guest_signups (id, user_telegram_id, training_uuid, created_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (signup_id, user_id, training_uuid))
+            self.conn.commit()
+            logger.info(f"Гость {telegram_id} записан на тренировку {training_uuid}")
+            return self.get_guest_signup(telegram_id, training_uuid)
+        except sqlite3.IntegrityError as e:
+            logger.error(f"Ошибка записи гостя (нарушение целостности): {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка записи гостя: {e}")
+            return None
+
+    def get_guest_signup(self, telegram_id: int, training_uuid: str) -> Optional[Dict[str, Any]]:
+        """
+        Получение информации о записи гостя на тренировку
+
+        Args:
+            telegram_id: Telegram ID пользователя
+            training_uuid: UUID тренировки
+
+        Returns:
+            Dict с информацией о записи или None если не найдена
+        """
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        
+        # Получаем ID пользователя
+        user = self.get_user_by_telegram_id(telegram_id)
+        if not user:
+            return None
+        
+        user_id = user['id']
+        
+        cursor.execute('''
+            SELECT gs.*, u.first_name, u.last_name, u.username, u.photo_url, u.is_active
+            FROM guest_signups gs
+            JOIN users u ON gs.user_telegram_id = u.id
+            WHERE gs.user_telegram_id = ? AND gs.training_uuid = ?
+        ''', (user_id, training_uuid))
+        row = cursor.fetchone()
+
+        if row:
+            return dict(row)
+        return None
+
+    def get_guest_trainings(self, telegram_id: int) -> List[Dict[str, Any]]:
+        """
+        Получение списка всех тренировок гостя
+
+        Args:
+            telegram_id: Telegram ID пользователя
+
+        Returns:
+            Список тренировок гостя
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        
+        # Получаем записи из guest_signups и джойним с games, scheduled_trainings, one_time_trainings
+        cursor.execute('''
+            SELECT gs.user_telegram_id as telegram_id, gs.training_uuid, gs.created_at,
+                   gu.uuid as training_uuid, gu.name as training_name, gu.date as training_date,
+                   gu.start_time, NULL as end_time, gu.location, 'games' as source
+            FROM guest_signups gs
+            JOIN games gu ON gs.training_uuid = gu.uuid
+            WHERE gs.user_telegram_id = ?
+
+            UNION
+
+            SELECT gs.user_telegram_id as telegram_id, gs.training_uuid, gs.created_at,
+                   st.uuid as training_uuid, st.name as training_name, st.training_date as training_date,
+                   st.start_time, st.end_time, st.location, 'scheduled_trainings' as source
+            FROM guest_signups gs
+            JOIN scheduled_trainings st ON gs.training_uuid = st.uuid
+            WHERE gs.user_telegram_id = ?
+
+            UNION
+
+            SELECT gs.user_telegram_id as telegram_id, gs.training_uuid, gs.created_at,
+                   ot.uuid as training_uuid, ot.name as training_name, ot.training_date as training_date,
+                   ot.start_time, ot.end_time, ot.location, 'one_time_trainings' as source
+            FROM guest_signups gs
+            JOIN one_time_trainings ot ON gs.training_uuid = ot.uuid
+            WHERE gs.user_telegram_id = ?
+
+            ORDER BY training_date ASC, start_time ASC
+        ''', (telegram_id, telegram_id, telegram_id))
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def remove_guest_signup(self, telegram_id: int, training_uuid: str) -> Dict[str, Any]:
+        """
+        Отписка гостя от тренировки
+
+        Args:
+            telegram_id: Telegram ID пользователя
+            training_uuid: UUID тренировки
+
+        Returns:
+            Dict с результатом операции
+        """
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        try:
+            # Получаем ID пользователя
+            user = self.get_user_by_telegram_id(telegram_id)
+            if not user:
+                return {"success": False, "error": "Пользователь не найден"}
+            
+            user_id = user['id']
+            
+            cursor.execute('''
+                DELETE FROM guest_signups
+                WHERE user_telegram_id = ? AND training_uuid = ?
+            ''', (user_id, training_uuid))
+            self.conn.commit()
+
+            if cursor.rowcount > 0:
+                return {"success": True, "message": "Гость отписан от тренировки"}
+            else:
+                return {"success": False, "error": "Запись не найдена"}
+        except Exception as e:
+            logger.error(f"Ошибка отписки гостя: {e}")
+            return {"success": False, "error": str(e)}
+
+    def is_guest_signed_up(self, telegram_id: int, training_uuid: str) -> bool:
+        """
+        Проверка: записан ли гость на тренировку
+
+        Args:
+            telegram_id: Telegram ID пользователя
+            training_uuid: UUID тренировки
+
+        Returns:
+            True если гость записан, False иначе
+        """
+        if not self.conn:
+            return False
+
+        cursor = self.conn.cursor()
+        
+        # Получаем ID пользователя
+        user = self.get_user_by_telegram_id(telegram_id)
+        if not user:
+            return False
+        
+        user_id = user['id']
+        
+        cursor.execute('''
+            SELECT 1 FROM guest_signups
+            WHERE user_telegram_id = ? AND training_uuid = ?
+        ''', (user_id, training_uuid))
+        return cursor.fetchone() is not None
+
+    def get_guest_by_telegram(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получение информации о госте по Telegram ID
+
+        Args:
+            telegram_id: Telegram ID пользователя
+
+        Returns:
+            Dict с информацией о госте или None если не найден
+        """
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE telegram_id = ? AND is_guest = 1', (telegram_id,))
+        row = cursor.fetchone()
+
+        if row:
+            guest = dict(row)
+            guest['is_active'] = bool(guest.get('is_active', 1))
+            guest['is_guest'] = True
+            return guest
+        return None
+
+    def get_guest_with_training(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получение информации о госте с данными о тренировке
+        (обратная совместимость - возвращает первую тренировку)
+
+        Args:
+            telegram_id: Telegram ID пользователя
+
+        Returns:
+            Dict с информацией о госте и тренировке или None если не найден
+        """
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+        
+        # Получаем ID пользователя
+        user = self.get_user_by_telegram_id(telegram_id)
+        if not user:
+            return None
+        
+        user_id = user['id']
+        
+        cursor.execute('''
+            SELECT u.*, gu.uuid as training_uuid, gu.name as training_name,
+                   gu.date as training_date, gu.start_time, gu.location
+            FROM users u
+            LEFT JOIN guest_signups gs ON u.id = gs.user_telegram_id
+            LEFT JOIN games gu ON gs.training_uuid = gu.uuid
+            WHERE u.telegram_id = ? AND u.is_guest = 1
+            ORDER BY gu.date ASC
+            LIMIT 1
+        ''', (telegram_id,))
+        row = cursor.fetchone()
+
+        if row:
+            guest = dict(row)
+            guest['is_active'] = bool(guest.get('is_active', 1))
+            guest['is_guest'] = True
+            return guest
+        return None
+
+    def update_guest_status(self, telegram_id: int, is_active: bool) -> Dict[str, Any]:
+        """
+        Активация/деактивация гостя
+
+        Args:
+            telegram_id: Telegram ID пользователя
+            is_active: Статус активности
+
+        Returns:
+            Dict с результатом операции
+        """
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE guests
+                SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE telegram_id = ?
+            ''', (1 if is_active else 0, telegram_id))
+            self.conn.commit()
+
+            if cursor.rowcount > 0:
+                return {"success": True, "is_active": is_active}
+            else:
+                return {"success": False, "error": "Гость не найден"}
+        except Exception as e:
+            logger.error(f"Ошибка обновления статуса гостя: {e}")
+            return {"success": False, "error": str(e)}
+
+    def is_guest(self, telegram_id: int) -> bool:
+        """
+        Проверка: является ли пользователь гостем
+
+        Args:
+            telegram_id: Telegram ID пользователя
+
+        Returns:
+            True если пользователь является гостем, False иначе
+        """
+        if not self.conn:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT 1 FROM users WHERE telegram_id = ? AND is_guest = 1', (telegram_id,))
+        return cursor.fetchone() is not None
+
+    def get_all_guests(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Получение всех гостей с пагинацией
+
+        Args:
+            limit: Максимальное количество записей
+            offset: Смещение для пагинации
+
+        Returns:
+            Список гостей
+        """
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT g.*, gs.status as signup_status
-            FROM games g
-            INNER JOIN game_signups gs ON g.id = gs.game_id
-            WHERE gs.user_telegram_id = ?
-            ORDER BY g.date ASC, g.start_time ASC
-        ''', (user_telegram_id,))
+            SELECT telegram_id, first_name, last_name, username, photo_url, is_active, created_at, updated_at, is_guest
+            FROM users
+            WHERE is_guest = 1
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+        ''', (limit, offset))
 
-        return [dict(row) for row in cursor.fetchall()]
+        guests = []
+        for row in cursor.fetchall():
+            guest = dict(row)
+            guest['is_active'] = bool(guest.get('is_active', 1))
+            guest['is_guest'] = True
+            guests.append(guest)
+
+        return guests
+
+    def get_guest_signup_count(self, telegram_id: int) -> int:
+        """
+        Получение количества тренировок, на которые записан гость
+
+        Args:
+            telegram_id: Telegram ID пользователя
+
+        Returns:
+            Количество записей
+        """
+        if not self.conn:
+            return 0
+
+        cursor = self.conn.cursor()
+        
+        # Получаем ID пользователя
+        user = self.get_user_by_telegram_id(telegram_id)
+        if not user:
+            return 0
+        
+        user_id = user['id']
+        
+        cursor.execute('''
+            SELECT COUNT(*) as count FROM guest_signups
+            WHERE user_telegram_id = ?
+        ''', (user_id,))
+        row = cursor.fetchone()
+        return row['count'] if row else 0
+
+    def convert_guest_to_user(
+        self,
+        telegram_id: int,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        username: Optional[str] = None,
+        photo_url: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Конвертация гостя в пользователя
+
+        Args:
+            telegram_id: Telegram ID пользователя
+            first_name: Имя (если не предоставлено, берётся из guests)
+            last_name: Фамилия
+            username: Username
+            photo_url: URL фото профиля
+
+        Returns:
+            Dict с информацией о новом пользователе или None если ошибка
+        """
+        if not self.conn:
+            logger.error("Нельзя конвертировать гостя: база данных не подключена")
+            return None
+
+        cursor = self.conn.cursor()
+        try:
+            # Получаем данные гостя
+            guest = self.get_guest_by_telegram(telegram_id)
+            if not guest:
+                logger.warning(f"Гость {telegram_id} не найден для конвертации")
+                return None
+
+            # Используем данные гостя если не предоставлены
+            first_name = first_name or guest['first_name']
+            last_name = last_name or guest.get('last_name')
+            username = username or guest.get('username')
+            photo_url = photo_url or guest.get('photo_url')
+
+            # Проверяем существует ли уже пользователь
+            existing_user = self.get_user_by_telegram_id(telegram_id)
+            if existing_user:
+                logger.warning(f"Пользователь {telegram_id} уже существует")
+                # Просто снимаем флаг гостя и удаляем записи
+                cursor.execute('DELETE FROM guest_signups WHERE user_telegram_id = (SELECT id FROM users WHERE telegram_id = ?)', (telegram_id,))
+                cursor.execute('UPDATE users SET is_guest = 0 WHERE telegram_id = ?', (telegram_id,))
+                self.conn.commit()
+                return existing_user
+
+            # Создаём пользователя
+            cursor.execute('''
+                INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, is_admin, is_active, created_at, updated_at, last_login)
+                VALUES (?, ?, ?, ?, ?, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ''', (telegram_id, first_name, last_name, username, photo_url))
+
+            # Снимаем флаг гостя и удаляем записи
+            cursor.execute('DELETE FROM guest_signups WHERE user_telegram_id = (SELECT id FROM users WHERE telegram_id = ?)', (telegram_id,))
+            cursor.execute('UPDATE users SET is_guest = 0 WHERE telegram_id = ?', (telegram_id,))
+
+            self.conn.commit()
+            logger.info(f"Гость {telegram_id} конвертирован в пользователя")
+            return self.get_user_by_telegram_id(telegram_id)
+        except Exception as e:
+            logger.error(f"Ошибка конвертации гостя в пользователя: {e}")
+            return None
+
+    def delete_guest(self, telegram_id: int) -> Dict[str, Any]:
+        """
+        Удаление гостя и всех его записей
+
+        Args:
+            telegram_id: Telegram ID пользователя
+
+        Returns:
+            Dict с результатом операции
+        """
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+        try:
+            # Сначала удаляем все записи из guest_signups
+            cursor.execute('DELETE FROM guest_signups WHERE user_telegram_id = (SELECT id FROM users WHERE telegram_id = ?)', (telegram_id,))
+            # Снимаем флаг гостя и удаляем пользователя
+            cursor.execute('DELETE FROM users WHERE telegram_id = ? AND is_guest = 1', (telegram_id,))
+            self.conn.commit()
+
+            if cursor.rowcount > 0:
+                return {"success": True, "message": "Гость и все его записи удалены"}
+            else:
+                return {"success": False, "error": "Гость не найден"}
+        except Exception as e:
+            logger.error(f"Ошибка удаления гостя: {e}")
+            return {"success": False, "error": str(e)}
