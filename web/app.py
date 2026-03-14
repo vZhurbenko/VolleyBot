@@ -2130,13 +2130,28 @@ async def remove_one_time_training(training_id: str, user: dict = Depends(get_cu
     Удаление разовой тренировки (только админы)
     """
     require_admin(user)
-    
+
     result = db.remove_one_time_training(training_id)
-    
+
     if result.get('success'):
         return result
     else:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove training'))
+
+
+@app.delete("/api/admin/events/{event_id}")
+async def remove_event(event_id: int, user: dict = Depends(get_current_user_from_access_cookie)):
+    """
+    Удаление события (только админы)
+    """
+    require_admin(user)
+
+    result = db.remove_event(event_id)
+
+    if result.get('success'):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove event'))
 
 
 @app.get("/api/admin/trainings")

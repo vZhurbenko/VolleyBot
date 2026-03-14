@@ -25,7 +25,7 @@
       @close="closeTrainingModal"
       @register="registerForTraining"
       @unregister="unregisterFromTraining"
-      @remove-training="removeOneTimeTraining"
+      @remove-training="handleRemoveTraining"
       @remove-user="removeUserFromTraining"
     />
 
@@ -392,6 +392,17 @@ const unregisterFromTraining = async () => {
   }
 }
 
+const handleRemoveTraining = async () => {
+  if (!selectedTraining.value || !authStore.isAdmin) return
+
+  // Для событий с event_type используем новый API
+  if (selectedTraining.value.event_type) {
+    await removeEvent()
+  } else {
+    await removeOneTimeTraining()
+  }
+}
+
 const removeOneTimeTraining = async () => {
   if (!selectedTraining.value || !authStore.isAdmin) return
 
@@ -418,6 +429,33 @@ const removeOneTimeTraining = async () => {
   } catch (error) {
     console.error('Error removing training:', error)
     notificationsStore.error('Ошибка удаления тренировки')
+  }
+}
+
+const removeEvent = async () => {
+  if (!selectedTraining.value || !authStore.isAdmin) return
+
+  const confirmed = await confirmStore.danger('Удалить это событие?')
+  if (!confirmed) return
+
+  try {
+    const eventId = selectedTraining.value.id
+    const response = await fetch(`/api/admin/events/${eventId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      closeTrainingModal()
+      notificationsStore.success('Событие удалено')
+    } else {
+      notificationsStore.error(result.detail || 'Ошибка удаления')
+    }
+  } catch (error) {
+    console.error('Error removing event:', error)
+    notificationsStore.error('Ошибка удаления события')
   }
 }
 

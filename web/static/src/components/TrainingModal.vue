@@ -172,7 +172,7 @@
         <div v-else class="text-gray-500 text-center py-8">Пока никто не записался</div>
 
         <!-- Кнопка удаления для админа -->
-        <div v-if="isAdmin && training.is_one_time" class="mt-4 pt-4 border-t border-gray-200">
+        <div v-if="isAdmin && (training.is_one_time || training.event_type === 'one_time_training' || training.event_type === 'scheduled_training')" class="mt-4 pt-4 border-t border-gray-200">
           <button
             @click="$emit('remove-training')"
             class="w-full h-11 px-6 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"

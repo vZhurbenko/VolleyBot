@@ -1918,6 +1918,77 @@ class Database:
             logger.error(f"Ошибка отмены записи: {e}")
             return {"success": False, "error": str(e)}
 
+    def remove_event(self, event_id: int) -> Dict[str, Any]:
+        """Удаление события (только для администратора)"""
+        if not self.conn:
+            return {"success": False, "error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Получаем информацию о событии
+            cursor.execute('SELECT event_type, uuid FROM events WHERE id = ?', (event_id,))
+            event = cursor.fetchone()
+
+            if not event:
+                # Событие не найдено в таблице events - пробуем удалить как старую тренировку
+                # Ищем в one_time_trainings по UUID
+                cursor.execute('''
+                    SELECT id FROM one_time_trainings WHERE uuid = ?
+                ''', (str(event_id),))
+                ottp = cursor.fetchone()
+                if ottp:
+                    return self.remove_one_time_training(ottp['id'])
+                
+                # Ищем в scheduled_trainings по UUID
+                cursor.execute('''
+                    SELECT id FROM scheduled_trainings WHERE uuid = ?
+                ''', (str(event_id),))
+                st = cursor.fetchone()
+                if st:
+                    return self.remove_scheduled_training(st['id'])
+                
+                return {"success": False, "error": "Тренировка не найдена"}
+
+            event_dict = dict(event)
+
+            # Удаляем все записи на это событие
+            cursor.execute('DELETE FROM event_signups WHERE event_id = ?', (event_id,))
+
+            # Удаляем из старых таблиц в зависимости от типа события
+            if event_dict['event_type'] in ('training', 'scheduled_training', 'one_time_training'):
+                # Удаляем из training_registrations
+                cursor.execute('''
+                    DELETE FROM training_registrations
+                    WHERE training_date = (SELECT date FROM events WHERE id = ?)
+                    AND training_time = (SELECT start_time FROM events WHERE id = ?)
+                    AND chat_id = (SELECT chat_id FROM events WHERE id = ?)
+                ''', (event_id, event_id, event_id))
+
+                # Удаляем из guest_signups по training_uuid
+                cursor.execute('''
+                    DELETE FROM guest_signups
+                    WHERE training_uuid = ?
+                ''', (event_dict['uuid'],))
+
+            elif event_dict['event_type'] == 'game':
+                # Удаляем из game_signups
+                cursor.execute('''
+                    DELETE FROM game_signups
+                    WHERE game_id = ?
+                ''', (event_dict['uuid'],))
+
+            # Удаляем само событие
+            cursor.execute('DELETE FROM events WHERE id = ?', (event_id,))
+
+            self.conn.commit()
+
+            return {"success": True, "message": "Событие удалено"}
+
+        except Exception as e:
+            logger.error(f"Ошибка удаления события: {e}")
+            return {"success": False, "error": str(e)}
+
     def get_user_events(self, user_id: int, year: Optional[int] = None, 
                         month: Optional[int] = None) -> List[Dict[str, Any]]:
         """Получение всех событий, на которые записан пользователь"""
