@@ -385,9 +385,6 @@ async function showUserStats(telegramId) {
   }
 }
 
-// Устанавливаем сегодняшнюю дату по умолчанию
-selectedDate.value = new Date().toISOString().split('T')[0]
-
 onMounted(() => {
   loadAllStats()
 })
