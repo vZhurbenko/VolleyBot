@@ -245,7 +245,23 @@ const updateMonth = ({ year, month }) => {
   })
 }
 
-const openTrainingModal = (training) => {
+const openTrainingModal = async (training) => {
+  // Если есть uuid, загружаем актуальные данные через API
+  if (training.uuid) {
+    try {
+      const response = await fetch(`/api/trainings/${training.uuid}`, {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        selectedTraining.value = data.training
+        return
+      }
+    } catch (error) {
+      console.error('Error loading training:', error)
+    }
+  }
+  // Фоллбэк: используем данные из календаря
   selectedTraining.value = { ...training }
 }
 
@@ -313,32 +329,27 @@ const registerForTraining = async () => {
       },
       credentials: 'include',
       body: JSON.stringify({
-        training_date: selectedTraining.value.date,
-        training_time: selectedTraining.value.time,
-        chat_id: selectedTraining.value.chat_id,
-        topic_id: selectedTraining.value.topic_id,
+        uuid: selectedTraining.value.uuid,
       }),
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
-      // Обновляем статус в модалке
-      selectedTraining.value.user_status = result.status
-
       // Перезагружаем календарь для обновления списка записавшихся
       await loadCalendar()
 
-      // Находим обновлённую тренировку и обновляем selectedTraining
-      const updatedTraining = trainings.value.find(
-        (t) =>
-          t.date === selectedTraining.value.date &&
-          t.time === selectedTraining.value.time &&
-          t.chat_id === selectedTraining.value.chat_id,
-      )
-      if (updatedTraining) {
-        selectedTraining.value = { ...updatedTraining }
+      // Загружаем актуальные данные тренировки через API
+      if (selectedTraining.value.uuid) {
+        const apiResponse = await fetch(`/api/trainings/${selectedTraining.value.uuid}`, {
+          credentials: 'include',
+        })
+        if (apiResponse.ok) {
+          const data = await apiResponse.json()
+          selectedTraining.value = data.training
+        }
       }
+
       notificationsStore.success('Вы записаны на тренировку')
     } else {
       notificationsStore.error(result.detail || 'Ошибка записи')
@@ -360,28 +371,27 @@ const unregisterFromTraining = async () => {
       },
       credentials: 'include',
       body: JSON.stringify({
-        training_date: selectedTraining.value.date,
-        training_time: selectedTraining.value.time,
-        chat_id: selectedTraining.value.chat_id,
+        uuid: selectedTraining.value.uuid,
       }),
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
-      selectedTraining.value.user_status = null
       // Перезагружаем календарь для обновления списка записавшихся
       await loadCalendar()
-      // Находим обновлённую тренировку и обновляем selectedTraining
-      const updatedTraining = trainings.value.find(
-        (t) =>
-          t.date === selectedTraining.value.date &&
-          t.time === selectedTraining.value.time &&
-          t.chat_id === selectedTraining.value.chat_id,
-      )
-      if (updatedTraining) {
-        selectedTraining.value = { ...updatedTraining }
+
+      // Загружаем актуальные данные тренировки через API
+      if (selectedTraining.value.uuid) {
+        const apiResponse = await fetch(`/api/trainings/${selectedTraining.value.uuid}`, {
+          credentials: 'include',
+        })
+        if (apiResponse.ok) {
+          const data = await apiResponse.json()
+          selectedTraining.value = data.training
+        }
       }
+
       notificationsStore.success('Вы успешно выписались с тренировки')
     } else {
       notificationsStore.error(result.detail || 'Ошибка отписки')
@@ -439,8 +449,8 @@ const removeEvent = async () => {
   if (!confirmed) return
 
   try {
-    const eventId = selectedTraining.value.id
-    const response = await fetch(`/api/admin/events/${eventId}`, {
+    const uuid = selectedTraining.value.uuid
+    const response = await fetch(`/api/admin/events/${uuid}`, {
       method: 'DELETE',
       credentials: 'include',
     })

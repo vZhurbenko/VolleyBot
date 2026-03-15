@@ -97,6 +97,7 @@
       @close="closeEditModal"
       @save="handleSaveUser"
       @delete="handleDeleteFromModal"
+      @convert="handleConvertGuest"
       @update:user="editingUser = $event"
     />
   </div>
@@ -403,6 +404,36 @@ const handleDeleteFromModal = async (user) => {
   } catch (error) {
     console.error('Error deleting user:', error)
     notificationsStore.error('Ошибка удаления пользователя')
+  }
+}
+
+const handleConvertGuest = async (user) => {
+  const confirmed = await confirmStore.info(
+    `Конвертировать гостя "${user.first_name}" в обычного пользователя?`,
+  )
+  if (!confirmed) return
+
+  try {
+    const response = await fetch(`/api/admin/guests/${user.telegram_id}/convert`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      closeEditModal()
+      await loadUsers()
+      notificationsStore.success('Гость конвертирован в пользователя')
+    } else {
+      notificationsStore.error(result.detail || 'Ошибка конвертации')
+    }
+  } catch (error) {
+    console.error('Error converting guest:', error)
+    notificationsStore.error('Ошибка конвертации гостя')
   }
 }
 

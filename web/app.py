@@ -1888,26 +1888,25 @@ async def get_event(event_uuid: str, request: Request):
 @app.post("/api/user/calendar/register")
 async def register_for_training(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Запись на тренировку (старая архитектура, для обратной совместимости)
+    Запись на тренировку по UUID
     """
     require_auth(user)
 
     body = await request.json()
-    training_date = body.get('training_date')
-    training_time = body.get('training_time')
-    chat_id = body.get('chat_id')
-    topic_id = body.get('topic_id')
+    training_uuid = body.get('uuid')
 
-    if not all([training_date, training_time, chat_id]):
-        raise HTTPException(status_code=400, detail="Missing required fields")
+    if not training_uuid:
+        raise HTTPException(status_code=400, detail="Missing uuid")
 
     user_telegram_id = user.get('telegram_id')
-    # Уникальный ID для каждой записи (тренировка + пользователь)
-    training_id = f"{training_date}_{training_time}_{chat_id}_{user_telegram_id}"
 
-    result = db.register_for_training(
-        training_id, training_date, training_time, chat_id, topic_id, user_telegram_id
-    )
+    # Находим event по UUID
+    event = db.get_event_by_uuid(training_uuid)
+    if not event:
+        raise HTTPException(status_code=404, detail="Событие не найдено")
+
+    # Записываем пользователя на событие
+    result = db.add_event_signup_to_training(event['id'], user_telegram_id)
 
     if result.get('success'):
         return {"success": True, "status": result.get('status')}
@@ -1918,21 +1917,25 @@ async def register_for_training(request: Request, user: dict = Depends(get_curre
 @app.post("/api/user/calendar/unregister")
 async def unregister_from_training(request: Request, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Отписка от тренировки (старая архитектура, для обратной совместимости)
+    Отписка от тренировки по UUID
     """
     require_auth(user)
 
     body = await request.json()
-    training_date = body.get('training_date')
-    training_time = body.get('training_time')
-    chat_id = body.get('chat_id')
+    training_uuid = body.get('uuid')
 
-    if not all([training_date, training_time, chat_id]):
-        raise HTTPException(status_code=400, detail="Missing required fields")
+    if not training_uuid:
+        raise HTTPException(status_code=400, detail="Missing uuid")
 
     user_telegram_id = user.get('telegram_id')
 
-    result = db.unregister_from_training(training_date, training_time, chat_id, user_telegram_id)
+    # Находим event по UUID
+    event = db.get_event_by_uuid(training_uuid)
+    if not event:
+        raise HTTPException(status_code=404, detail="Событие не найдено")
+
+    # Отписываем пользователя от события
+    result = db.remove_event_signup_by_telegram(event['id'], user_telegram_id)
 
     if result.get('success'):
         return {"success": True}
@@ -2139,14 +2142,14 @@ async def remove_one_time_training(training_id: str, user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove training'))
 
 
-@app.delete("/api/admin/events/{event_id}")
-async def remove_event(event_id: int, user: dict = Depends(get_current_user_from_access_cookie)):
+@app.delete("/api/admin/events/{event_uuid}")
+async def remove_event(event_uuid: str, user: dict = Depends(get_current_user_from_access_cookie)):
     """
-    Удаление события (только админы)
+    Удаление события по UUID (только админы)
     """
     require_admin(user)
 
-    result = db.remove_event(event_id)
+    result = db.remove_event_by_uuid(event_uuid)
 
     if result.get('success'):
         return result
@@ -2466,9 +2469,25 @@ async def get_training_by_uuid(
     if 'training_time' in training:
         training['time'] = training['training_time']
 
+    # Добавляем тип события для фронтенда
+    if training.get('source') == 'one_time_trainings':
+        training['event_type'] = 'one_time_training'
+    elif training.get('source') == 'scheduled_trainings':
+        training['event_type'] = 'scheduled_training'
+
     # Добавляем список участников с флагом is_guest
     participants = db.get_training_participants(training_uuid)
-    training['participants'] = participants
+    training['registrations'] = participants
+    training['registered_count'] = len([p for p in participants if p.get('status') == 'registered'])
+    training['waitlist_count'] = len([p for p in participants if p.get('status') == 'waitlist'])
+
+    # Добавляем статус записи текущего пользователя
+    if user:
+        telegram_id = user.get('telegram_id')
+        user_signup = next((p for p in participants if int(p.get('user_telegram_id')) == telegram_id), None)
+        training['user_status'] = user_signup['status'] if user_signup else None
+    else:
+        training['user_status'] = None
 
     return {"training": training}
 
