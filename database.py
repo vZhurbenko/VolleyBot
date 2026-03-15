@@ -3380,6 +3380,43 @@ class Database:
 
     # ==================== Методы для статистики тренировок ====================
 
+    def get_training_stats_by_day(self, period: str = 'month', year: int = None, month: int = None) -> List[Dict[str, Any]]:
+        """
+        Получение статистики по дням (для графика)
+
+        Args:
+            period: Период статистики ('day', 'week', 'month', 'all')
+            year: Год (опционально, для периода 'month')
+            month: Месяц (опционально, для периода 'month')
+
+        Returns:
+            List с данными по дням:
+                - date: дата
+                - trainings_count: количество тренировок
+                - signups_count: количество записей
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        date_filter, date_params = self._get_period_filter(period, year, month)
+
+        # Получаем статистику по дням из events + event_signups
+        cursor.execute(f'''
+            SELECT
+                e.date,
+                COUNT(DISTINCT CASE WHEN e.event_type IN ('scheduled_training', 'one_time_training') THEN e.id END) as trainings_count,
+                COUNT(DISTINCT CASE WHEN e.event_type = 'game' THEN e.id END) as games_count,
+                COUNT(es.id) as signups_count
+            FROM events e
+            LEFT JOIN event_signups es ON e.id = es.event_id
+            WHERE e.date {date_filter}
+            GROUP BY e.date
+            ORDER BY e.date
+        ''', date_params if date_params else ())
+
+        return [dict(row) for row in cursor.fetchall()]
+
     def get_training_stats(self, period: str = 'week') -> Dict[str, Any]:
         """
         Получение общей статистики по тренировкам за период
@@ -3925,12 +3962,14 @@ class Database:
 
         return rows
 
-    def get_events_count(self, period: str = 'month') -> Dict[str, int]:
+    def get_events_count(self, period: str = 'month', year: int = None, month: int = None) -> Dict[str, int]:
         """
         Получение общего количества мероприятий (тренировки + игры) за период
 
         Args:
             period: 'day', 'week', 'month', 'all'
+            year: Год (опционально, для периода 'month')
+            month: Месяц (опционально, для периода 'month')
 
         Returns:
             Dict с количеством:
@@ -3942,24 +3981,19 @@ class Database:
             return {"total_events": 0, "trainings_count": 0, "games_count": 0}
 
         cursor = self.conn.cursor()
-        date_filter, date_params = self._get_period_filter(period)
+        date_filter, date_params = self._get_period_filter(period, year, month)
 
-        # Считаем тренировки по дате тренировки (training_date)
+        # Считаем мероприятия из таблицы events (новая архитектура)
         cursor.execute(f'''
-            SELECT COUNT(DISTINCT training_date || training_time || chat_id) as count
-            FROM training_registrations
-            WHERE training_date {date_filter}
+            SELECT
+                COUNT(DISTINCT CASE WHEN event_type IN ('scheduled_training', 'one_time_training') THEN id END) as trainings_count,
+                COUNT(DISTINCT CASE WHEN event_type = 'game' THEN id END) as games_count
+            FROM events
+            WHERE date {date_filter}
         ''', date_params if date_params else ())
-        trainings_count = cursor.fetchone()[0] or 0
-
-        # Считаем игры по дате игры
-        cursor.execute(f'''
-            SELECT COUNT(DISTINCT g.id) as count
-            FROM game_signups gs
-            INNER JOIN games g ON gs.game_id = g.id
-            WHERE g.date {date_filter}
-        ''', date_params if date_params else ())
-        games_count = cursor.fetchone()[0] or 0
+        row = cursor.fetchone()
+        trainings_count = row[0] or 0
+        games_count = row[1] or 0
 
         return {
             "total_events": trainings_count + games_count,
@@ -3967,13 +4001,15 @@ class Database:
             "games_count": games_count
         }
 
-    def get_all_users_stats(self, limit: int = 50, period: str = 'month') -> List[Dict[str, Any]]:
+    def get_all_users_stats(self, limit: int = 50, period: str = 'month', year: int = None, month: int = None) -> List[Dict[str, Any]]:
         """
         Получение статистики всех пользователей с процентом посещаемости
 
         Args:
             limit: Количество пользователей
             period: 'day', 'week', 'month', 'all'
+            year: Год (опционально, для периода 'month')
+            month: Месяц (опционально, для периода 'month')
 
         Returns:
             List пользователей со статистикой:
@@ -3987,16 +4023,17 @@ class Database:
             return []
 
         cursor = self.conn.cursor()
-        date_filter, date_params = self._get_period_filter(period)
+        date_filter, date_params = self._get_period_filter(period, year, month)
 
         # Сначала получаем общее количество мероприятий за период
-        events_count = self.get_events_count(period)
+        events_count = self.get_events_count(period, year, month)
         total_events = events_count['total_events']
 
         # Получаем всех активных пользователей с их активностью
-        # Фильтруем по дате тренировки (training_date), а не по дате записи
+        # Используем event_signups (новая архитектура) + training_registrations + game_signups (старая)
+        # Фильтруем по дате события (e.date), а не по дате записи
         if date_params:
-            params = date_params + date_params + [limit]
+            params = date_params + date_params + [limit]  # 2 раза date_params для тренировок и игр + limit
         else:
             params = [limit]
 
@@ -4009,28 +4046,32 @@ class Database:
                 u.photo_url,
                 u.is_guest,
                 u.is_admin,
-                COALESCE(tr.count, 0) as trainings_count,
-                COALESCE(gs.count, 0) as games_count,
-                COALESCE(tr.count, 0) + COALESCE(gs.count, 0) as total_count
+                COALESCE(tr.trainings_count, 0) as trainings_count,
+                COALESCE(gs.games_count, 0) as games_count,
+                COALESCE(tr.trainings_count, 0) + COALESCE(gs.games_count, 0) as total_count
             FROM users u
             LEFT JOIN (
-                SELECT 
-                    user_telegram_id,
-                    COUNT(*) as count
-                FROM training_registrations
-                WHERE training_date {date_filter}
-                GROUP BY user_telegram_id
-            ) tr ON u.telegram_id = tr.user_telegram_id
+                SELECT
+                    es.user_id,
+                    COUNT(*) as trainings_count
+                FROM event_signups es
+                INNER JOIN events e ON es.event_id = e.id
+                WHERE e.event_type IN ('scheduled_training', 'one_time_training')
+                  AND e.date {date_filter}
+                GROUP BY es.user_id
+            ) tr ON u.id = tr.user_id
             LEFT JOIN (
-                SELECT 
-                    user_telegram_id,
-                    COUNT(*) as count
-                FROM game_signups
-                WHERE created_at {date_filter}
-                GROUP BY user_telegram_id
-            ) gs ON u.telegram_id = gs.user_telegram_id
+                SELECT
+                    es.user_id,
+                    COUNT(*) as games_count
+                FROM event_signups es
+                INNER JOIN events e ON es.event_id = e.id
+                WHERE e.event_type = 'game'
+                  AND e.date {date_filter}
+                GROUP BY es.user_id
+            ) gs ON u.id = gs.user_id
             WHERE u.is_active = 1
-            ORDER BY total_count DESC, tr.count DESC, gs.count DESC
+            ORDER BY total_count DESC, trainings_count DESC, games_count DESC
             LIMIT ?
         ''', params)
 
@@ -4047,20 +4088,23 @@ class Database:
 
         return rows
 
-    def _get_period_filter(self, period: str) -> tuple:
+    def _get_period_filter(self, period: str, year: int = None, month: int = None) -> tuple:
         """
         Вспомогательный метод для получения SQL-фильтра по периоду
 
         Args:
             period: 'day', 'week', 'month', 'all'
+            year: Год (опционально, для периода 'month')
+            month: Месяц (опционально, для периода 'month')
 
         Returns:
             Tuple (filter_string, params)
         """
         from datetime import timedelta
-        
+        import calendar
+
         now = datetime.now()
-        
+
         if period == 'day':
             start = now - timedelta(days=1)
             return (">= ?", [start.strftime('%Y-%m-%d')])
@@ -4068,12 +4112,19 @@ class Database:
             start = now - timedelta(weeks=1)
             return (">= ?", [start.strftime('%Y-%m-%d')])
         elif period == 'month':
-            start = now - timedelta(days=30)
-            return (">= ?", [start.strftime('%Y-%m-%d')])
+            # Используем календарный месяц (с 1 по последнее число)
+            if year is None or month is None:
+                # Текущий месяц
+                year = now.year
+                month = now.month
+            _, last_day = calendar.monthrange(year, month)
+            start_date = f"{year}-{month:02d}-01"
+            end_date = f"{year}-{month:02d}-{last_day:02d}"
+            return ("BETWEEN ? AND ?", [start_date, end_date])
         else:  # 'all'
             return ("IS NOT NULL", [])
 
-    def _get_period_date_range(self, period: str) -> Dict[str, str]:
+    def _get_period_date_range(self, period: str, year: int = None, month: int = None) -> Dict[str, str]:
         """
         Вспомогательный метод для получения диапазона дат периода
 

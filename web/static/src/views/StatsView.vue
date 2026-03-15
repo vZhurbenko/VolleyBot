@@ -1,27 +1,41 @@
 <template>
   <div class="flex flex-col gap-4 lg:gap-6">
     <!-- Заголовок -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between flex-wrap gap-4">
       <div class="flex items-center gap-3">
         <BarChart3 class="w-8 h-8 text-teal-600" />
         <h1 class="text-2xl font-bold text-gray-900">Статистика тренировок</h1>
       </div>
-      
-      <!-- Выбор периода -->
-      <div class="flex gap-2">
-        <button
-          v-for="p in periods"
-          :key="p.value"
-          @click="selectedPeriod = p.value; loadAllStats()"
-          :class="[
-            'px-3 py-1.5 rounded text-sm font-medium transition-colors',
-            selectedPeriod === p.value
-              ? 'bg-teal-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          ]"
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- Выбор месяца -->
+        <select
+          v-if="selectedPeriod === 'month'"
+          v-model="selectedMonth"
+          @change="loadAllStats()"
+          class="px-3 py-1.5 rounded border border-gray-300 bg-white text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
         >
-          {{ p.label }}
-        </button>
+          <option v-for="m in months" :key="m.value" :value="m.value">
+            {{ m.label }}
+          </option>
+        </select>
+
+        <!-- Выбор периода -->
+        <div class="flex gap-2">
+          <button
+            v-for="p in periods"
+            :key="p.value"
+            @click="selectedPeriod = p.value; loadAllStats()"
+            :class="[
+              'px-3 py-1.5 rounded text-sm font-medium transition-colors',
+              selectedPeriod === p.value
+                ? 'bg-teal-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            ]"
+          >
+            {{ p.label }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -51,21 +65,27 @@
           <p class="text-sm text-gray-500 mb-2">Тренировок</p>
           <p class="text-3xl font-bold text-gray-900">{{ overviewStats.total_trainings || 0 }}</p>
         </div>
-        
+
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <p class="text-sm text-gray-500 mb-2">Всего записей</p>
           <p class="text-3xl font-bold text-gray-900">{{ overviewStats.total_signups || 0 }}</p>
         </div>
-        
+
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <p class="text-sm text-gray-500 mb-2">Уникальных пользователей</p>
           <p class="text-3xl font-bold text-gray-900">{{ overviewStats.unique_users || 0 }}</p>
         </div>
-        
+
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <p class="text-sm text-gray-500 mb-2">В среднем на тренировку</p>
           <p class="text-3xl font-bold text-gray-900">{{ overviewStats.avg_per_training || 0 }}</p>
         </div>
+      </div>
+
+      <!-- График по дням -->
+      <div v-if="statsByDay.length > 0" class="bg-white rounded shadow p-4 lg:p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Активность по дням</h3>
+        <Bar :data="statsByDayChartData" :options="chartOptions" />
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -105,21 +125,27 @@
           <p class="text-sm text-gray-500 mb-2">Игр</p>
           <p class="text-3xl font-bold text-gray-900">{{ gamesStats.total_games || 0 }}</p>
         </div>
-        
+
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <p class="text-sm text-gray-500 mb-2">Всего записей</p>
           <p class="text-3xl font-bold text-gray-900">{{ gamesStats.total_signups || 0 }}</p>
         </div>
-        
+
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <p class="text-sm text-gray-500 mb-2">Уникальных пользователей</p>
           <p class="text-3xl font-bold text-gray-900">{{ gamesStats.unique_users || 0 }}</p>
         </div>
-        
+
         <div class="bg-white rounded shadow p-4 lg:p-6">
           <p class="text-sm text-gray-500 mb-2">В среднем на игру</p>
           <p class="text-3xl font-bold text-gray-900">{{ gamesStats.avg_per_game || 0 }}</p>
         </div>
+      </div>
+
+      <!-- График по дням для игр -->
+      <div v-if="statsByDay.length > 0" class="bg-white rounded shadow p-4 lg:p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Активность по дням</h3>
+        <Bar :data="gamesChartData" :options="chartOptions" />
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -154,19 +180,43 @@
 
     <!-- Топ пользователей -->
     <div v-if="activeTab === 'top_users'" class="bg-white rounded shadow p-4 lg:p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-semibold text-gray-900">Статистика пользователей</h3>
-        <p class="text-sm text-gray-500">
-          Всего мероприятий: <span class="font-semibold">{{ totalEvents }}</span>
-          <span v-if="trainingsCount || gamesCount" class="text-gray-400">
-            ({{ trainingsCount }} тренир., {{ gamesCount }} игр)
-          </span>
-        </p>
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+        <div>
+          <h3 class="font-semibold text-gray-900">Статистика пользователей</h3>
+          <p class="text-sm text-gray-500">
+            Всего мероприятий: <span class="font-semibold">{{ totalEvents }}</span>
+            <span v-if="trainingsCount || gamesCount" class="text-gray-400">
+              ({{ trainingsCount }} тренир., {{ gamesCount }} игр)
+            </span>
+          </p>
+        </div>
+        
+        <!-- Выбор количества пользователей -->
+        <div class="flex gap-2">
+          <button
+            v-for="opt in userLimitOptions"
+            :key="opt.value"
+            @click="userLimit = opt.value"
+            :class="[
+              'px-3 py-1.5 rounded text-sm font-medium transition-colors',
+              userLimit === opt.value
+                ? 'bg-teal-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            ]"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
       </div>
-      
-      <div v-if="topUsers.length > 0" class="overflow-x-auto">
+
+      <!-- График топ пользователей (только для видимых) -->
+      <div v-if="displayedUsers.length > 0" class="mb-6">
+        <Bar :data="topUsersChartData" :options="chartOptions" />
+      </div>
+
+      <div v-if="displayedUsers.length > 0" class="overflow-x-auto" style="max-height: 500px; overflow-y: auto;">
         <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+          <thead class="bg-gray-50 sticky top-0 z-10">
             <tr>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Пользователь</th>
@@ -178,7 +228,7 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr
-              v-for="(user, index) in topUsers"
+              v-for="(user, index) in displayedUsers"
               :key="user.telegram_id"
               class="hover:bg-gray-50 cursor-pointer"
               @click="showUserStats(user.telegram_id)"
@@ -264,8 +314,8 @@
           <div class="flex items-center gap-3">
             <User v-if="selectedUserStats.user_info.is_guest" class="w-5 h-5 text-blue-600" />
             <span class="font-medium text-gray-900">
-              {{ selectedUserStats.user_info.username 
-                ? '@' + selectedUserStats.user_info.username 
+              {{ selectedUserStats.user_info.username
+                ? '@' + selectedUserStats.user_info.username
                 : selectedUserStats.user_info.first_name + ' ' + (selectedUserStats.user_info.last_name || '') }}
             </span>
           </div>
@@ -295,15 +345,51 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { BadgeCheck, User, BarChart3, Shield } from 'lucide-vue-next'
+import { Bar } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+} from 'chart.js'
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+)
 
 const authStore = useAuthStore()
 
 const periods = [
   { value: 'month', label: 'Месяц' },
   { value: 'all', label: 'Всё время' }
+]
+
+const months = [
+  { value: 1, label: 'Январь' },
+  { value: 2, label: 'Февраль' },
+  { value: 3, label: 'Март' },
+  { value: 4, label: 'Апрель' },
+  { value: 5, label: 'Май' },
+  { value: 6, label: 'Июнь' },
+  { value: 7, label: 'Июль' },
+  { value: 8, label: 'Август' },
+  { value: 9, label: 'Сентябрь' },
+  { value: 10, label: 'Октябрь' },
+  { value: 11, label: 'Ноябрь' },
+  { value: 12, label: 'Декабрь' }
 ]
 
 const tabs = [
@@ -313,25 +399,181 @@ const tabs = [
 ]
 
 const selectedPeriod = ref('month')
+const selectedMonth = ref(new Date().getMonth() + 1)
 const activeTab = ref('overview')
 
 const overviewStats = ref({})
 const gamesStats = ref({})
 const topUsers = ref([])
+const statsByDay = ref([])
 const totalEvents = ref(0)
 const trainingsCount = ref(0)
 const gamesCount = ref(0)
 const selectedUserStats = ref(null)
+const userLimit = ref(10)
+
+const userLimitOptions = [
+  { value: 5, label: 'Топ-5' },
+  { value: 10, label: 'Топ-10' },
+  { value: 20, label: 'Топ-20' },
+  { value: 50, label: 'Все (50)' }
+]
+
+// Вычисляемые пользователи (все или топ-N)
+const displayedUsers = computed(() => {
+  return topUsers.value.slice(0, userLimit.value)
+})
+
+// Опции для графиков
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top'
+    },
+    tooltip: {
+      enabled: true
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      ticks: {
+        stepSize: 1
+      }
+    }
+  }
+}
+
+// Данные для графика по дням
+const statsByDayChartData = computed(() => {
+  const labels = statsByDay.value.map(d => {
+    const date = new Date(d.date)
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  })
+  
+  const trainingsData = statsByDay.value.map(d => d.trainings_count || 0)
+  const gamesData = statsByDay.value.map(d => d.games_count || 0)
+  const signupsData = statsByDay.value.map(d => d.signups_count || 0)
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Тренировки',
+        backgroundColor: 'rgba(20, 184, 166, 0.5)',
+        borderColor: 'rgb(20, 184, 166)',
+        borderWidth: 1,
+        data: trainingsData
+      },
+      {
+        label: 'Игры',
+        backgroundColor: 'rgba(147, 51, 234, 0.5)',
+        borderColor: 'rgb(147, 51, 234)',
+        borderWidth: 1,
+        data: gamesData
+      },
+      {
+        label: 'Записи',
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderColor: 'rgb(59, 130, 246)',
+        borderWidth: 1,
+        data: signupsData
+      }
+    ]
+  }
+})
+
+// Данные для графика топ пользователей
+const topUsersChartData = computed(() => {
+  const labels = displayedUsers.value.map(u => {
+    const name = u.first_name || ''
+    return name.length > 10 ? name.substring(0, 10) + '...' : name
+  })
+
+  const trainingsData = displayedUsers.value.map(u => u.trainings_count || 0)
+  const gamesData = displayedUsers.value.map(u => u.games_count || 0)
+  const totalData = displayedUsers.value.map(u => u.total_count || 0)
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Тренировки',
+        backgroundColor: 'rgba(20, 184, 166, 0.7)',
+        borderColor: 'rgb(20, 184, 166)',
+        borderWidth: 1,
+        data: trainingsData
+      },
+      {
+        label: 'Игры',
+        backgroundColor: 'rgba(147, 51, 234, 0.7)',
+        borderColor: 'rgb(147, 51, 234)',
+        borderWidth: 1,
+        data: gamesData
+      },
+      {
+        label: 'Всего',
+        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+        borderColor: 'rgb(59, 130, 246)',
+        borderWidth: 1,
+        data: totalData
+      }
+    ]
+  }
+})
+
+// Данные для графика игр (только игры)
+const gamesChartData = computed(() => {
+  const labels = statsByDay.value.map(d => {
+    const date = new Date(d.date)
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  })
+
+  const gamesData = statsByDay.value.map(d => d.games_count || 0)
+  const signupsData = statsByDay.value.map(d => d.signups_count || 0)
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Игры',
+        backgroundColor: 'rgba(147, 51, 234, 0.7)',
+        borderColor: 'rgb(147, 51, 234)',
+        borderWidth: 1,
+        data: gamesData
+      },
+      {
+        label: 'Записи на игры',
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderColor: 'rgb(59, 130, 246)',
+        borderWidth: 1,
+        data: signupsData
+      }
+    ]
+  }
+})
 
 async function loadAllStats() {
   await loadOverviewStats()
   await loadGamesStats()
   await loadTopUsers()
+  await loadStatsByDay()
 }
 
 async function loadOverviewStats() {
   try {
-    const response = await fetch(`/api/admin/training-stats/overview?period=${selectedPeriod.value}`, {
+    const params = new URLSearchParams({
+      period: selectedPeriod.value
+    })
+    if (selectedPeriod.value === 'month' && selectedMonth.value) {
+      params.append('year', new Date().getFullYear())
+      params.append('month', selectedMonth.value)
+    }
+    
+    const response = await fetch(`/api/admin/training-stats/overview?${params}`, {
       credentials: 'include'
     })
     if (response.ok) {
@@ -357,7 +599,16 @@ async function loadGamesStats() {
 
 async function loadTopUsers() {
   try {
-    const response = await fetch(`/api/admin/training-stats/top-users?limit=50&period=${selectedPeriod.value}`, {
+    const params = new URLSearchParams({
+      limit: 50,
+      period: selectedPeriod.value
+    })
+    if (selectedPeriod.value === 'month' && selectedMonth.value) {
+      params.append('year', new Date().getFullYear())
+      params.append('month', selectedMonth.value)
+    }
+    
+    const response = await fetch(`/api/admin/training-stats/top-users?${params}`, {
       credentials: 'include'
     })
     if (response.ok) {
@@ -369,6 +620,27 @@ async function loadTopUsers() {
     }
   } catch (error) {
     console.error('Error loading top users:', error)
+  }
+}
+
+async function loadStatsByDay() {
+  try {
+    const params = new URLSearchParams({
+      period: selectedPeriod.value
+    })
+    if (selectedPeriod.value === 'month' && selectedMonth.value) {
+      params.append('year', new Date().getFullYear())
+      params.append('month', selectedMonth.value)
+    }
+    
+    const response = await fetch(`/api/admin/training-stats/by-day?${params}`, {
+      credentials: 'include'
+    })
+    if (response.ok) {
+      statsByDay.value = await response.json()
+    }
+  } catch (error) {
+    console.error('Error loading stats by day:', error)
   }
 }
 
@@ -389,3 +661,9 @@ onMounted(() => {
   loadAllStats()
 })
 </script>
+
+<style scoped>
+canvas {
+  max-height: 300px;
+}
+</style>

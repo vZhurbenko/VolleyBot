@@ -1637,15 +1637,38 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 @app.get("/api/admin/training-stats/overview")
 async def get_training_stats_overview(
     period: str = "week",
+    year: int = None,
+    month: int = None,
     user: dict = Depends(get_current_user_from_access_cookie)
 ):
     """
     Получение общей статистики по тренировкам за период
     period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
     """
     require_admin(user)
-    
+
     stats = db.get_training_stats(period)
+    return stats
+
+
+@app.get("/api/admin/training-stats/by-day")
+async def get_training_stats_by_day(
+    period: str = "month",
+    year: int = None,
+    month: int = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение статистики по дням (для графика)
+    period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
+    """
+    require_admin(user)
+
+    stats = db.get_training_stats_by_day(period, year, month)
     return stats
 
 
@@ -1689,21 +1712,25 @@ async def get_user_training_stats(
 async def get_top_users_stats(
     limit: int = 50,
     period: str = "month",
+    year: int = None,
+    month: int = None,
     user: dict = Depends(get_current_user_from_access_cookie)
 ):
     """
     Получение статистики всех пользователей с процентом посещаемости
     limit: Количество пользователей (по умолчанию 50)
     period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
     """
     require_admin(user)
-    
+
     # Используем новый метод get_all_users_stats
-    users_stats = db.get_all_users_stats(limit, period)
-    
+    users_stats = db.get_all_users_stats(limit, period, year, month)
+
     # Получаем общее количество мероприятий для отображения
-    events_count = db.get_events_count(period)
-    
+    events_count = db.get_events_count(period, year, month)
+
     return {
         "users": users_stats,
         "total_events": events_count["total_events"],
