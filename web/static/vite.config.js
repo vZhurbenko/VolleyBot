@@ -15,7 +15,7 @@ export default defineConfig({
   },
   base: '/',
   build: {
-    outDir: '/var/www/volleyteam.ru',
+    outDir: '/var/www/teamr.volleyteam.ru',
     emptyOutDir: true,
   },
   server: {

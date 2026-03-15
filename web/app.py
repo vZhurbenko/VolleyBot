@@ -12,9 +12,13 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
+from dotenv import load_dotenv
 
 # Добавляем родительскую директорию в path для импорта database
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Загружаем переменные из .env
+load_dotenv(Path(__file__).parent / ".env")
 
 from fastapi import FastAPI, HTTPException, Depends, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,7 +52,11 @@ app = FastAPI(title="VolleyBot Auth API")
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://volleyteam.ru", "https://www.volleyteam.ru"],  # Только наш домен
+    allow_origins=[
+        "https://volleyteam.ru",
+        "https://www.volleyteam.ru",
+        "https://teamr.volleyteam.ru"
+    ],  # Только наши домены
     allow_credentials=True,  # Разрешить cookie
     allow_methods=["*"],
     allow_headers=["*"],
@@ -2857,7 +2865,9 @@ logger.info("Планировщик запущен: добавление тре�
 
 # ==================== Статика ====================
 
-static_path = Path("/var/www/volleyteam.ru")
+# Путь к статике берётся из переменной окружения или используется по умолчанию
+STATIC_ROOT = os.getenv("STATIC_ROOT", "/var/www/teamr.volleyteam.ru")
+static_path = Path(STATIC_ROOT)
 assets_path = static_path / "assets"
 
 # Монтируем директорию ассетов для CSS/JS файлов
@@ -2890,7 +2900,7 @@ async def root(full_path: str):
         raise HTTPException(status_code=404)
 
     # Иначе отдаём index.html для Vue Router
-    index_path = Path("/var/www/volleyteam.ru") / "index.html"
+    index_path = Path(STATIC_ROOT) / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
     return {"message": "VolleyBot Auth API - build not found"}
