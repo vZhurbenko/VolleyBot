@@ -185,11 +185,40 @@
             >
               <td class="px-4 py-3 text-sm text-gray-900">{{ index + 1 }}</td>
               <td class="px-4 py-3 text-sm">
-                <div class="flex items-center gap-2">
-                  <User v-if="user.is_guest" class="w-4 h-4 text-blue-600" />
-                  <span class="font-medium text-gray-900">
-                    {{ user.username ? '@' + user.username : user.first_name + ' ' + (user.last_name || '') }}
-                  </span>
+                <div class="flex items-center gap-3">
+                  <img
+                    v-if="user.photo_url"
+                    :src="user.photo_url"
+                    alt=""
+                    class="w-8 h-8 rounded-full"
+                  />
+                  <div
+                    v-else
+                    class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-sm"
+                  >
+                    {{ user.first_name?.charAt(0) || '' }}
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-gray-900">
+                      {{ user.first_name }} {{ user.last_name || '' }}
+                      <span v-if="user.username" class="text-gray-400 font-normal">@{{ user.username }}</span>
+                    </span>
+                    <Shield
+                      v-if="user.is_admin"
+                      class="w-4 h-4 text-purple-600"
+                      title="Администратор"
+                    />
+                    <BadgeCheck
+                      v-else-if="!user.is_guest"
+                      class="w-4 h-4 text-teal-600"
+                      title="Участник"
+                    />
+                    <User
+                      v-else
+                      class="w-4 h-4 text-blue-600"
+                      title="Гость"
+                    />
+                  </div>
                 </div>
               </td>
               <td class="px-4 py-3 text-sm text-center">{{ user.trainings_count || 0 }}</td>
@@ -268,7 +297,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { BadgeCheck, User, BarChart3 } from 'lucide-vue-next'
+import { BadgeCheck, User, BarChart3, Shield } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 
