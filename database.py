@@ -2950,6 +2950,29 @@ class Database:
                 INSERT INTO guest_signups (id, user_telegram_id, training_uuid, created_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
             ''', (signup_id, user_id, training_uuid))
+            
+            # ==================== ДУБЛИРУЕМ В event_signups (новая архитектура) ====================
+            # Находим event по uuid
+            cursor.execute("SELECT id FROM events WHERE uuid = ?", (training_uuid,))
+            event_row = cursor.fetchone()
+            
+            if event_row:
+                event_id = dict(event_row)['id']
+                
+                # Проверяем, есть ли уже запись в event_signups
+                cursor.execute('''
+                    SELECT id FROM event_signups
+                    WHERE event_id = ? AND user_id = ?
+                ''', (event_id, user_id))
+                
+                if not cursor.fetchone():
+                    # Добавляем запись в event_signups
+                    cursor.execute('''
+                        INSERT INTO event_signups (event_id, user_id, status, is_guest, created_at)
+                        VALUES (?, ?, 'registered', 1, CURRENT_TIMESTAMP)
+                    ''', (event_id, user_id))
+                    logger.info(f"Гость {telegram_id} добавлен в event_signups (event_id={event_id})")
+            
             self.conn.commit()
             logger.info(f"Гость {telegram_id} записан на тренировку {training_uuid}")
             return self.get_guest_signup(telegram_id, training_uuid)
@@ -3062,13 +3085,29 @@ class Database:
             user = self.get_user_by_telegram_id(telegram_id)
             if not user:
                 return {"success": False, "error": "Пользователь не найден"}
-            
+
             user_id = user['id']
-            
+
+            # Удаляем из guest_signups
             cursor.execute('''
                 DELETE FROM guest_signups
                 WHERE user_telegram_id = ? AND training_uuid = ?
             ''', (user_id, training_uuid))
+            
+            # ==================== УДАЛЯЕМ ИЗ event_signups (новая архитектура) ====================
+            # Находим event по uuid
+            cursor.execute("SELECT id FROM events WHERE uuid = ?", (training_uuid,))
+            event_row = cursor.fetchone()
+            
+            if event_row:
+                event_id = dict(event_row)['id']
+                
+                # Удаляем запись из event_signups
+                cursor.execute('''
+                    DELETE FROM event_signups
+                    WHERE event_id = ? AND user_id = ?
+                ''', (event_id, user_id))
+            
             self.conn.commit()
 
             if cursor.rowcount > 0:
