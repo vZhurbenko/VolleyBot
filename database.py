@@ -3421,7 +3421,7 @@ class Database:
 
     def get_training_stats_by_day(self, period: str = 'month', year: int = None, month: int = None) -> List[Dict[str, Any]]:
         """
-        Получение статистики по дням (для графика)
+        Получение статистики по тренировкам по дням (для графика)
 
         Args:
             period: Период статистики ('day', 'week', 'month', 'all')
@@ -3432,7 +3432,7 @@ class Database:
             List с данными по дням:
                 - date: дата
                 - trainings_count: количество тренировок
-                - signups_count: количество записей
+                - signups_count: количество записей на тренировки
         """
         if not self.conn:
             return []
@@ -3440,16 +3440,53 @@ class Database:
         cursor = self.conn.cursor()
         date_filter, date_params = self._get_period_filter(period, year, month)
 
-        # Получаем статистику по дням из events + event_signups
+        # Получаем статистику по тренировкам по дням
         cursor.execute(f'''
             SELECT
                 e.date,
-                COUNT(DISTINCT CASE WHEN e.event_type IN ('scheduled_training', 'one_time_training') THEN e.id END) as trainings_count,
-                COUNT(DISTINCT CASE WHEN e.event_type = 'game' THEN e.id END) as games_count,
+                COUNT(DISTINCT e.id) as trainings_count,
                 COUNT(es.id) as signups_count
             FROM events e
             LEFT JOIN event_signups es ON e.id = es.event_id
-            WHERE e.date {date_filter}
+            WHERE e.event_type IN ('scheduled_training', 'one_time_training')
+              AND e.date {date_filter}
+            GROUP BY e.date
+            ORDER BY e.date
+        ''', date_params if date_params else ())
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_games_stats_by_day(self, period: str = 'month', year: int = None, month: int = None) -> List[Dict[str, Any]]:
+        """
+        Получение статистики по играм по дням (для графика)
+
+        Args:
+            period: Период статистики ('day', 'week', 'month', 'all')
+            year: Год (опционально, для периода 'month')
+            month: Месяц (опционально, для периода 'month')
+
+        Returns:
+            List с данными по дням:
+                - date: дата
+                - games_count: количество игр
+                - signups_count: количество записей на игры
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        date_filter, date_params = self._get_period_filter(period, year, month)
+
+        # Получаем статистику по играм по дням
+        cursor.execute(f'''
+            SELECT
+                e.date,
+                COUNT(DISTINCT e.id) as games_count,
+                COUNT(es.id) as signups_count
+            FROM events e
+            LEFT JOIN event_signups es ON e.id = es.event_id
+            WHERE e.event_type = 'game'
+              AND e.date {date_filter}
             GROUP BY e.date
             ORDER BY e.date
         ''', date_params if date_params else ())
@@ -3559,12 +3596,14 @@ class Database:
 
         return stats
 
-    def get_games_stats(self, period: str = 'week') -> Dict[str, Any]:
+    def get_games_stats(self, period: str = 'month', year: int = None, month: int = None) -> Dict[str, Any]:
         """
         Получение статистики по играм за период
 
         Args:
             period: Период статистики ('day', 'week', 'month', 'all')
+            year: Год (опционально, для периода 'month')
+            month: Месяц (опционально, для периода 'month')
 
         Returns:
             Dict со статистикой:
@@ -3582,21 +3621,22 @@ class Database:
         cursor = self.conn.cursor()
 
         # Определяем диапазон дат
-        date_filter, date_params = self._get_period_filter(period)
+        date_filter, date_params = self._get_period_filter(period, year, month)
 
-        # Статистика из game_signups
+        # Статистика из event_signups + events (новая архитектура)
         cursor.execute(f'''
             SELECT
-                COUNT(DISTINCT gs.game_id) as total_games,
-                COUNT(gs.id) as total_signups,
-                COUNT(DISTINCT gs.user_telegram_id) as unique_users,
-                0 as guests_count,
-                COUNT(gs.id) as users_count
-            FROM game_signups gs
-            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
-            INNER JOIN games g ON gs.game_id = g.id
-            WHERE gs.created_at {date_filter}
-              AND u.is_active = 1
+                COUNT(DISTINCT e.id) as total_games,
+                COUNT(es.id) as total_signups,
+                COUNT(DISTINCT es.user_id) as unique_users,
+                SUM(CASE WHEN u.is_guest = 1 THEN 1 ELSE 0 END) as guests_count,
+                SUM(CASE WHEN u.is_guest = 0 THEN 1 ELSE 0 END) as users_count
+            FROM events e
+            LEFT JOIN event_signups es ON e.id = es.event_id
+            LEFT JOIN users u ON es.user_id = u.id
+            WHERE e.event_type = 'game'
+              AND e.date {date_filter}
+              AND (u.is_active = 1 OR u.is_active IS NULL)
         ''', date_params if date_params else ())
 
         row = cursor.fetchone()
@@ -3604,15 +3644,15 @@ class Database:
         stats['total_games'] = stats.get('total_games', 0) or 0
         stats['total_signups'] = stats.get('total_signups', 0) or 0
         stats['unique_users'] = stats.get('unique_users', 0) or 0
-        stats['users_count'] = stats.get('users_count', 0) or 0
         stats['guests_count'] = stats.get('guests_count', 0) or 0
+        stats['users_count'] = stats.get('users_count', 0) or 0
 
         # Вычисляем среднее
         total_games = stats.get('total_games', 0) or 1
         stats['avg_per_game'] = round(stats.get('total_signups', 0) / total_games, 2)
 
         # Диапазон дат
-        stats['date_range'] = self._get_period_date_range(period)
+        stats['date_range'] = self._get_period_date_range(period, year, month)
         stats['period'] = period
 
         return stats

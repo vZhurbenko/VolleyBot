@@ -1661,7 +1661,7 @@ async def get_training_stats_by_day(
     user: dict = Depends(get_current_user_from_access_cookie)
 ):
     """
-    Получение статистики по дням (для графика)
+    Получение статистики по тренировкам по дням (для графика)
     period: day, week, month, all
     year: Год (опционально, для периода 'month')
     month: Месяц (опционально, для периода 'month')
@@ -1669,6 +1669,25 @@ async def get_training_stats_by_day(
     require_admin(user)
 
     stats = db.get_training_stats_by_day(period, year, month)
+    return stats
+
+
+@app.get("/api/admin/game-stats/by-day")
+async def get_games_stats_by_day(
+    period: str = "month",
+    year: int = None,
+    month: int = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение статистики по играм по дням (для графика)
+    period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
+    """
+    require_admin(user)
+
+    stats = db.get_games_stats_by_day(period, year, month)
     return stats
 
 

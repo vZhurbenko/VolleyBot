@@ -406,6 +406,7 @@ const overviewStats = ref({})
 const gamesStats = ref({})
 const topUsers = ref([])
 const statsByDay = ref([])
+const gamesStatsByDay = ref([])
 const totalEvents = ref(0)
 const trainingsCount = ref(0)
 const gamesCount = ref(0)
@@ -527,13 +528,13 @@ const topUsersChartData = computed(() => {
 
 // Данные для графика игр (только игры)
 const gamesChartData = computed(() => {
-  const labels = statsByDay.value.map(d => {
+  const labels = gamesStatsByDay.value.map(d => {
     const date = new Date(d.date)
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
   })
 
-  const gamesData = statsByDay.value.map(d => d.games_count || 0)
-  const signupsData = statsByDay.value.map(d => d.signups_count || 0)
+  const gamesData = gamesStatsByDay.value.map(d => d.games_count || 0)
+  const signupsData = gamesStatsByDay.value.map(d => d.signups_count || 0)
 
   return {
     labels,
@@ -572,7 +573,7 @@ async function loadOverviewStats() {
       params.append('year', new Date().getFullYear())
       params.append('month', selectedMonth.value)
     }
-    
+
     const response = await fetch(`/api/admin/training-stats/overview?${params}`, {
       credentials: 'include'
     })
@@ -586,7 +587,15 @@ async function loadOverviewStats() {
 
 async function loadGamesStats() {
   try {
-    const response = await fetch(`/api/admin/game-stats/overview?period=${selectedPeriod.value}`, {
+    const params = new URLSearchParams({
+      period: selectedPeriod.value
+    })
+    if (selectedPeriod.value === 'month' && selectedMonth.value) {
+      params.append('year', new Date().getFullYear())
+      params.append('month', selectedMonth.value)
+    }
+
+    const response = await fetch(`/api/admin/game-stats/overview?${params}`, {
       credentials: 'include'
     })
     if (response.ok) {
@@ -632,12 +641,22 @@ async function loadStatsByDay() {
       params.append('year', new Date().getFullYear())
       params.append('month', selectedMonth.value)
     }
-    
-    const response = await fetch(`/api/admin/training-stats/by-day?${params}`, {
-      credentials: 'include'
-    })
-    if (response.ok) {
-      statsByDay.value = await response.json()
+
+    // Загружаем статистику для текущей вкладки
+    if (activeTab.value === 'games') {
+      const response = await fetch(`/api/admin/game-stats/by-day?${params}`, {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        gamesStatsByDay.value = await response.json()
+      }
+    } else {
+      const response = await fetch(`/api/admin/training-stats/by-day?${params}`, {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        statsByDay.value = await response.json()
+      }
     }
   } catch (error) {
     console.error('Error loading stats by day:', error)
