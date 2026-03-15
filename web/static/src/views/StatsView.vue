@@ -45,7 +45,7 @@
         <button
           v-for="tab in tabs"
           :key="tab.id"
-          @click="activeTab = tab.id"
+          @click="activeTab = tab.id; loadStatsByDay()"
           :class="[
             'pb-2 px-1 border-b-2 font-medium text-sm transition-colors',
             activeTab === tab.id
@@ -143,7 +143,7 @@
       </div>
 
       <!-- График по дням для игр -->
-      <div v-if="statsByDay.length > 0" class="bg-white rounded shadow p-4 lg:p-6">
+      <div v-if="gamesStatsByDay.length > 0" class="bg-white rounded shadow p-4 lg:p-6">
         <h3 class="font-semibold text-gray-900 mb-4">Активность по дням</h3>
         <Bar :data="gamesChartData" :options="chartOptions" />
       </div>
@@ -448,15 +448,14 @@ const chartOptions = {
   }
 }
 
-// Данные для графика по дням
+// Данные для графика по дням (тренировки)
 const statsByDayChartData = computed(() => {
   const labels = statsByDay.value.map(d => {
     const date = new Date(d.date)
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
   })
-  
+
   const trainingsData = statsByDay.value.map(d => d.trainings_count || 0)
-  const gamesData = statsByDay.value.map(d => d.games_count || 0)
   const signupsData = statsByDay.value.map(d => d.signups_count || 0)
 
   return {
@@ -464,20 +463,13 @@ const statsByDayChartData = computed(() => {
     datasets: [
       {
         label: 'Тренировки',
-        backgroundColor: 'rgba(20, 184, 166, 0.5)',
+        backgroundColor: 'rgba(20, 184, 166, 0.7)',
         borderColor: 'rgb(20, 184, 166)',
         borderWidth: 1,
         data: trainingsData
       },
       {
-        label: 'Игры',
-        backgroundColor: 'rgba(147, 51, 234, 0.5)',
-        borderColor: 'rgb(147, 51, 234)',
-        borderWidth: 1,
-        data: gamesData
-      },
-      {
-        label: 'Записи',
+        label: 'Записи на тренировки',
         backgroundColor: 'rgba(59, 130, 246, 0.5)',
         borderColor: 'rgb(59, 130, 246)',
         borderWidth: 1,
