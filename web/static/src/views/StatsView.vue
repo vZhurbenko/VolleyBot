@@ -292,10 +292,10 @@
     <!-- Модальное окно статистики пользователя -->
     <div
       v-if="selectedUserStats"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       @click="selectedUserStats = null"
     >
-      <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" @click.stop>
+      <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full" @click.stop>
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-gray-900">Статистика пользователя</h3>
           <button @click="selectedUserStats = null" class="text-gray-400 hover:text-gray-600">
@@ -325,10 +325,6 @@
             <div class="bg-yellow-50 rounded p-3 text-center">
               <p class="text-sm text-gray-500">В ожидании</p>
               <p class="text-2xl font-bold text-yellow-600">{{ selectedUserStats.stats?.waitlist_count || 0 }}</p>
-            </div>
-            <div class="bg-gray-50 rounded p-3 text-center">
-              <p class="text-sm text-gray-500">Как гость</p>
-              <p class="text-2xl font-bold text-gray-900">{{ selectedUserStats.stats?.guests_trainings || 0 }}</p>
             </div>
           </div>
 
