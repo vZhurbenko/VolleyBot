@@ -13,7 +13,7 @@
       >
         <div>
           <h3 class="text-lg font-semibold text-gray-900">{{ training.name || 'Тренировка' }}</h3>
-          <p class="text-sm text-gray-500">{{ formatDate(training.date) }} • {{ training.time }}{{ training.end_time ? ' - ' + training.end_time : '' }}</p>
+          <p class="text-sm text-gray-500">{{ formatDate(training.date) }} • {{ training.time }}</p>
           <p v-if="training.location" class="text-sm text-gray-600 mt-1">{{ training.location }}</p>
         </div>
         <div class="flex items-center gap-2">
@@ -172,7 +172,7 @@
         <div v-else class="text-gray-500 text-center py-8">Пока никто не записался</div>
 
         <!-- Кнопка удаления для админа -->
-        <div v-if="isAdmin && (training.is_one_time || training.event_type === 'one_time_training' || training.event_type === 'scheduled_training')" class="mt-4 pt-4 border-t border-gray-200">
+        <div v-if="isAdmin && (training.source === 'one_time_trainings' || training.event_type === 'one_time_training' || training.event_type === 'scheduled_training')" class="mt-4 pt-4 border-t border-gray-200">
           <button
             @click="$emit('remove-training')"
             class="w-full h-11 px-6 rounded font-medium transition-colors text-red-600 hover:text-red-700 bg-transparent"
