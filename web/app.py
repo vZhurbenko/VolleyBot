@@ -2613,12 +2613,17 @@ async def get_training_by_uuid(
         training['date'] = training['training_date']
     if 'training_time' in training:
         training['time'] = training['training_time']
+    # Для games
+    if 'start_time' in training and 'time' not in training:
+        training['time'] = training['start_time']
 
     # Добавляем тип события для фронтенда
     if training.get('source') == 'one_time_trainings':
         training['event_type'] = 'one_time_training'
     elif training.get('source') == 'scheduled_trainings':
         training['event_type'] = 'scheduled_training'
+    elif training.get('source') == 'games':
+        training['event_type'] = 'game'
 
     # Добавляем список участников с флагом is_guest
     participants = db.get_training_participants(training_uuid)
