@@ -2,7 +2,10 @@
   <div class="flex flex-col gap-4 lg:gap-6">
     <!-- Заголовок -->
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-gray-900">📈 Статистика тренировок</h1>
+      <div class="flex items-center gap-3">
+        <BarChart3 class="w-8 h-8 text-teal-600" />
+        <h1 class="text-2xl font-bold text-gray-900">Статистика тренировок</h1>
+      </div>
       
       <!-- Выбор периода -->
       <div class="flex gap-2">
@@ -266,7 +269,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { BadgeCheck, User } from 'lucide-vue-next'
+import { BadgeCheck, User, BarChart3 } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 

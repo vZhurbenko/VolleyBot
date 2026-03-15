@@ -3405,9 +3405,31 @@ class Database:
         # Определяем диапазон дат
         date_filter, date_params = self._get_period_filter(period)
 
-        # Общая статистика из event_signups (новая архитектура)
+        # Статистика из training_registrations (основная таблица)
         cursor.execute(f'''
-            SELECT 
+            SELECT
+                COUNT(DISTINCT tr.training_date || tr.training_time || tr.chat_id) as total_trainings,
+                COUNT(tr.id) as total_signups,
+                COUNT(DISTINCT tr.user_telegram_id) as unique_users,
+                0 as guests_count,
+                COUNT(tr.id) as users_count
+            FROM training_registrations tr
+            INNER JOIN users u ON tr.user_telegram_id = u.telegram_id
+            WHERE tr.registered_at {date_filter}
+              AND u.is_active = 1
+        ''', date_params if date_params else ())
+
+        row = cursor.fetchone()
+        stats = dict(row) if row else {}
+        stats['total_trainings'] = stats.get('total_trainings', 0) or 0
+        stats['total_signups'] = stats.get('total_signups', 0) or 0
+        stats['unique_users'] = stats.get('unique_users', 0) or 0
+        stats['users_count'] = stats.get('users_count', 0) or 0
+        stats['guests_count'] = stats.get('guests_count', 0) or 0
+
+        # Дополняем из event_signups (новая архитектура)
+        cursor.execute(f'''
+            SELECT
                 COUNT(DISTINCT e.id) as total_trainings,
                 COUNT(es.id) as total_signups,
                 COUNT(DISTINCT es.user_id) as unique_users,
@@ -3419,42 +3441,15 @@ class Database:
               AND e.date {date_filter}
         ''', date_params if date_params else ())
 
-        row = cursor.fetchone()
-        stats = dict(row) if row else {}
-
-        # Дополняем из training_registrations (старая архитектура)
-        # только если нет данных из event_signups
-        cursor.execute(f'''
-            SELECT 
-                COUNT(DISTINCT tr.training_date || tr.training_time || tr.chat_id) as total_trainings,
-                COUNT(tr.id) as total_signups,
-                COUNT(DISTINCT tr.user_telegram_id) as unique_users,
-                0 as guests_count,
-                COUNT(tr.id) as users_count
-            FROM training_registrations tr
-            INNER JOIN users u ON tr.user_telegram_id = u.telegram_id
-            WHERE tr.registered_at {date_filter}
-              AND u.is_active = 1
-              AND NOT EXISTS (
-                  SELECT 1 FROM event_signups es2
-                  INNER JOIN events e2 ON es2.event_id = e2.id
-                  WHERE e2.date = tr.training_date
-                    AND e2.start_time = tr.training_time
-                    AND e2.chat_id = tr.chat_id
-              )
-        ''', date_params if date_params else ())
-
-        old_row = cursor.fetchone()
-        if old_row:
-            old_stats = dict(old_row)
-            # Добавляем только если новые данные пустые
-            if stats.get('total_trainings', 0) == 0:
-                stats['total_trainings'] = old_stats.get('total_trainings', 0) or 0
-            if stats.get('total_signups', 0) == 0:
-                stats['total_signups'] = old_stats.get('total_signups', 0) or 0
-            if stats.get('unique_users', 0) == 0:
-                stats['unique_users'] = old_stats.get('unique_users', 0) or 0
-            stats['users_count'] = (stats.get('users_count', 0) or 0) + (old_stats.get('users_count', 0) or 0)
+        event_row = cursor.fetchone()
+        if event_row:
+            event_stats = dict(event_row)
+            # Добавляем данные из event_signups
+            stats['total_trainings'] = max(stats.get('total_trainings', 0), event_stats.get('total_trainings', 0) or 0)
+            stats['total_signups'] = (stats.get('total_signups', 0) or 0) + (event_stats.get('total_signups', 0) or 0)
+            stats['unique_users'] = max(stats.get('unique_users', 0), event_stats.get('unique_users', 0) or 0)
+            stats['guests_count'] = (stats.get('guests_count', 0) or 0) + (event_stats.get('guests_count', 0) or 0)
+            stats['users_count'] = (stats.get('users_count', 0) or 0) + (event_stats.get('users_count', 0) or 0)
 
         # Вычисляем среднее
         total_trainings = stats.get('total_trainings', 0) or 1
