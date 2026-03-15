@@ -154,7 +154,15 @@
 
     <!-- Топ пользователей -->
     <div v-if="activeTab === 'top_users'" class="bg-white rounded shadow p-4 lg:p-6">
-      <h3 class="font-semibold text-gray-900 mb-4">Топ пользователей по посещаемости</h3>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-gray-900">Статистика пользователей</h3>
+        <p class="text-sm text-gray-500">
+          Всего мероприятий: <span class="font-semibold">{{ totalEvents }}</span>
+          <span v-if="trainingsCount || gamesCount" class="text-gray-400">
+            ({{ trainingsCount }} тренир., {{ gamesCount }} игр)
+          </span>
+        </p>
+      </div>
       
       <div v-if="topUsers.length > 0" class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
@@ -162,9 +170,10 @@
             <tr>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Пользователь</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Тренировки</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Игры</th>
               <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Всего</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Посещено</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Как гость</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">% посещаемости</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
@@ -183,9 +192,21 @@
                   </span>
                 </div>
               </td>
-              <td class="px-4 py-3 text-sm text-center font-semibold text-gray-900">{{ user.total_trainings }}</td>
-              <td class="px-4 py-3 text-sm text-center text-green-600">{{ user.attended_trainings }}</td>
-              <td class="px-4 py-3 text-sm text-center text-gray-500">{{ user.guests_trainings || 0 }}</td>
+              <td class="px-4 py-3 text-sm text-center">{{ user.trainings_count || 0 }}</td>
+              <td class="px-4 py-3 text-sm text-center">{{ user.games_count || 0 }}</td>
+              <td class="px-4 py-3 text-sm text-center font-semibold text-gray-900">{{ user.total_count || 0 }}</td>
+              <td class="px-4 py-3 text-sm text-center">
+                <span
+                  :class="[
+                    'px-2 py-1 rounded text-xs font-semibold',
+                    user.attendance_percent >= 75 ? 'bg-green-100 text-green-700' :
+                    user.attendance_percent >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                    user.attendance_percent > 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'
+                  ]"
+                >
+                  {{ user.attendance_percent || 0 }}%
+                </span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -348,6 +369,9 @@ const selectedDate = ref('')
 const overviewStats = ref({})
 const gamesStats = ref({})
 const topUsers = ref([])
+const totalEvents = ref(0)
+const trainingsCount = ref(0)
+const gamesCount = ref(0)
 const trainingDetails = ref({})
 const selectedUserStats = ref(null)
 
@@ -385,12 +409,15 @@ async function loadGamesStats() {
 
 async function loadTopUsers() {
   try {
-    const response = await fetch(`/api/admin/training-stats/top-users?limit=10&period=${selectedPeriod.value}`, {
+    const response = await fetch(`/api/admin/training-stats/top-users?limit=50&period=${selectedPeriod.value}`, {
       credentials: 'include'
     })
     if (response.ok) {
       const data = await response.json()
-      topUsers.value = data.top_users || []
+      topUsers.value = data.users || []
+      totalEvents.value = data.total_events || 0
+      trainingsCount.value = data.trainings_count || 0
+      gamesCount.value = data.games_count || 0
     }
   } catch (error) {
     console.error('Error loading top users:', error)

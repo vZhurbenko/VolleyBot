@@ -3925,9 +3925,63 @@ class Database:
 
         return rows
 
-    def get_top_users_for_games(self, limit: int = 10, period: str = 'month') -> List[Dict[str, Any]]:
+    def get_events_count(self, period: str = 'month') -> Dict[str, int]:
         """
-        Получение топа пользователей по посещаемости игр
+        Получение общего количества мероприятий (тренировки + игры) за период
+
+        Args:
+            period: 'day', 'week', 'month', 'all'
+
+        Returns:
+            Dict с количеством:
+                - total_events: всего мероприятий
+                - trainings_count: количество тренировок
+                - games_count: количество игр
+        """
+        if not self.conn:
+            return {"total_events": 0, "trainings_count": 0, "games_count": 0}
+
+        cursor = self.conn.cursor()
+        date_filter, date_params = self._get_period_filter(period)
+
+        # Считаем тренировки из training_registrations (уникальные комбинации дата/время/чат)
+        cursor.execute(f'''
+            SELECT COUNT(DISTINCT training_date || training_time || chat_id) as count
+            FROM training_registrations
+            WHERE registered_at {date_filter}
+        ''', date_params if date_params else ())
+        trainings_count = cursor.fetchone()[0] or 0
+
+        # Считаем игры
+        cursor.execute(f'''
+            SELECT COUNT(DISTINCT g.id) as count
+            FROM game_signups gs
+            INNER JOIN games g ON gs.game_id = g.id
+            WHERE gs.created_at {date_filter}
+        ''', date_params if date_params else ())
+        games_count = cursor.fetchone()[0] or 0
+
+        return {
+            "total_events": trainings_count + games_count,
+            "trainings_count": trainings_count,
+            "games_count": games_count
+        }
+
+    def get_all_users_stats(self, limit: int = 50, period: str = 'month') -> List[Dict[str, Any]]:
+        """
+        Получение статистики всех пользователей с процентом посещаемости
+
+        Args:
+            limit: Количество пользователей
+            period: 'day', 'week', 'month', 'all'
+
+        Returns:
+            List пользователей со статистикой:
+                - telegram_id, first_name, last_name, username, is_guest
+                - trainings_count: записей на тренировки
+                - games_count: записей на игры
+                - total_count: всего записей
+                - attendance_percent: процент посещаемости
         """
         if not self.conn:
             return []
@@ -3935,27 +3989,57 @@ class Database:
         cursor = self.conn.cursor()
         date_filter, date_params = self._get_period_filter(period)
 
+        # Сначала получаем общее количество мероприятий за период
+        events_count = self.get_events_count(period)
+        total_events = events_count['total_events']
+
+        # Получаем всех активных пользователей с их активностью
+        if date_params:
+            params = date_params + date_params + [limit]
+        else:
+            params = [limit]
+
         cursor.execute(f'''
             SELECT
                 u.telegram_id,
                 u.first_name,
                 u.last_name,
                 u.username,
-                COUNT(gs.id) as total_games,
-                SUM(CASE WHEN gs.status = 'registered' THEN 1 ELSE 0 END) as attended_games
-            FROM game_signups gs
-            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
-            WHERE gs.created_at {date_filter}
-              AND u.is_active = 1
-            GROUP BY u.id, u.telegram_id, u.first_name, u.last_name, u.username
-            ORDER BY total_games DESC, attended_games DESC
+                u.is_guest,
+                COALESCE(tr.count, 0) as trainings_count,
+                COALESCE(gs.count, 0) as games_count,
+                COALESCE(tr.count, 0) + COALESCE(gs.count, 0) as total_count
+            FROM users u
+            LEFT JOIN (
+                SELECT 
+                    user_telegram_id,
+                    COUNT(*) as count
+                FROM training_registrations
+                WHERE registered_at {date_filter}
+                GROUP BY user_telegram_id
+            ) tr ON u.telegram_id = tr.user_telegram_id
+            LEFT JOIN (
+                SELECT 
+                    user_telegram_id,
+                    COUNT(*) as count
+                FROM game_signups
+                WHERE created_at {date_filter}
+                GROUP BY user_telegram_id
+            ) gs ON u.telegram_id = gs.user_telegram_id
+            WHERE u.is_active = 1
+            ORDER BY total_count DESC, tr.count DESC, gs.count DESC
             LIMIT ?
-        ''', date_params + [limit] if date_params else [limit])
+        ''', params)
 
         rows = [dict(row) for row in cursor.fetchall()]
+
+        # Добавляем процент посещаемости
         for row in rows:
-            row['total_games'] = row.get('total_games', 0) or 0
-            row['attended_games'] = row.get('attended_games', 0) or 0
+            if total_events > 0:
+                row['attendance_percent'] = round((row['total_count'] / total_events) * 100, 1)
+            else:
+                row['attendance_percent'] = 0
+            row['is_guest'] = bool(row.get('is_guest', False))
 
         return rows
 

@@ -1687,19 +1687,29 @@ async def get_user_training_stats(
 
 @app.get("/api/admin/training-stats/top-users")
 async def get_top_users_stats(
-    limit: int = 10,
+    limit: int = 50,
     period: str = "month",
     user: dict = Depends(get_current_user_from_access_cookie)
 ):
     """
-    Получение топа пользователей по посещаемости
-    limit: Количество пользователей (по умолчанию 10)
+    Получение статистики всех пользователей с процентом посещаемости
+    limit: Количество пользователей (по умолчанию 50)
     period: day, week, month, all
     """
     require_admin(user)
     
-    top_users = db.get_top_users(limit, period)
-    return {"top_users": top_users}
+    # Используем новый метод get_all_users_stats
+    users_stats = db.get_all_users_stats(limit, period)
+    
+    # Получаем общее количество мероприятий для отображения
+    events_count = db.get_events_count(period)
+    
+    return {
+        "users": users_stats,
+        "total_events": events_count["total_events"],
+        "trainings_count": events_count["trainings_count"],
+        "games_count": events_count["games_count"]
+    }
 
 
 # ==================== Статистика игр ====================
