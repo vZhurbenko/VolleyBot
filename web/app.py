@@ -1632,6 +1632,76 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 
 
 
+# ==================== Статистика тренировок ====================
+
+@app.get("/api/admin/training-stats/overview")
+async def get_training_stats_overview(
+    period: str = "week",
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение общей статистики по тренировкам за период
+    period: day, week, month, all
+    """
+    require_admin(user)
+    
+    stats = db.get_training_stats(period)
+    return stats
+
+
+@app.get("/api/admin/training-stats/details")
+async def get_training_stats_details(
+    training_date: str,
+    training_time: str = None,
+    chat_id: str = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение детальной информации о конкретной тренировке
+    training_date: Дата в формате YYYY-MM-DD
+    training_time: Время тренировки (опционально)
+    chat_id: Chat ID (опционально)
+    """
+    require_admin(user)
+    
+    details = db.get_training_details(training_date, training_time, chat_id)
+    return details
+
+
+@app.get("/api/admin/training-stats/user/{user_id}")
+async def get_user_training_stats(
+    user_id: int,
+    period: str = "month",
+    current_user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение статистики по конкретному пользователю
+    user_id: Telegram ID пользователя
+    period: day, week, month, all
+    """
+    require_admin(current_user)
+    
+    stats = db.get_user_stats(user_id, period)
+    return stats
+
+
+@app.get("/api/admin/training-stats/top-users")
+async def get_top_users_stats(
+    limit: int = 10,
+    period: str = "month",
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение топа пользователей по посещаемости
+    limit: Количество пользователей (по умолчанию 10)
+    period: day, week, month, all
+    """
+    require_admin(user)
+    
+    top_users = db.get_top_users(limit, period)
+    return {"top_users": top_users}
+
+
 # ==================== Универсальные ссылки на тренировки ====================
 
 @app.get("/training/{training_uuid}")
