@@ -12,9 +12,13 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
+from dotenv import load_dotenv
 
 # Добавляем родительскую директорию в path для импорта database
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Загружаем переменные из .env
+load_dotenv(Path(__file__).parent / ".env")
 
 from fastapi import FastAPI, HTTPException, Depends, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
