@@ -14,7 +14,10 @@ def get_main_menu() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📋 Список опросов", callback_data='polls_list_menu'),
             InlineKeyboardButton("✏️ Редактировать шаблон", callback_data='edit_poll_menu')
         ],
-        [InlineKeyboardButton("⚙️ Настройки", callback_data='settings_menu')]
+        [
+            InlineKeyboardButton("⚙️ Настройки", callback_data='settings_menu'),
+            InlineKeyboardButton("📈 Статистика", callback_data='stats_menu')
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -156,5 +159,59 @@ def get_template_confirmation_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
         [InlineKeyboardButton("✅ Создать", callback_data="confirm_create_template")],
         [InlineKeyboardButton("❌ Отменить", callback_data="cancel_create_template")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_stats_menu_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура меню статистики"""
+    keyboard = [
+        [InlineKeyboardButton("📈 Общая статистика", callback_data='stats_overview')],
+        [InlineKeyboardButton("👥 Топ пользователей", callback_data='stats_top_users')],
+        [InlineKeyboardButton("📅 Статистика по дате", callback_data='stats_by_date')],
+        [InlineKeyboardButton("◀️ Назад", callback_data='back_to_main')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_stats_period_keyboard(stats_type: str = 'overview') -> InlineKeyboardMarkup:
+    """
+    Клавиатура выбора периода для статистики
+    
+    Args:
+        stats_type: Тип статистики для возврата ('overview', 'top_users', 'by_date')
+    """
+    keyboard = [
+        [InlineKeyboardButton("📅 День", callback_data=f"stats_period:day:{stats_type}")],
+        [InlineKeyboardButton("📆 Неделя", callback_data=f"stats_period:week:{stats_type}")],
+        [InlineKeyboardButton("📆 Месяц", callback_data=f"stats_period:month:{stats_type}")],
+        [InlineKeyboardButton("📆 Всё время", callback_data=f"stats_period:all:{stats_type}")],
+        [InlineKeyboardButton("◀️ Назад", callback_data='stats_menu')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_stats_date_input_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для ввода даты статистики"""
+    keyboard = [
+        [InlineKeyboardButton("📅 Сегодня", callback_data='stats_date:today')],
+        [InlineKeyboardButton("📅 Вчера", callback_data='stats_date:yesterday')],
+        [InlineKeyboardButton("◀️ Назад", callback_data='stats_menu')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_user_stats_keyboard(user_telegram_id: int) -> InlineKeyboardMarkup:
+    """
+    Клавиатура для статистики пользователя
+    
+    Args:
+        user_telegram_id: Telegram ID пользователя
+    """
+    keyboard = [
+        [InlineKeyboardButton("📆 Неделя", callback_data=f'user_stats_period:week:{user_telegram_id}')],
+        [InlineKeyboardButton("📆 Месяц", callback_data=f'user_stats_period:month:{user_telegram_id}')],
+        [InlineKeyboardButton("📆 Всё время", callback_data=f'user_stats_period:all:{user_telegram_id}')],
+        [InlineKeyboardButton("◀️ Назад", callback_data='stats_top_users')]
     ]
     return InlineKeyboardMarkup(keyboard)

@@ -26,7 +26,11 @@ from keyboards import (
     get_schedule_edit_training_day_keyboard,
     get_schedule_edit_poll_day_keyboard,
     get_polls_list_keyboard,
-    get_template_confirmation_keyboard
+    get_template_confirmation_keyboard,
+    get_stats_menu_keyboard,
+    get_stats_period_keyboard,
+    get_stats_date_input_keyboard,
+    get_user_stats_keyboard
 )
 
 logger = logging.getLogger(__name__)
@@ -119,6 +123,22 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_info += f"Username: @{username}"
 
     await update.message.reply_text(user_info)
+
+
+async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /stats - показать статистику тренировок"""
+    volley_bot = context.bot_data['volley_bot']
+
+    user_id = update.effective_user.id
+    if user_id not in volley_bot.admin_user_ids:
+        await update.message.reply_text('❌ У вас нет прав для управления этим ботом.')
+        return
+
+    await update.message.reply_text(
+        text="📊 **Статистика тренировок**\n\n"
+             "Выберите раздел статистики:",
+        reply_markup=get_stats_menu_keyboard()
+    )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -899,3 +919,179 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  'Выберите действие:',
             reply_markup=get_main_menu()
         )
+
+    # ==================== Обработчики статистики ====================
+
+    elif query.data == 'stats_menu':
+        await query.edit_message_text(
+            text="📊 **Статистика тренировок**\n\n"
+                 "Выберите раздел статистики:",
+            reply_markup=get_stats_menu_keyboard()
+        )
+
+    elif query.data == 'stats_overview':
+        await query.edit_message_text(
+            text="📈 **Общая статистика**\n\nВыберите период:",
+            reply_markup=get_stats_period_keyboard('overview')
+        )
+
+    elif query.data == 'stats_top_users':
+        await query.edit_message_text(
+            text="👥 **Топ пользователей**\n\nВыберите период:",
+            reply_markup=get_stats_period_keyboard('top_users')
+        )
+
+    elif query.data == 'stats_by_date':
+        await query.edit_message_text(
+            text="📅 **Статистика по дате**\n\n"
+                 "Выберите дату для просмотра детальной статистики:",
+            reply_markup=get_stats_date_input_keyboard()
+        )
+
+    elif query.data.startswith('stats_period:'):
+        parts = query.data.split(':')
+        period = parts[1]
+        stats_type = parts[2] if len(parts) > 2 else 'overview'
+
+        stats = volley_bot.db.get_training_stats(period)
+
+        if 'error' in stats:
+            await query.edit_message_text(text=f"❌ Ошибка: {stats['error']}")
+            return
+
+        period_names = {
+            'day': 'день',
+            'week': 'неделю',
+            'month': 'месяц',
+            'all': 'всё время'
+        }
+
+        text = (
+            f"📈 **Общая статистика за {period_names.get(period, period)}**\n\n"
+            f"📅 Период: {stats['date_range']['from']} - {stats['date_range']['to']}\n\n"
+            f"🏐 Тренировок: {stats.get('total_trainings', 0)}\n"
+            f"👥 Всего записей: {stats.get('total_signups', 0)}\n"
+            f"👤 Уникальных пользователей: {stats.get('unique_users', 0)}\n"
+            f"👥 Авторизованных: {stats.get('users_count', 0)}\n"
+            f"👻 Гостей: {stats.get('guests_count', 0)}\n"
+            f"📊 В среднем на тренировку: {stats.get('avg_per_training', 0)}"
+        )
+
+        await query.edit_message_text(
+            text=text,
+            reply_markup=get_stats_period_keyboard(stats_type)
+        )
+
+    elif query.data.startswith('stats_date:'):
+        date_type = query.data.split(':')[1]
+        from datetime import timedelta
+
+        now = datetime.now()
+        if date_type == 'today':
+            target_date = now.strftime('%Y-%m-%d')
+            display_date = now.strftime('%d.%m.%Y')
+        elif date_type == 'yesterday':
+            yesterday = now - timedelta(days=1)
+            target_date = yesterday.strftime('%Y-%m-%d')
+            display_date = yesterday.strftime('%d.%m.%Y')
+        else:
+            await query.edit_message_text(
+                text="❌ Неверный формат даты",
+                reply_markup=get_stats_date_input_keyboard()
+            )
+            return
+
+        details = volley_bot.db.get_training_details(target_date)
+
+        if 'error' in details:
+            await query.edit_message_text(
+                text=f"❌ Ошибка: {details['error']}",
+                reply_markup=get_stats_date_input_keyboard()
+            )
+            return
+
+        training_info = details.get('training_info', {})
+        stats = details.get('stats', {})
+        participants = details.get('participants', [])
+
+        text = (
+            f"📅 **Статистика за {display_date}**\n\n"
+        )
+
+        if training_info:
+            text += (
+                f"🏐 **{training_info.get('name', 'Тренировка')}**\n"
+                f"⏰ Время: {training_info.get('start_time', 'Н/Д')} - {training_info.get('end_time', 'Н/Д')}\n"
+                f"📍 Место: {training_info.get('location', 'Н/Д')}\n\n"
+            )
+
+        text += (
+            f"📊 **Итого:**\n"
+            f"Всего участников: {stats.get('total', 0)}\n"
+            f"👥 Авторизованных: {stats.get('users_count', 0)}\n"
+            f"👻 Гостей: {stats.get('guests_count', 0)}\n"
+        )
+
+        if participants:
+            text += "\n**Участники:**\n"
+            for i, p in enumerate(participants[:20], 1):  # Показываем до 20 участников
+                guest_mark = "👻 " if p.get('is_guest', False) else ""
+                username = p.get('username', '')
+                name = f"@{username}" if username else f"{p.get('first_name', '')} {p.get('last_name', '')}"
+                text += f"{i}. {guest_mark}{name.strip()}\n"
+
+            if len(participants) > 20:
+                text += f"\n... и ещё {len(participants) - 20} участников"
+
+        await query.edit_message_text(
+            text=text,
+            reply_markup=get_stats_date_input_keyboard()
+        )
+
+    elif query.data.startswith('user_stats_period:'):
+        parts = query.data.split(':')
+        period = parts[1]
+        user_telegram_id = int(parts[2])
+
+        user_stats = volley_bot.db.get_user_stats(user_telegram_id, period)
+
+        if 'error' in user_stats:
+            await query.answer(text=f"❌ Ошибка: {user_stats['error']}", show_alert=True)
+            return
+
+        user_info = user_stats.get('user_info', {})
+        stats = user_stats.get('stats', {})
+
+        period_names = {
+            'week': 'неделю',
+            'month': 'месяц',
+            'all': 'всё время'
+        }
+
+        guest_mark = "👻 " if user_info.get('is_guest', False) else ""
+        username = user_info.get('username', '')
+        name = f"@{username}" if username else f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}"
+
+        text = (
+            f"👤 **Статистика: {guest_mark}{name}**\n\n"
+            f"📅 Период: {user_stats['date_range']['from']} - {user_stats['date_range']['to']}\n\n"
+            f"🏐 Тренировок записался: {stats.get('total_trainings', 0)}\n"
+            f"✅ Посещено: {stats.get('attended_trainings', 0)}\n"
+            f"⏳ В листе ожидания: {stats.get('waitlist_count', 0)}\n"
+            f"👻 Записей как гость: {stats.get('guests_trainings', 0)}\n"
+        )
+
+        if stats.get('last_activity'):
+            last_activity = stats['last_activity']
+            if isinstance(last_activity, str):
+                text += f"🕒 Последняя активность: {last_activity[:16]}"
+
+        await query.edit_message_text(
+            text=text,
+            reply_markup=get_user_stats_keyboard(user_telegram_id)
+        )
+
+    elif query.data.startswith('stats_date_select:'):
+        # Обработка выбора конкретной даты (для будущего расширения)
+        await query.answer(text="Функция в разработке", show_alert=True)
+

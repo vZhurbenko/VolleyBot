@@ -3377,3 +3377,419 @@ class Database:
         except Exception as e:
             logger.error(f"Ошибка удаления гостя: {e}")
             return {"success": False, "error": str(e)}
+
+    # ==================== Методы для статистики тренировок ====================
+
+    def get_training_stats(self, period: str = 'week') -> Dict[str, Any]:
+        """
+        Получение общей статистики по тренировкам за период
+
+        Args:
+            period: Период статистики ('day', 'week', 'month', 'all')
+
+        Returns:
+            Dict со статистикой:
+                - total_trainings: количество тренировок
+                - total_signups: общее количество записей
+                - unique_users: количество уникальных пользователей
+                - guests_count: количество гостей
+                - users_count: количество авторизованных пользователей
+                - avg_per_training: среднее количество участников на тренировку
+                - date_range: диапазон дат (from, to)
+        """
+        if not self.conn:
+            return {"error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        # Определяем диапазон дат
+        date_filter, date_params = self._get_period_filter(period)
+
+        # Общая статистика из event_signups (новая архитектура)
+        cursor.execute(f'''
+            SELECT 
+                COUNT(DISTINCT e.id) as total_trainings,
+                COUNT(es.id) as total_signups,
+                COUNT(DISTINCT es.user_id) as unique_users,
+                SUM(CASE WHEN es.is_guest = 1 THEN 1 ELSE 0 END) as guests_count,
+                SUM(CASE WHEN es.is_guest = 0 THEN 1 ELSE 0 END) as users_count
+            FROM events e
+            INNER JOIN event_signups es ON e.id = es.event_id
+            WHERE e.event_type IN ('training', 'scheduled_training', 'one_time_training')
+              AND e.date {date_filter}
+        ''', date_params if date_params else ())
+
+        row = cursor.fetchone()
+        stats = dict(row) if row else {}
+
+        # Дополняем из training_registrations (старая архитектура)
+        # только если нет данных из event_signups
+        cursor.execute(f'''
+            SELECT 
+                COUNT(DISTINCT tr.training_date || tr.training_time || tr.chat_id) as total_trainings,
+                COUNT(tr.id) as total_signups,
+                COUNT(DISTINCT tr.user_telegram_id) as unique_users,
+                0 as guests_count,
+                COUNT(tr.id) as users_count
+            FROM training_registrations tr
+            INNER JOIN users u ON tr.user_telegram_id = u.telegram_id
+            WHERE tr.registered_at {date_filter}
+              AND u.is_active = 1
+              AND NOT EXISTS (
+                  SELECT 1 FROM event_signups es2
+                  INNER JOIN events e2 ON es2.event_id = e2.id
+                  WHERE e2.date = tr.training_date
+                    AND e2.start_time = tr.training_time
+                    AND e2.chat_id = tr.chat_id
+              )
+        ''', date_params if date_params else ())
+
+        old_row = cursor.fetchone()
+        if old_row:
+            old_stats = dict(old_row)
+            # Добавляем только если новые данные пустые
+            if stats.get('total_trainings', 0) == 0:
+                stats['total_trainings'] = old_stats.get('total_trainings', 0) or 0
+            if stats.get('total_signups', 0) == 0:
+                stats['total_signups'] = old_stats.get('total_signups', 0) or 0
+            if stats.get('unique_users', 0) == 0:
+                stats['unique_users'] = old_stats.get('unique_users', 0) or 0
+            stats['users_count'] = (stats.get('users_count', 0) or 0) + (old_stats.get('users_count', 0) or 0)
+
+        # Вычисляем среднее
+        total_trainings = stats.get('total_trainings', 0) or 1
+        stats['avg_per_training'] = round(stats.get('total_signups', 0) / total_trainings, 2)
+
+        # Диапазон дат
+        stats['date_range'] = self._get_period_date_range(period)
+        stats['period'] = period
+
+        return stats
+
+    def get_training_details(self, training_date: str, training_time: str = None, chat_id: str = None) -> Dict[str, Any]:
+        """
+        Получение детальной информации о конкретной тренировке
+
+        Args:
+            training_date: Дата тренировки (YYYY-MM-DD)
+            training_time: Время тренировки (опционально)
+            chat_id: Chat ID (опционально)
+
+        Returns:
+            Dict с деталями тренировки:
+                - training_info: информация о тренировке
+                - participants: список участников
+                - stats: статистика (users_count, guests_count, total)
+        """
+        if not self.conn:
+            return {"error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        # Получаем информацию о тренировке из events
+        cursor.execute('''
+            SELECT uuid, name, date, start_time, end_time, location, chat_id, topic_id
+            FROM events
+            WHERE event_type IN ('training', 'scheduled_training', 'one_time_training')
+              AND date = ?
+              AND (? IS NULL OR start_time = ?)
+              AND (? IS NULL OR chat_id = ?)
+            ORDER BY start_time ASC
+            LIMIT 1
+        ''', (training_date, training_time, training_time, chat_id, chat_id))
+
+        training_row = cursor.fetchone()
+
+        if not training_row:
+            # Пробуем найти в one_time_trainings или scheduled_trainings
+            cursor.execute('''
+                SELECT uuid, name, training_date as date, training_time as start_time, 
+                       end_time, location, chat_id, topic_id
+                FROM one_time_trainings
+                WHERE training_date = ?
+                  AND (? IS NULL OR training_time = ?)
+                  AND (? IS NULL OR chat_id = ?)
+                UNION ALL
+                SELECT uuid, name, training_date as date, training_time as start_time,
+                       end_time, location, chat_id, topic_id
+                FROM scheduled_trainings
+                WHERE training_date = ?
+                  AND (? IS NULL OR training_time = ?)
+                  AND (? IS NULL OR chat_id = ?)
+                LIMIT 1
+            ''', (training_date, training_time, training_time, chat_id, chat_id,
+                  training_date, training_time, training_time, chat_id, chat_id))
+            training_row = cursor.fetchone()
+
+        if not training_row:
+            return {"error": "Training not found"}
+
+        training_info = dict(training_row)
+        training_uuid = training_info.get('uuid')
+
+        # Получаем участников из event_signups
+        cursor.execute('''
+            SELECT 
+                u.telegram_id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                es.status,
+                es.is_guest,
+                es.created_at as registered_at
+            FROM event_signups es
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE es.event_id = (SELECT id FROM events WHERE uuid = ?)
+              AND u.is_active = 1
+            ORDER BY es.created_at ASC
+        ''', (training_uuid,))
+
+        participants = [dict(row) for row in cursor.fetchall()]
+
+        # Если участников нет, пробуем training_registrations
+        if not participants:
+            cursor.execute('''
+                SELECT 
+                    tr.user_telegram_id as telegram_id,
+                    u.first_name,
+                    u.last_name,
+                    u.username,
+                    tr.status,
+                    0 as is_guest,
+                    tr.registered_at
+                FROM training_registrations tr
+                INNER JOIN users u ON tr.user_telegram_id = u.telegram_id
+                WHERE tr.training_date = ?
+                  AND (? IS NULL OR tr.training_time = ?)
+                  AND (? IS NULL OR tr.chat_id = ?)
+                  AND u.is_active = 1
+                ORDER BY tr.registered_at ASC
+            ''', (training_date, training_time, training_time, chat_id, chat_id))
+            participants = [dict(row) for row in cursor.fetchall()]
+
+        # Статистика
+        users_count = sum(1 for p in participants if not p.get('is_guest', False))
+        guests_count = sum(1 for p in participants if p.get('is_guest', False))
+
+        return {
+            'training_info': training_info,
+            'participants': participants,
+            'stats': {
+                'total': len(participants),
+                'users_count': users_count,
+                'guests_count': guests_count
+            }
+        }
+
+    def get_user_stats(self, user_id: int, period: str = 'month') -> Dict[str, Any]:
+        """
+        Получение статистики по конкретному пользователю
+
+        Args:
+            user_id: Telegram ID пользователя
+            period: Период статистики ('day', 'week', 'month', 'all')
+
+        Returns:
+            Dict со статистикой пользователя:
+                - user_info: информация о пользователе
+                - total_trainings: количество записей на тренировки
+                - attended_trainings: количество посещённых тренировок (registered)
+                - waitlist_count: количество записей в листе ожидания
+                - guests_trainings: количество записей как гость
+                - last_activity: дата последней активности
+        """
+        if not self.conn:
+            return {"error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        # Получаем информацию о пользователе
+        user = self.get_user_by_telegram_id(user_id)
+        if not user:
+            # Пробуем найти как гостя
+            guest = self.get_guest_by_telegram(user_id)
+            if guest:
+                user = {
+                    'telegram_id': guest['telegram_id'],
+                    'first_name': guest['first_name'],
+                    'last_name': guest.get('last_name'),
+                    'username': guest.get('username'),
+                    'is_guest': True
+                }
+            else:
+                return {"error": "User not found"}
+
+        # Определяем диапазон дат
+        date_filter, date_params = self._get_period_filter(period)
+
+        # Статистика из event_signups
+        cursor.execute(f'''
+            SELECT 
+                COUNT(es.id) as total_trainings,
+                SUM(CASE WHEN es.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
+                SUM(CASE WHEN es.status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
+                SUM(CASE WHEN es.is_guest = 1 THEN 1 ELSE 0 END) as guests_trainings,
+                MAX(es.created_at) as last_activity
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            WHERE es.user_id = (SELECT id FROM users WHERE telegram_id = ?)
+              AND e.event_type IN ('training', 'scheduled_training', 'one_time_training')
+              AND e.date {date_filter}
+        ''', [user_id] + (date_params if date_params else []))
+
+        row = cursor.fetchone()
+        stats = dict(row) if row else {}
+
+        # Дополняем из training_registrations если нет данных
+        if stats.get('total_trainings', 0) == 0:
+            cursor.execute(f'''
+                SELECT 
+                    COUNT(tr.id) as total_trainings,
+                    SUM(CASE WHEN tr.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
+                    SUM(CASE WHEN tr.status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
+                    0 as guests_trainings,
+                    MAX(tr.registered_at) as last_activity
+                FROM training_registrations tr
+                WHERE tr.user_telegram_id = ?
+                  AND tr.registered_at {date_filter}
+            ''', [user_id] + (date_params if date_params else []))
+            
+            old_row = cursor.fetchone()
+            if old_row:
+                stats = dict(old_row)
+
+        # Заполняем нулями если None
+        stats['total_trainings'] = stats.get('total_trainings', 0) or 0
+        stats['attended_trainings'] = stats.get('attended_trainings', 0) or 0
+        stats['waitlist_count'] = stats.get('waitlist_count', 0) or 0
+        stats['guests_trainings'] = stats.get('guests_trainings', 0) or 0
+
+        return {
+            'user_info': user,
+            'stats': stats,
+            'period': period,
+            'date_range': self._get_period_date_range(period)
+        }
+
+    def get_top_users(self, limit: int = 10, period: str = 'month') -> List[Dict[str, Any]]:
+        """
+        Получение топа пользователей по посещаемости
+
+        Args:
+            limit: Количество пользователей в топе
+            period: Период статистики ('day', 'week', 'month', 'all')
+
+        Returns:
+            List пользователей с их статистикой:
+                - telegram_id, first_name, last_name, username
+                - total_trainings: количество записей
+                - attended_trainings: количество посещений
+                - guests_trainings: количество как гость
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+
+        # Определяем диапазон дат
+        date_filter, date_params = self._get_period_filter(period)
+
+        # Топ из event_signups
+        cursor.execute(f'''
+            SELECT 
+                u.telegram_id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                u.is_guest,
+                COUNT(es.id) as total_trainings,
+                SUM(CASE WHEN es.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
+                SUM(CASE WHEN es.is_guest = 1 THEN 1 ELSE 0 END) as guests_trainings
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE e.event_type IN ('training', 'scheduled_training', 'one_time_training')
+              AND e.date {date_filter}
+              AND u.is_active = 1
+            GROUP BY u.id, u.telegram_id, u.first_name, u.last_name, u.username, u.is_guest
+            ORDER BY total_trainings DESC, attended_trainings DESC
+            LIMIT ?
+        ''', date_params + [limit] if date_params else [limit])
+
+        rows = [dict(row) for row in cursor.fetchall()]
+
+        # Если нет данных, пробуем training_registrations
+        if not rows:
+            cursor.execute(f'''
+                SELECT 
+                    u.telegram_id,
+                    u.first_name,
+                    u.last_name,
+                    u.username,
+                    0 as is_guest,
+                    COUNT(tr.id) as total_trainings,
+                    SUM(CASE WHEN tr.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
+                    0 as guests_trainings
+                FROM training_registrations tr
+                INNER JOIN users u ON tr.user_telegram_id = u.telegram_id
+                WHERE tr.registered_at {date_filter}
+                  AND u.is_active = 1
+                GROUP BY u.id, u.telegram_id, u.first_name, u.last_name, u.username
+                ORDER BY total_trainings DESC, attended_trainings DESC
+                LIMIT ?
+            ''', date_params + [limit] if date_params else [limit])
+            rows = [dict(row) for row in cursor.fetchall()]
+
+        return rows
+
+    def _get_period_filter(self, period: str) -> tuple:
+        """
+        Вспомогательный метод для получения SQL-фильтра по периоду
+
+        Args:
+            period: 'day', 'week', 'month', 'all'
+
+        Returns:
+            Tuple (filter_string, params)
+        """
+        from datetime import timedelta
+        
+        now = datetime.now()
+        
+        if period == 'day':
+            start = now - timedelta(days=1)
+            return (">= ?", [start.strftime('%Y-%m-%d')])
+        elif period == 'week':
+            start = now - timedelta(weeks=1)
+            return (">= ?", [start.strftime('%Y-%m-%d')])
+        elif period == 'month':
+            start = now - timedelta(days=30)
+            return (">= ?", [start.strftime('%Y-%m-%d')])
+        else:  # 'all'
+            return ("IS NOT NULL", [])
+
+    def _get_period_date_range(self, period: str) -> Dict[str, str]:
+        """
+        Вспомогательный метод для получения диапазона дат периода
+
+        Args:
+            period: 'day', 'week', 'month', 'all'
+
+        Returns:
+            Dict с ключами 'from' и 'to'
+        """
+        from datetime import timedelta
+        
+        now = datetime.now()
+        
+        if period == 'day':
+            start = now - timedelta(days=1)
+            return {'from': start.strftime('%d.%m.%Y'), 'to': now.strftime('%d.%m.%Y')}
+        elif period == 'week':
+            start = now - timedelta(weeks=1)
+            return {'from': start.strftime('%d.%m.%Y'), 'to': now.strftime('%d.%m.%Y')}
+        elif period == 'month':
+            start = now - timedelta(days=30)
+            return {'from': start.strftime('%d.%m.%Y'), 'to': now.strftime('%d.%m.%Y')}
+        else:  # 'all'
+            return {'from': 'начало', 'to': now.strftime('%d.%m.%Y')}
