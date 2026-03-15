@@ -50,9 +50,9 @@
               <Calendar class="w-4 h-4" />
               <span>{{ formatDate(training.date) }}</span>
             </div>
-            <div class="flex items-center gap-2">
+            <div v-if="getTimeDisplay()" class="flex items-center gap-2">
               <Clock class="w-4 h-4" />
-              <span>{{ training.time }}</span>
+              <span>{{ getTimeDisplay() }}</span>
             </div>
             <div v-if="training.location" class="flex items-center gap-2">
               <MapPin class="w-4 h-4" />
@@ -171,7 +171,7 @@ const trainingUuid = computed(() => route.params.uuid)
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isGuest = computed(() => authStore.user?.is_guest ?? false)
 
-const participants = computed(() => training.value?.participants || [])
+const participants = computed(() => training.value?.registrations || [])
 
 const registeredCount = computed(() => {
   return (participants.value || []).filter((p) => !p.is_guest || p.is_active !== false).length
@@ -320,6 +320,18 @@ const formatDate = (dateStr) => {
     year: 'numeric',
     weekday: 'long',
   })
+}
+
+const getTimeDisplay = () => {
+  if (!training.value) return ''
+  
+  // Для игр (event_type === 'game') используем только start_time
+  if (training.value.event_type === 'game') {
+    return training.value.start_time || training.value.time || ''
+  }
+  
+  // Для тренировок используем time (который уже нормализован)
+  return training.value.time || training.value.start_time || ''
 }
 
 const getInitials = (participant) => {

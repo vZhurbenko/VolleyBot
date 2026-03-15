@@ -38,7 +38,7 @@ from telegram.ext import (
 
 from database import Database
 from utils import get_weekday_russian, get_next_occurrence, get_next_sunday, format_date_with_weekday, get_day_of_week_number
-from handlers import start, get_user_id, handle_message, button_handler, creation_states
+from handlers import start, get_user_id, handle_message, button_handler, creation_states, show_stats
 
 
 logger = logging.getLogger(__name__)
@@ -694,6 +694,7 @@ def main():
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("getid", get_user_id))
+    application.add_handler(CommandHandler("stats", show_stats))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 

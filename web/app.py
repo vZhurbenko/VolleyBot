@@ -1632,6 +1632,164 @@ async def remove_admin_id(admin_id: int, user: dict = Depends(get_current_user_f
 
 
 
+# ==================== Статистика тренировок ====================
+
+@app.get("/api/admin/training-stats/overview")
+async def get_training_stats_overview(
+    period: str = "week",
+    year: int = None,
+    month: int = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение общей статистики по тренировкам за период
+    period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
+    """
+    require_admin(user)
+
+    stats = db.get_training_stats(period)
+    return stats
+
+
+@app.get("/api/admin/training-stats/by-day")
+async def get_training_stats_by_day(
+    period: str = "month",
+    year: int = None,
+    month: int = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение статистики по тренировкам по дням (для графика)
+    period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
+    """
+    require_admin(user)
+
+    stats = db.get_training_stats_by_day(period, year, month)
+    return stats
+
+
+@app.get("/api/admin/game-stats/by-day")
+async def get_games_stats_by_day(
+    period: str = "month",
+    year: int = None,
+    month: int = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение статистики по играм по дням (для графика)
+    period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
+    """
+    require_admin(user)
+
+    stats = db.get_games_stats_by_day(period, year, month)
+    return stats
+
+
+@app.get("/api/admin/training-stats/details")
+async def get_training_stats_details(
+    training_date: str,
+    training_time: str = None,
+    chat_id: str = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение детальной информации о конкретной тренировке
+    training_date: Дата в формате YYYY-MM-DD
+    training_time: Время тренировки (опционально)
+    chat_id: Chat ID (опционально)
+    """
+    require_admin(user)
+    
+    details = db.get_training_details(training_date, training_time, chat_id)
+    return details
+
+
+@app.get("/api/admin/training-stats/user/{user_id}")
+async def get_user_training_stats(
+    user_id: int,
+    period: str = "month",
+    current_user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение статистики по конкретному пользователю
+    user_id: Telegram ID пользователя
+    period: day, week, month, all
+    """
+    require_admin(current_user)
+    
+    stats = db.get_user_stats(user_id, period)
+    return stats
+
+
+@app.get("/api/admin/training-stats/top-users")
+async def get_top_users_stats(
+    limit: int = 50,
+    period: str = "month",
+    year: int = None,
+    month: int = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение статистики всех пользователей с процентом посещаемости
+    limit: Количество пользователей (по умолчанию 50)
+    period: day, week, month, all
+    year: Год (опционально, для периода 'month')
+    month: Месяц (опционально, для периода 'month')
+    """
+    require_admin(user)
+
+    # Используем новый метод get_all_users_stats
+    users_stats = db.get_all_users_stats(limit, period, year, month)
+
+    # Получаем общее количество мероприятий для отображения
+    events_count = db.get_events_count(period, year, month)
+
+    return {
+        "users": users_stats,
+        "total_events": events_count["total_events"],
+        "trainings_count": events_count["trainings_count"],
+        "games_count": events_count["games_count"]
+    }
+
+
+# ==================== Статистика игр ====================
+
+@app.get("/api/admin/game-stats/overview")
+async def get_game_stats_overview(
+    period: str = "week",
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение общей статистики по играм за период
+    period: day, week, month, all
+    """
+    require_admin(user)
+    
+    stats = db.get_games_stats(period)
+    return stats
+
+
+@app.get("/api/admin/game-stats/details")
+async def get_game_stats_details(
+    game_id: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение детальной информации о конкретной игре
+    game_id: ID игры
+    """
+    require_admin(user)
+    
+    details = db.get_game_details(game_id)
+    return details
+
+
 # ==================== Универсальные ссылки на тренировки ====================
 
 @app.get("/training/{training_uuid}")
@@ -2474,12 +2632,17 @@ async def get_training_by_uuid(
         training['date'] = training['training_date']
     if 'training_time' in training:
         training['time'] = training['training_time']
+    # Для games
+    if 'start_time' in training and 'time' not in training:
+        training['time'] = training['start_time']
 
     # Добавляем тип события для фронтенда
     if training.get('source') == 'one_time_trainings':
         training['event_type'] = 'one_time_training'
     elif training.get('source') == 'scheduled_trainings':
         training['event_type'] = 'scheduled_training'
+    elif training.get('source') == 'games':
+        training['event_type'] = 'game'
 
     # Добавляем список участников с флагом is_guest
     participants = db.get_training_participants(training_uuid)
