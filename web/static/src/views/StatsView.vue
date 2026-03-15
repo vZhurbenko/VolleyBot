@@ -70,11 +70,17 @@
           <h3 class="font-semibold text-gray-900 mb-4">Распределение по типам</h3>
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <span class="text-gray-700">👥 Авторизованные</span>
+              <div class="flex items-center gap-2">
+                <BadgeCheck class="w-5 h-5 text-teal-600" />
+                <span class="text-gray-700">Участники</span>
+              </div>
               <span class="font-semibold text-gray-900">{{ overviewStats.users_count || 0 }}</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-gray-700">👻 Гости</span>
+              <div class="flex items-center gap-2">
+                <User class="w-5 h-5 text-blue-600" />
+                <span class="text-gray-700">Гости</span>
+              </div>
               <span class="font-semibold text-gray-900">{{ overviewStats.guests_count || 0 }}</span>
             </div>
           </div>
@@ -114,7 +120,7 @@
               <td class="px-4 py-3 text-sm text-gray-900">{{ index + 1 }}</td>
               <td class="px-4 py-3 text-sm">
                 <div class="flex items-center gap-2">
-                  <span v-if="user.is_guest" class="text-gray-400">👻</span>
+                  <User v-if="user.is_guest" class="w-4 h-4 text-blue-600" />
                   <span class="font-medium text-gray-900">
                     {{ user.username ? '@' + user.username : user.first_name + ' ' + (user.last_name || '') }}
                   </span>
@@ -178,7 +184,7 @@
               class="flex items-center justify-between p-2 bg-gray-50 rounded"
             >
               <div class="flex items-center gap-2">
-                <span v-if="p.is_guest" class="text-gray-400">👻</span>
+                <User v-if="p.is_guest" class="w-4 h-4 text-blue-600" />
                 <span class="text-gray-900">
                   {{ p.username ? '@' + p.username : p.first_name + ' ' + (p.last_name || '') }}
                 </span>
@@ -221,7 +227,7 @@
 
         <div v-if="selectedUserStats.user_info" class="space-y-4">
           <div class="flex items-center gap-3">
-            <span v-if="selectedUserStats.user_info.is_guest" class="text-gray-400">👻</span>
+            <User v-if="selectedUserStats.user_info.is_guest" class="w-5 h-5 text-blue-600" />
             <span class="font-medium text-gray-900">
               {{ selectedUserStats.user_info.username 
                 ? '@' + selectedUserStats.user_info.username 
@@ -260,6 +266,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { BadgeCheck, User } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 
