@@ -2861,7 +2861,9 @@ logger.info("Планировщик запущен: добавление тре�
 
 # ==================== Статика ====================
 
-static_path = Path("/var/www/volleyteam.ru")
+# Путь к статике берётся из переменной окружения или используется по умолчанию
+STATIC_ROOT = os.getenv("STATIC_ROOT", "/var/www/teamr.volleyteam.ru")
+static_path = Path(STATIC_ROOT)
 assets_path = static_path / "assets"
 
 # Монтируем директорию ассетов для CSS/JS файлов
@@ -2894,7 +2896,7 @@ async def root(full_path: str):
         raise HTTPException(status_code=404)
 
     # Иначе отдаём index.html для Vue Router
-    index_path = Path("/var/www/volleyteam.ru") / "index.html"
+    index_path = Path(STATIC_ROOT) / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
     return {"message": "VolleyBot Auth API - build not found"}
