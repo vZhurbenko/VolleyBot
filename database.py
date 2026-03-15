@@ -3838,13 +3838,15 @@ class Database:
             }
         }
 
-    def get_user_stats(self, user_id: int, period: str = 'month') -> Dict[str, Any]:
+    def get_user_stats(self, user_id: int, period: str = 'month', year: int = None, month: int = None) -> Dict[str, Any]:
         """
         Получение статистики по конкретному пользователю (тренировки + игры)
 
         Args:
             user_id: Telegram ID пользователя
             period: Период статистики ('day', 'week', 'month', 'all')
+            year: Год (опционально, для периода 'month')
+            month: Месяц (опционально, для периода 'month')
 
         Returns:
             Dict со статистикой пользователя:
@@ -3877,45 +3879,26 @@ class Database:
                 return {"error": "User not found"}
 
         # Определяем диапазон дат
-        date_filter, date_params = self._get_period_filter(period)
+        date_filter, date_params = self._get_period_filter(period, year, month)
 
-        # Статистика из training_registrations + game_signups
+        # Статистика из event_signups (новая архитектура)
         if date_params:
-            params = [user_id] + date_params + date_params
+            params = [user['id']] + date_params
         else:
-            params = [user_id]
-            
+            params = [user['id']]
+
         cursor.execute(f'''
             SELECT
-                COALESCE(tr.count, 0) + COALESCE(gs.count, 0) as total_trainings,
-                COALESCE(tr.registered_count, 0) + COALESCE(gs.registered_count, 0) as attended_trainings,
-                COALESCE(tr.waitlist_count, 0) + COALESCE(gs.waitlist_count, 0) as waitlist_count,
-                0 as guests_trainings,
-                MAX(COALESCE(tr.last_activity, gs.last_activity)) as last_activity
-            FROM users u
-            LEFT JOIN (
-                SELECT 
-                    user_telegram_id,
-                    COUNT(*) as count,
-                    SUM(CASE WHEN status = 'registered' THEN 1 ELSE 0 END) as registered_count,
-                    SUM(CASE WHEN status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
-                    MAX(registered_at) as last_activity
-                FROM training_registrations
-                WHERE registered_at {date_filter}
-                GROUP BY user_telegram_id
-            ) tr ON u.telegram_id = tr.user_telegram_id
-            LEFT JOIN (
-                SELECT 
-                    user_telegram_id,
-                    COUNT(*) as count,
-                    SUM(CASE WHEN status = 'registered' THEN 1 ELSE 0 END) as registered_count,
-                    SUM(CASE WHEN status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
-                    MAX(created_at) as last_activity
-                FROM game_signups
-                WHERE created_at {date_filter}
-                GROUP BY user_telegram_id
-            ) gs ON u.telegram_id = gs.user_telegram_id
-            WHERE u.telegram_id = ?
+                COUNT(es.id) as total_trainings,
+                SUM(CASE WHEN es.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
+                SUM(CASE WHEN es.status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
+                SUM(CASE WHEN u.is_guest = 1 THEN 1 ELSE 0 END) as guests_trainings,
+                MAX(es.created_at) as last_activity
+            FROM event_signups es
+            INNER JOIN events e ON es.event_id = e.id
+            INNER JOIN users u ON es.user_id = u.id
+            WHERE es.user_id = ?
+              AND e.date {date_filter}
         ''', params)
 
         row = cursor.fetchone()
@@ -3931,7 +3914,7 @@ class Database:
             'user_info': user,
             'stats': stats,
             'period': period,
-            'date_range': self._get_period_date_range(period)
+            'date_range': self._get_period_date_range(period, year, month)
         }
 
     def get_top_users(self, limit: int = 10, period: str = 'month') -> List[Dict[str, Any]]:
