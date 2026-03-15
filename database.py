@@ -679,13 +679,35 @@ class Database:
             logger.error(f"Ошибка установки статуса админа: {e}")
             return {"success": False, "error": str(e)}
 
-    def get_all_users(self) -> List[Dict[str, Any]]:
-        """Получение всех пользователей"""
+    def get_all_users(self, filter_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Получение всех пользователей с опциональной фильтрацией
+
+        Args:
+            filter_type: Тип фильтрации:
+                - None: все пользователи
+                - 'active': активные пользователи (is_active = 1)
+                - 'inactive': неактивные пользователи (is_active = 0)
+                - 'guests': гости (is_guest = 1)
+
+        Returns:
+            Список пользователей с применённым фильтром
+        """
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM users ORDER BY created_at DESC')
+
+        # Формируем SQL-запрос с фильтром
+        if filter_type == 'active':
+            cursor.execute('SELECT * FROM users WHERE is_active = 1 ORDER BY created_at DESC')
+        elif filter_type == 'inactive':
+            cursor.execute('SELECT * FROM users WHERE is_active = 0 ORDER BY created_at DESC')
+        elif filter_type == 'guests':
+            cursor.execute('SELECT * FROM users WHERE is_guest = 1 ORDER BY created_at DESC')
+        else:
+            cursor.execute('SELECT * FROM users ORDER BY created_at DESC')
+
         rows = cursor.fetchall()
 
         users = []

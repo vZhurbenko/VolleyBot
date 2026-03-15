@@ -3,6 +3,46 @@
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Пользователи</h1>
 
     <div class="flex flex-col gap-6">
+      <!-- Фильтры -->
+      <div class="flex gap-1.5 flex-wrap">
+        <button
+          @click="setFilter(null)"
+          class="px-3 py-1.5 text-sm rounded border transition-colors"
+          :class="currentFilter === null
+            ? 'bg-teal-600 border-teal-600 text-white'
+            : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'"
+        >
+          Всех
+        </button>
+        <button
+          @click="setFilter('active')"
+          class="px-3 py-1.5 text-sm rounded border transition-colors"
+          :class="currentFilter === 'active'
+            ? 'bg-teal-600 border-teal-600 text-white'
+            : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'"
+        >
+          Активные
+        </button>
+        <button
+          @click="setFilter('inactive')"
+          class="px-3 py-1.5 text-sm rounded border transition-colors"
+          :class="currentFilter === 'inactive'
+            ? 'bg-teal-600 border-teal-600 text-white'
+            : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'"
+        >
+          Деактивированные
+        </button>
+        <button
+          @click="setFilter('guests')"
+          class="px-3 py-1.5 text-sm rounded border transition-colors"
+          :class="currentFilter === 'guests'
+            ? 'bg-teal-600 border-teal-600 text-white'
+            : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'"
+        >
+          Гости
+        </button>
+      </div>
+
       <!-- Форма добавления -->
       <div class="flex flex-col gap-2">
         <label class="block text-sm font-medium text-gray-700"
@@ -104,11 +144,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Shield, Edit2, User, BadgeCheck } from 'lucide-vue-next'
 import UserEditModal from '@/components/UserEditModal.vue'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useConfirmStore } from '@/stores/confirm'
+
+const route = useRoute()
+const router = useRouter()
 
 const users = ref([])
 const newTelegramId = ref('')
@@ -119,6 +163,12 @@ const showEditModal = ref(false)
 const notificationsStore = useNotificationsStore()
 const confirmStore = useConfirmStore()
 
+// Получение текущего фильтра из URL query params
+const currentFilter = computed(() => {
+  const filter = route.query.filter
+  return filter === undefined || filter === null || filter === '' ? null : filter
+})
+
 onMounted(() => {
   loadUsers()
 })
@@ -127,7 +177,13 @@ const loadUsers = async () => {
   loading.value = true
 
   try {
-    const response = await fetch('/api/admin/users', {
+    // Формируем URL с query параметром filter
+    const url = new URL('/api/admin/users', window.location.origin)
+    if (currentFilter.value) {
+      url.searchParams.set('filter', currentFilter.value)
+    }
+
+    const response = await fetch(url, {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
@@ -164,6 +220,20 @@ const loadUsers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Установка фильтра и обновление URL
+const setFilter = (filterType) => {
+  const query = { ...route.query }
+  
+  if (filterType === null || filterType === undefined) {
+    delete query.filter
+  } else {
+    query.filter = filterType
+  }
+  
+  router.push({ query })
+  loadUsers()
 }
 
 const handleAdd = async () => {

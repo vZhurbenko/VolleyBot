@@ -446,7 +446,7 @@ class TestGuestSignups:
     def test_convert_guest_to_user_removes_signups(self, db, sample_training):
         """Тест конвертации гостя в пользователя с удалением записей"""
         db.add_game(sample_training)
-        
+
         # Записываем гостя
         db.add_guest_signup(
             telegram_id=123456789,
@@ -454,16 +454,122 @@ class TestGuestSignups:
             first_name="Test",
             last_name="User"
         )
-        
+
         # Конвертируем в пользователя
         user = db.convert_guest_to_user(
             telegram_id=123456789,
             first_name="Test",
             last_name="User"
         )
-        
+
         # Пользователь создан
         assert user is not None
         assert user['telegram_id'] == 123456789
         # Гость удалён
         assert db.get_guest_by_telegram(123456789) is None
+
+
+class TestGetAllUsersWithFilters:
+    """Тесты метода get_all_users с фильтрацией"""
+
+    def test_get_all_users_empty(self, db):
+        """Тест получения пустого списка пользователей"""
+        users = db.get_all_users()
+        assert users == []
+
+    def test_get_all_users_no_filter(self, db):
+        """Тест получения всех пользователей без фильтра"""
+        # Добавляем пользователей
+        db.add_user(telegram_id=111, first_name="User1", is_admin=False)
+        db.add_user(telegram_id=222, first_name="User2", is_admin=False)
+        db.add_user(telegram_id=333, first_name="User3", is_admin=True)
+
+        users = db.get_all_users()
+        assert len(users) == 3
+
+    def test_get_all_users_filter_active(self, db):
+        """Тест фильтрации активных пользователей"""
+        # Добавляем пользователей
+        db.add_user(telegram_id=111, first_name="Active1", is_admin=False)
+        db.add_user(telegram_id=222, first_name="Active2", is_admin=False)
+        
+        # Деактивируем одного пользователя
+        db.toggle_user_active_status(222, is_active=False)
+
+        users = db.get_all_users(filter_type='active')
+        assert len(users) == 1
+        assert users[0]['telegram_id'] == 111
+        assert users[0]['is_active'] is True
+
+    def test_get_all_users_filter_inactive(self, db):
+        """Тест фильтрации неактивных пользователей"""
+        # Добавляем пользователей
+        db.add_user(telegram_id=111, first_name="Active1", is_admin=False)
+        db.add_user(telegram_id=222, first_name="Inactive1", is_admin=False)
+        db.add_user(telegram_id=333, first_name="Inactive2", is_admin=False)
+        
+        # Деактивируем пользователей
+        db.toggle_user_active_status(222, is_active=False)
+        db.toggle_user_active_status(333, is_active=False)
+
+        users = db.get_all_users(filter_type='inactive')
+        assert len(users) == 2
+        inactive_ids = [u['telegram_id'] for u in users]
+        assert 222 in inactive_ids
+        assert 333 in inactive_ids
+
+    def test_get_all_users_filter_guests(self, db):
+        """Тест фильтрации гостей"""
+        # Добавляем обычных пользователей
+        db.add_user(telegram_id=111, first_name="User1", is_admin=False)
+        db.add_user(telegram_id=222, first_name="User2", is_admin=False)
+        
+        # Добавляем гостей через таблицу users с is_guest=1
+        if db.conn:
+            cursor = db.conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (telegram_id, first_name, is_guest, is_active)
+                VALUES (?, ?, 1, 1)
+            ''', (333, "Guest1"))
+            cursor.execute('''
+                INSERT INTO users (telegram_id, first_name, is_guest, is_active)
+                VALUES (?, ?, 1, 1)
+            ''', (444, "Guest2"))
+            db.conn.commit()
+
+        users = db.get_all_users(filter_type='guests')
+        assert len(users) == 2
+        guest_ids = [u['telegram_id'] for u in users]
+        assert 333 in guest_ids
+        assert 444 in guest_ids
+        # Все должны быть гостями
+        assert all(u['is_guest'] for u in users)
+
+    def test_get_all_users_filter_preserves_admin_status(self, db):
+        """Тест что фильтрация сохраняет статус админа"""
+        # Добавляем админа и обычного пользователя
+        db.add_user(telegram_id=111, first_name="Admin", is_admin=True)
+        db.add_user(telegram_id=222, first_name="User", is_admin=False)
+
+        users = db.get_all_users(filter_type='active')
+        admin_user = next(u for u in users if u['telegram_id'] == 111)
+        assert admin_user['is_admin'] is True
+
+    def test_get_all_users_filter_guests_only_guests(self, db):
+        """Тест что фильтр guests не возвращает обычных пользователей"""
+        # Добавляем обычного пользователя
+        db.add_user(telegram_id=111, first_name="User1", is_admin=False)
+        
+        # Добавляем гостя
+        if db.conn:
+            cursor = db.conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (telegram_id, first_name, is_guest, is_active)
+                VALUES (?, ?, 1, 1)
+            ''', (222, "Guest1"))
+            db.conn.commit()
+
+        users = db.get_all_users(filter_type='guests')
+        assert len(users) == 1
+        assert users[0]['telegram_id'] == 222
+        assert users[0]['is_guest'] is True

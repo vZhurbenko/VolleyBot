@@ -1337,12 +1337,18 @@ async def delete_guest(
 
 
 @app.get("/api/admin/users", response_model=List[UserInfo])
-async def get_all_users(user: dict = Depends(get_current_user_from_access_cookie)):
+async def get_all_users(
+    filter: Optional[str] = None,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
     """
     Получение списка всех пользователей (только для администраторов)
+    
+    Args:
+        filter: Фильтр пользователей (active, inactive, guests)
     """
     require_admin(user)
-    users = db.get_all_users()
+    users = db.get_all_users(filter_type=filter)
     return users
 
 
