@@ -271,7 +271,7 @@
     <!-- Модальное окно статистики пользователя -->
     <div
       v-if="selectedUserStats"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
       @click="selectedUserStats = null"
     >
       <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" @click.stop>

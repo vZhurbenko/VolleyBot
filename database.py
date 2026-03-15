@@ -3724,7 +3724,7 @@ class Database:
 
     def get_user_stats(self, user_id: int, period: str = 'month') -> Dict[str, Any]:
         """
-        Получение статистики по конкретному пользователю
+        Получение статистики по конкретному пользователю (тренировки + игры)
 
         Args:
             user_id: Telegram ID пользователя
@@ -3733,8 +3733,8 @@ class Database:
         Returns:
             Dict со статистикой пользователя:
                 - user_info: информация о пользователе
-                - total_trainings: количество записей на тренировки
-                - attended_trainings: количество посещённых тренировок (registered)
+                - total_trainings: количество записей (тренировки + игры)
+                - attended_trainings: количество посещённых (registered)
                 - waitlist_count: количество записей в листе ожидания
                 - guests_trainings: количество записей как гость
                 - last_activity: дата последней активности
@@ -3763,41 +3763,47 @@ class Database:
         # Определяем диапазон дат
         date_filter, date_params = self._get_period_filter(period)
 
-        # Статистика из event_signups
+        # Статистика из training_registrations + game_signups
+        if date_params:
+            params = [user_id] + date_params + date_params
+        else:
+            params = [user_id]
+            
         cursor.execute(f'''
-            SELECT 
-                COUNT(es.id) as total_trainings,
-                SUM(CASE WHEN es.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
-                SUM(CASE WHEN es.status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
-                SUM(CASE WHEN es.is_guest = 1 THEN 1 ELSE 0 END) as guests_trainings,
-                MAX(es.created_at) as last_activity
-            FROM event_signups es
-            INNER JOIN events e ON es.event_id = e.id
-            WHERE es.user_id = (SELECT id FROM users WHERE telegram_id = ?)
-              AND e.event_type IN ('training', 'scheduled_training', 'one_time_training')
-              AND e.date {date_filter}
-        ''', [user_id] + (date_params if date_params else []))
+            SELECT
+                COALESCE(tr.count, 0) + COALESCE(gs.count, 0) as total_trainings,
+                COALESCE(tr.registered_count, 0) + COALESCE(gs.registered_count, 0) as attended_trainings,
+                COALESCE(tr.waitlist_count, 0) + COALESCE(gs.waitlist_count, 0) as waitlist_count,
+                0 as guests_trainings,
+                MAX(COALESCE(tr.last_activity, gs.last_activity)) as last_activity
+            FROM users u
+            LEFT JOIN (
+                SELECT 
+                    user_telegram_id,
+                    COUNT(*) as count,
+                    SUM(CASE WHEN status = 'registered' THEN 1 ELSE 0 END) as registered_count,
+                    SUM(CASE WHEN status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
+                    MAX(registered_at) as last_activity
+                FROM training_registrations
+                WHERE registered_at {date_filter}
+                GROUP BY user_telegram_id
+            ) tr ON u.telegram_id = tr.user_telegram_id
+            LEFT JOIN (
+                SELECT 
+                    user_telegram_id,
+                    COUNT(*) as count,
+                    SUM(CASE WHEN status = 'registered' THEN 1 ELSE 0 END) as registered_count,
+                    SUM(CASE WHEN status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
+                    MAX(created_at) as last_activity
+                FROM game_signups
+                WHERE created_at {date_filter}
+                GROUP BY user_telegram_id
+            ) gs ON u.telegram_id = gs.user_telegram_id
+            WHERE u.telegram_id = ?
+        ''', params)
 
         row = cursor.fetchone()
         stats = dict(row) if row else {}
-
-        # Дополняем из training_registrations если нет данных
-        if stats.get('total_trainings', 0) == 0:
-            cursor.execute(f'''
-                SELECT 
-                    COUNT(tr.id) as total_trainings,
-                    SUM(CASE WHEN tr.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
-                    SUM(CASE WHEN tr.status = 'waitlist' THEN 1 ELSE 0 END) as waitlist_count,
-                    0 as guests_trainings,
-                    MAX(tr.registered_at) as last_activity
-                FROM training_registrations tr
-                WHERE tr.user_telegram_id = ?
-                  AND tr.registered_at {date_filter}
-            ''', [user_id] + (date_params if date_params else []))
-            
-            old_row = cursor.fetchone()
-            if old_row:
-                stats = dict(old_row)
 
         # Заполняем нулями если None
         stats['total_trainings'] = stats.get('total_trainings', 0) or 0
