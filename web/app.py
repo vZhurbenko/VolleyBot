@@ -48,7 +48,11 @@ app = FastAPI(title="VolleyBot Auth API")
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://volleyteam.ru", "https://www.volleyteam.ru"],  # Только наш домен
+    allow_origins=[
+        "https://volleyteam.ru",
+        "https://www.volleyteam.ru",
+        "https://teamr.volleyteam.ru"
+    ],  # Только наши домены
     allow_credentials=True,  # Разрешить cookie
     allow_methods=["*"],
     allow_headers=["*"],
