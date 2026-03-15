@@ -3814,7 +3814,7 @@ class Database:
 
     def get_top_users(self, limit: int = 10, period: str = 'month') -> List[Dict[str, Any]]:
         """
-        Получение топа пользователей по посещаемости
+        Получение топа пользователей по посещаемости (тренировки + игры)
 
         Args:
             limit: Количество пользователей в топе
@@ -3823,7 +3823,7 @@ class Database:
         Returns:
             List пользователей с их статистикой:
                 - telegram_id, first_name, last_name, username
-                - total_trainings: количество записей
+                - total_trainings: количество записей (тренировки + игры)
                 - attended_trainings: количество посещений
                 - guests_trainings: количество как гость
         """
@@ -3835,51 +3835,121 @@ class Database:
         # Определяем диапазон дат
         date_filter, date_params = self._get_period_filter(period)
 
-        # Топ из event_signups
+        # Топ из training_registrations + game_signups (объединённая статистика)
+        # Сначала получаем пользователей с их активностью
+        if date_params:
+            # date_params содержит 1 значение, но используем его дважды
+            params = date_params + date_params + [limit]
+        else:
+            params = [limit]
+            
         cursor.execute(f'''
-            SELECT 
+            SELECT
                 u.telegram_id,
                 u.first_name,
                 u.last_name,
                 u.username,
                 u.is_guest,
-                COUNT(es.id) as total_trainings,
-                SUM(CASE WHEN es.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
-                SUM(CASE WHEN es.is_guest = 1 THEN 1 ELSE 0 END) as guests_trainings
-            FROM event_signups es
-            INNER JOIN events e ON es.event_id = e.id
-            INNER JOIN users u ON es.user_id = u.id
-            WHERE e.event_type IN ('training', 'scheduled_training', 'one_time_training')
-              AND e.date {date_filter}
-              AND u.is_active = 1
-            GROUP BY u.id, u.telegram_id, u.first_name, u.last_name, u.username, u.is_guest
+                COALESCE(tr.count, 0) + COALESCE(gs.count, 0) as total_trainings,
+                COALESCE(tr.registered_count, 0) + COALESCE(gs.registered_count, 0) as attended_trainings,
+                0 as guests_trainings
+            FROM users u
+            LEFT JOIN (
+                SELECT 
+                    user_telegram_id,
+                    COUNT(*) as count,
+                    SUM(CASE WHEN status = 'registered' THEN 1 ELSE 0 END) as registered_count
+                FROM training_registrations
+                WHERE registered_at {date_filter}
+                GROUP BY user_telegram_id
+            ) tr ON u.telegram_id = tr.user_telegram_id
+            LEFT JOIN (
+                SELECT 
+                    user_telegram_id,
+                    COUNT(*) as count,
+                    SUM(CASE WHEN status = 'registered' THEN 1 ELSE 0 END) as registered_count
+                FROM game_signups
+                WHERE created_at {date_filter}
+                GROUP BY user_telegram_id
+            ) gs ON u.telegram_id = gs.user_telegram_id
+            WHERE u.is_active = 1
+              AND (tr.count IS NOT NULL OR gs.count IS NOT NULL)
             ORDER BY total_trainings DESC, attended_trainings DESC
             LIMIT ?
-        ''', date_params + [limit] if date_params else [limit])
+        ''', params)
 
         rows = [dict(row) for row in cursor.fetchall()]
 
-        # Если нет данных, пробуем training_registrations
+        # Если нет данных, пробуем event_signups (новая архитектура)
         if not rows:
+            if date_params:
+                params = date_params + [limit]
+            else:
+                params = [limit]
+                
             cursor.execute(f'''
-                SELECT 
+                SELECT
                     u.telegram_id,
                     u.first_name,
                     u.last_name,
                     u.username,
-                    0 as is_guest,
-                    COUNT(tr.id) as total_trainings,
-                    SUM(CASE WHEN tr.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
-                    0 as guests_trainings
-                FROM training_registrations tr
-                INNER JOIN users u ON tr.user_telegram_id = u.telegram_id
-                WHERE tr.registered_at {date_filter}
+                    u.is_guest,
+                    COUNT(es.id) as total_trainings,
+                    SUM(CASE WHEN es.status = 'registered' THEN 1 ELSE 0 END) as attended_trainings,
+                    SUM(CASE WHEN es.is_guest = 1 THEN 1 ELSE 0 END) as guests_trainings
+                FROM event_signups es
+                INNER JOIN events e ON es.event_id = e.id
+                INNER JOIN users u ON es.user_id = u.id
+                WHERE e.event_type IN ('training', 'scheduled_training', 'one_time_training')
+                  AND e.date {date_filter}
                   AND u.is_active = 1
-                GROUP BY u.id, u.telegram_id, u.first_name, u.last_name, u.username
+                GROUP BY u.id, u.telegram_id, u.first_name, u.last_name, u.username, u.is_guest
                 ORDER BY total_trainings DESC, attended_trainings DESC
                 LIMIT ?
-            ''', date_params + [limit] if date_params else [limit])
+            ''', params)
+
             rows = [dict(row) for row in cursor.fetchall()]
+
+        # Преобразуем поля в bool
+        for row in rows:
+            row['is_guest'] = bool(row.get('is_guest', False))
+            row['total_trainings'] = row.get('total_trainings', 0) or 0
+            row['attended_trainings'] = row.get('attended_trainings', 0) or 0
+            row['guests_trainings'] = row.get('guests_trainings', 0) or 0
+
+        return rows
+
+    def get_top_users_for_games(self, limit: int = 10, period: str = 'month') -> List[Dict[str, Any]]:
+        """
+        Получение топа пользователей по посещаемости игр
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        date_filter, date_params = self._get_period_filter(period)
+
+        cursor.execute(f'''
+            SELECT
+                u.telegram_id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                COUNT(gs.id) as total_games,
+                SUM(CASE WHEN gs.status = 'registered' THEN 1 ELSE 0 END) as attended_games
+            FROM game_signups gs
+            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
+            WHERE gs.created_at {date_filter}
+              AND u.is_active = 1
+            GROUP BY u.id, u.telegram_id, u.first_name, u.last_name, u.username
+            ORDER BY total_games DESC, attended_games DESC
+            LIMIT ?
+        ''', date_params + [limit] if date_params else [limit])
+
+        rows = [dict(row) for row in cursor.fetchall()]
+        for row in rows:
+            row['total_games'] = row.get('total_games', 0) or 0
+            row['attended_games'] = row.get('attended_games', 0) or 0
 
         return rows
 
