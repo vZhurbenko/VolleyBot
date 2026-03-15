@@ -144,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Shield, Edit2, User, BadgeCheck } from 'lucide-vue-next'
 import UserEditModal from '@/components/UserEditModal.vue'
@@ -169,18 +169,28 @@ const currentFilter = computed(() => {
   return filter === undefined || filter === null || filter === '' ? null : filter
 })
 
+// Загрузка пользователей при монтировании и при изменении route
+const loadUsersFromRoute = () => {
+  loadUsers(currentFilter.value)
+}
+
 onMounted(() => {
-  loadUsers()
+  loadUsersFromRoute()
 })
 
-const loadUsers = async () => {
+// Следим за изменениями route.query.filter для навигации назад/вперёд
+watch(() => route.query.filter, () => {
+  loadUsersFromRoute()
+})
+
+const loadUsers = async (filterType = null) => {
   loading.value = true
 
   try {
     // Формируем URL с query параметром filter
     const url = new URL('/api/admin/users', window.location.origin)
-    if (currentFilter.value) {
-      url.searchParams.set('filter', currentFilter.value)
+    if (filterType) {
+      url.searchParams.set('filter', filterType)
     }
 
     const response = await fetch(url, {
@@ -225,15 +235,16 @@ const loadUsers = async () => {
 // Установка фильтра и обновление URL
 const setFilter = (filterType) => {
   const query = { ...route.query }
-  
+
   if (filterType === null || filterType === undefined) {
     delete query.filter
   } else {
     query.filter = filterType
   }
-  
+
   router.push({ query })
-  loadUsers()
+  // Передаём фильтр напрямую, а не полагаемся на reactive обновление currentFilter
+  loadUsers(filterType)
 }
 
 const handleAdd = async () => {
