@@ -53,6 +53,16 @@
           <Toggle :model-value="user.is_active" @toggle="toggleActive" />
         </div>
 
+        <!-- Кнопка конвертации гостя -->
+        <div v-if="user.is_guest" class="pt-4 border-t border-gray-100">
+          <button
+            @click="$emit('convert', user)"
+            class="w-full h-11 px-6 rounded font-medium transition-colors text-blue-600 hover:text-blue-700 bg-transparent"
+          >
+            Конвертировать в пользователя
+          </button>
+        </div>
+
         <!-- Кнопка удаления -->
         <div class="pt-4 border-t border-gray-100">
           <button
