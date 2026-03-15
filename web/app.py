@@ -2468,7 +2468,17 @@ async def get_training_by_uuid(
 
     # Добавляем список участников с флагом is_guest
     participants = db.get_training_participants(training_uuid)
-    training['participants'] = participants
+    training['registrations'] = participants
+    training['registered_count'] = len([p for p in participants if p.get('status') == 'registered'])
+    training['waitlist_count'] = len([p for p in participants if p.get('status') == 'waitlist'])
+
+    # Добавляем статус записи текущего пользователя
+    if user:
+        telegram_id = user.get('telegram_id')
+        user_signup = next((p for p in participants if int(p.get('user_telegram_id')) == telegram_id), None)
+        training['user_status'] = user_signup['status'] if user_signup else None
+    else:
+        training['user_status'] = None
 
     return {"training": training}
 

@@ -245,7 +245,23 @@ const updateMonth = ({ year, month }) => {
   })
 }
 
-const openTrainingModal = (training) => {
+const openTrainingModal = async (training) => {
+  // Если есть uuid, загружаем актуальные данные через API
+  if (training.uuid) {
+    try {
+      const response = await fetch(`/api/trainings/${training.uuid}`, {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        selectedTraining.value = data.training
+        return
+      }
+    } catch (error) {
+      console.error('Error loading training:', error)
+    }
+  }
+  // Фоллбэк: используем данные из календаря
   selectedTraining.value = { ...training }
 }
 
