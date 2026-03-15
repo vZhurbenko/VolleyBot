@@ -3427,6 +3427,28 @@ class Database:
         stats['users_count'] = stats.get('users_count', 0) or 0
         stats['guests_count'] = stats.get('guests_count', 0) or 0
 
+        # Статистика из guest_signups (гости)
+        cursor.execute(f'''
+            SELECT
+                COUNT(DISTINCT gs.training_uuid) as total_trainings,
+                COUNT(gs.id) as total_signups,
+                COUNT(DISTINCT gs.user_telegram_id) as unique_users,
+                COUNT(gs.id) as guests_count,
+                0 as users_count
+            FROM guest_signups gs
+            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
+            WHERE gs.created_at {date_filter}
+              AND u.is_active = 1
+        ''', date_params if date_params else ())
+
+        guest_row = cursor.fetchone()
+        if guest_row:
+            guest_stats = dict(guest_row)
+            stats['total_trainings'] = max(stats.get('total_trainings', 0), guest_stats.get('total_trainings', 0) or 0)
+            stats['total_signups'] = (stats.get('total_signups', 0) or 0) + (guest_stats.get('total_signups', 0) or 0)
+            stats['unique_users'] = max(stats.get('unique_users', 0), guest_stats.get('unique_users', 0) or 0)
+            stats['guests_count'] = (stats.get('guests_count', 0) or 0) + (guest_stats.get('guests_count', 0) or 0)
+
         # Дополняем из event_signups (новая архитектура)
         cursor.execute(f'''
             SELECT
@@ -3444,7 +3466,7 @@ class Database:
         event_row = cursor.fetchone()
         if event_row:
             event_stats = dict(event_row)
-            # Добавляем данные из event_signups
+            # Добавляем данные из event_signups только если они ещё не учтены
             stats['total_trainings'] = max(stats.get('total_trainings', 0), event_stats.get('total_trainings', 0) or 0)
             stats['total_signups'] = (stats.get('total_signups', 0) or 0) + (event_stats.get('total_signups', 0) or 0)
             stats['unique_users'] = max(stats.get('unique_users', 0), event_stats.get('unique_users', 0) or 0)
