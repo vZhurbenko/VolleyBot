@@ -217,78 +217,6 @@
       </div>
     </div>
 
-    <!-- Статистика по дате -->
-    <div v-if="activeTab === 'by_date'" class="flex flex-col gap-4">
-      <!-- Выбор даты -->
-      <div class="bg-white rounded shadow p-4 lg:p-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Выберите дату</label>
-        <input
-          v-model="selectedDate"
-          type="date"
-          class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
-          @change="loadTrainingDetails"
-        />
-      </div>
-
-      <!-- Детали тренировки -->
-      <div v-if="trainingDetails.training_info" class="bg-white rounded shadow p-4 lg:p-6">
-        <h3 class="font-semibold text-gray-900 mb-4">
-          {{ trainingDetails.training_info.name || 'Тренировка' }}
-        </h3>
-        
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div>
-            <p class="text-sm text-gray-500">Время</p>
-            <p class="font-medium text-gray-900">
-              {{ trainingDetails.training_info.start_time }} - {{ trainingDetails.training_info.end_time }}
-            </p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500">Место</p>
-            <p class="font-medium text-gray-900">{{ trainingDetails.training_info.location || '—' }}</p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500">Участников</p>
-            <p class="font-medium text-gray-900">{{ trainingDetails.stats?.total || 0 }}</p>
-          </div>
-        </div>
-
-        <div v-if="trainingDetails.participants && trainingDetails.participants.length > 0">
-          <h4 class="font-medium text-gray-900 mb-3">Участники ({{ trainingDetails.participants.length }})</h4>
-          <div class="space-y-2 max-h-96 overflow-y-auto">
-            <div
-              v-for="(p, index) in trainingDetails.participants"
-              :key="index"
-              class="flex items-center justify-between p-2 bg-gray-50 rounded"
-            >
-              <div class="flex items-center gap-2">
-                <User v-if="p.is_guest" class="w-4 h-4 text-blue-600" />
-                <span class="text-gray-900">
-                  {{ p.username ? '@' + p.username : p.first_name + ' ' + (p.last_name || '') }}
-                </span>
-              </div>
-              <span
-                :class="[
-                  'px-2 py-0.5 rounded text-xs font-medium',
-                  p.status === 'registered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                ]"
-              >
-                {{ p.status === 'registered' ? 'Записан' : 'Лист ожидания' }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="text-center py-8 text-gray-500">
-          Нет участников на эту дату
-        </div>
-      </div>
-
-      <div v-else-if="selectedDate" class="bg-white rounded shadow p-4 lg:p-6 text-center text-gray-500">
-        Тренировка на {{ selectedDate }} не найдена
-      </div>
-    </div>
-
     <!-- Модальное окно статистики пользователя -->
     <div
       v-if="selectedUserStats"
@@ -345,8 +273,6 @@ import { BadgeCheck, User, BarChart3 } from 'lucide-vue-next'
 const authStore = useAuthStore()
 
 const periods = [
-  { value: 'day', label: 'День' },
-  { value: 'week', label: 'Неделя' },
   { value: 'month', label: 'Месяц' },
   { value: 'all', label: 'Всё время' }
 ]
@@ -354,13 +280,11 @@ const periods = [
 const tabs = [
   { id: 'overview', label: 'Тренировки' },
   { id: 'games', label: 'Игры' },
-  { id: 'top_users', label: 'Топ пользователей' },
-  { id: 'by_date', label: 'По дате' }
+  { id: 'top_users', label: 'Топ пользователей' }
 ]
 
-const selectedPeriod = ref('week')
+const selectedPeriod = ref('month')
 const activeTab = ref('overview')
-const selectedDate = ref('')
 
 const overviewStats = ref({})
 const gamesStats = ref({})
@@ -368,7 +292,6 @@ const topUsers = ref([])
 const totalEvents = ref(0)
 const trainingsCount = ref(0)
 const gamesCount = ref(0)
-const trainingDetails = ref({})
 const selectedUserStats = ref(null)
 
 async function loadAllStats() {
@@ -417,27 +340,6 @@ async function loadTopUsers() {
     }
   } catch (error) {
     console.error('Error loading top users:', error)
-  }
-}
-
-async function loadTrainingDetails() {
-  if (!selectedDate.value) {
-    trainingDetails.value = {}
-    return
-  }
-
-  try {
-    const response = await fetch(`/api/admin/training-stats/details?training_date=${selectedDate.value}`, {
-      credentials: 'include'
-    })
-    if (response.ok) {
-      trainingDetails.value = await response.json()
-    } else {
-      trainingDetails.value = {}
-    }
-  } catch (error) {
-    console.error('Error loading training details:', error)
-    trainingDetails.value = {}
   }
 }
 
