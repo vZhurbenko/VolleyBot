@@ -3483,6 +3483,130 @@ class Database:
 
         return stats
 
+    def get_games_stats(self, period: str = 'week') -> Dict[str, Any]:
+        """
+        Получение статистики по играм за период
+
+        Args:
+            period: Период статистики ('day', 'week', 'month', 'all')
+
+        Returns:
+            Dict со статистикой:
+                - total_games: количество игр
+                - total_signups: общее количество записей
+                - unique_users: количество уникальных пользователей
+                - guests_count: количество гостей
+                - users_count: количество авторизованных пользователей
+                - avg_per_game: среднее количество участников на игру
+                - date_range: диапазон дат (from, to)
+        """
+        if not self.conn:
+            return {"error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        # Определяем диапазон дат
+        date_filter, date_params = self._get_period_filter(period)
+
+        # Статистика из game_signups
+        cursor.execute(f'''
+            SELECT
+                COUNT(DISTINCT gs.game_id) as total_games,
+                COUNT(gs.id) as total_signups,
+                COUNT(DISTINCT gs.user_telegram_id) as unique_users,
+                0 as guests_count,
+                COUNT(gs.id) as users_count
+            FROM game_signups gs
+            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
+            INNER JOIN games g ON gs.game_id = g.id
+            WHERE gs.created_at {date_filter}
+              AND u.is_active = 1
+        ''', date_params if date_params else ())
+
+        row = cursor.fetchone()
+        stats = dict(row) if row else {}
+        stats['total_games'] = stats.get('total_games', 0) or 0
+        stats['total_signups'] = stats.get('total_signups', 0) or 0
+        stats['unique_users'] = stats.get('unique_users', 0) or 0
+        stats['users_count'] = stats.get('users_count', 0) or 0
+        stats['guests_count'] = stats.get('guests_count', 0) or 0
+
+        # Вычисляем среднее
+        total_games = stats.get('total_games', 0) or 1
+        stats['avg_per_game'] = round(stats.get('total_signups', 0) / total_games, 2)
+
+        # Диапазон дат
+        stats['date_range'] = self._get_period_date_range(period)
+        stats['period'] = period
+
+        return stats
+
+    def get_game_details(self, game_id: str) -> Dict[str, Any]:
+        """
+        Получение детальной информации о конкретной игре
+
+        Args:
+            game_id: ID игры
+
+        Returns:
+            Dict с деталями игры:
+                - game_info: информация об игре
+                - participants: список участников
+                - stats: статистика (users_count, guests_count, total)
+        """
+        if not self.conn:
+            return {"error": "DB not connected"}
+
+        cursor = self.conn.cursor()
+
+        # Получаем информацию об игре
+        cursor.execute('''
+            SELECT id, uuid, name, date, location, opponent, result, score
+            FROM games
+            WHERE id = ?
+        ''', (game_id,))
+
+        game_row = cursor.fetchone()
+
+        if not game_row:
+            return {"error": "Game not found"}
+
+        game_info = dict(game_row)
+
+        # Получаем участников из game_signups
+        cursor.execute('''
+            SELECT
+                gs.user_telegram_id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                u.photo_url,
+                gs.status,
+                0 as is_guest,
+                gs.created_at as registered_at
+            FROM game_signups gs
+            INNER JOIN users u ON gs.user_telegram_id = u.telegram_id
+            WHERE gs.game_id = ?
+              AND u.is_active = 1
+            ORDER BY gs.created_at ASC
+        ''', (game_id,))
+
+        participants = [dict(row) for row in cursor.fetchall()]
+
+        # Статистика
+        users_count = len(participants)
+        guests_count = 0  # В game_signups пока нет разделения на гостей
+
+        return {
+            'game_info': game_info,
+            'participants': participants,
+            'stats': {
+                'total': len(participants),
+                'users_count': users_count,
+                'guests_count': guests_count
+            }
+        }
+
     def get_training_details(self, training_date: str, training_time: str = None, chat_id: str = None) -> Dict[str, Any]:
         """
         Получение детальной информации о конкретной тренировке

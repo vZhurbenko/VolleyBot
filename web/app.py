@@ -1702,6 +1702,38 @@ async def get_top_users_stats(
     return {"top_users": top_users}
 
 
+# ==================== Статистика игр ====================
+
+@app.get("/api/admin/game-stats/overview")
+async def get_game_stats_overview(
+    period: str = "week",
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение общей статистики по играм за период
+    period: day, week, month, all
+    """
+    require_admin(user)
+    
+    stats = db.get_games_stats(period)
+    return stats
+
+
+@app.get("/api/admin/game-stats/details")
+async def get_game_stats_details(
+    game_id: str,
+    user: dict = Depends(get_current_user_from_access_cookie)
+):
+    """
+    Получение детальной информации о конкретной игре
+    game_id: ID игры
+    """
+    require_admin(user)
+    
+    details = db.get_game_details(game_id)
+    return details
+
+
 # ==================== Универсальные ссылки на тренировки ====================
 
 @app.get("/training/{training_uuid}")

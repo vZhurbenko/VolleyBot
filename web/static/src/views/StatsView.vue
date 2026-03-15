@@ -44,7 +44,7 @@
       </nav>
     </div>
 
-    <!-- Общая статистика -->
+    <!-- Общая статистика по тренировкам -->
     <div v-if="activeTab === 'overview'" class="flex flex-col gap-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white rounded shadow p-4 lg:p-6">
@@ -98,6 +98,60 @@
       </div>
     </div>
 
+    <!-- Общая статистика по играм -->
+    <div v-if="activeTab === 'games'" class="flex flex-col gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded shadow p-4 lg:p-6">
+          <p class="text-sm text-gray-500 mb-2">Игр</p>
+          <p class="text-3xl font-bold text-gray-900">{{ gamesStats.total_games || 0 }}</p>
+        </div>
+        
+        <div class="bg-white rounded shadow p-4 lg:p-6">
+          <p class="text-sm text-gray-500 mb-2">Всего записей</p>
+          <p class="text-3xl font-bold text-gray-900">{{ gamesStats.total_signups || 0 }}</p>
+        </div>
+        
+        <div class="bg-white rounded shadow p-4 lg:p-6">
+          <p class="text-sm text-gray-500 mb-2">Уникальных пользователей</p>
+          <p class="text-3xl font-bold text-gray-900">{{ gamesStats.unique_users || 0 }}</p>
+        </div>
+        
+        <div class="bg-white rounded shadow p-4 lg:p-6">
+          <p class="text-sm text-gray-500 mb-2">В среднем на игру</p>
+          <p class="text-3xl font-bold text-gray-900">{{ gamesStats.avg_per_game || 0 }}</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded shadow p-4 lg:p-6">
+          <h3 class="font-semibold text-gray-900 mb-4">Распределение по типам</h3>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <BadgeCheck class="w-5 h-5 text-teal-600" />
+                <span class="text-gray-700">Участники</span>
+              </div>
+              <span class="font-semibold text-gray-900">{{ gamesStats.users_count || 0 }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <User class="w-5 h-5 text-blue-600" />
+                <span class="text-gray-700">Гости</span>
+              </div>
+              <span class="font-semibold text-gray-900">{{ gamesStats.guests_count || 0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded shadow p-4 lg:p-6">
+          <h3 class="font-semibold text-gray-900 mb-4">Период</h3>
+          <p class="text-gray-700">
+            {{ gamesStats.date_range?.from || '—' }} — {{ gamesStats.date_range?.to || '—' }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Топ пользователей -->
     <div v-if="activeTab === 'top_users'" class="bg-white rounded shadow p-4 lg:p-6">
       <h3 class="font-semibold text-gray-900 mb-4">Топ пользователей по посещаемости</h3>
@@ -110,7 +164,7 @@
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Пользователь</th>
               <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Всего</th>
               <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Посещено</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Гостей</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Как гость</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
@@ -281,7 +335,8 @@ const periods = [
 ]
 
 const tabs = [
-  { id: 'overview', label: 'Общая' },
+  { id: 'overview', label: 'Тренировки' },
+  { id: 'games', label: 'Игры' },
   { id: 'top_users', label: 'Топ пользователей' },
   { id: 'by_date', label: 'По дате' }
 ]
@@ -291,12 +346,14 @@ const activeTab = ref('overview')
 const selectedDate = ref('')
 
 const overviewStats = ref({})
+const gamesStats = ref({})
 const topUsers = ref([])
 const trainingDetails = ref({})
 const selectedUserStats = ref(null)
 
 async function loadAllStats() {
   await loadOverviewStats()
+  await loadGamesStats()
   await loadTopUsers()
 }
 
@@ -310,6 +367,19 @@ async function loadOverviewStats() {
     }
   } catch (error) {
     console.error('Error loading overview stats:', error)
+  }
+}
+
+async function loadGamesStats() {
+  try {
+    const response = await fetch(`/api/admin/game-stats/overview?period=${selectedPeriod.value}`, {
+      credentials: 'include'
+    })
+    if (response.ok) {
+      gamesStats.value = await response.json()
+    }
+  } catch (error) {
+    console.error('Error loading games stats:', error)
   }
 }
 
