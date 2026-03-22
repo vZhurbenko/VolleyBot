@@ -1023,45 +1023,57 @@ class Database:
             logger.error(f"Ошибка отписки от тренировки: {e}")
             return {"success": False, "error": str(e)}
 
-    def admin_remove_user_from_training(self, training_date: str, training_time: str,
-                                        chat_id: str, user_telegram_id: int) -> Dict[str, Any]:
-        """Удаление участника из тренировки администратором с автоматическим зачислением из waitlist"""
+    def admin_remove_user_from_training(self, event_uuid: str, user_telegram_id: int) -> Dict[str, Any]:
+        """Удаление участника из тренировки администратором с автоматическим зачислением из waitlist
+        (новая архитектура: event_signups)"""
         if not self.conn:
             return {"success": False, "error": "DB not connected"}
 
         cursor = self.conn.cursor()
 
         try:
-            # Проверяем существование записи
+            # Находим event_id по uuid
+            cursor.execute('SELECT id FROM events WHERE uuid = ?', (event_uuid,))
+            event_row = cursor.fetchone()
+            if not event_row:
+                return {"success": False, "error": "Событие не найдено"}
+
+            event_id = event_row['id']
+
+            # Проверяем существование записи в event_signups
             cursor.execute('''
-                SELECT id, status FROM training_registrations
-                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
-            ''', (training_date, training_time, chat_id, user_telegram_id))
+                SELECT id, status FROM event_signups
+                WHERE event_id = ? AND user_id = (
+                    SELECT id FROM users WHERE telegram_id = ?
+                )
+            ''', (event_id, user_telegram_id))
 
             existing = cursor.fetchone()
             if not existing:
                 return {"success": False, "error": "Запись не найдена"}
 
-            # Удаляем запись
+            # Удаляем запись из event_signups
             cursor.execute('''
-                DELETE FROM training_registrations
-                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND user_telegram_id = ?
-            ''', (training_date, training_time, chat_id, user_telegram_id))
+                DELETE FROM event_signups
+                WHERE event_id = ? AND user_id = (
+                    SELECT id FROM users WHERE telegram_id = ?
+                )
+            ''', (event_id, user_telegram_id))
 
             self.conn.commit()
 
             # Находим первого в waitlist и переводим в registered
             cursor.execute('''
-                SELECT id FROM training_registrations
-                WHERE training_date = ? AND training_time = ? AND chat_id = ? AND status = 'waitlist'
-                ORDER BY registered_at ASC
+                SELECT id FROM event_signups
+                WHERE event_id = ? AND status = 'waitlist'
+                ORDER BY created_at ASC
                 LIMIT 1
-            ''', (training_date, training_time, chat_id))
+            ''', (event_id,))
 
             waitlist_user = cursor.fetchone()
             if waitlist_user:
                 cursor.execute('''
-                    UPDATE training_registrations
+                    UPDATE event_signups
                     SET status = 'registered'
                     WHERE id = ?
                 ''', (waitlist_user['id'],))
@@ -1301,19 +1313,21 @@ class Database:
             return []
 
         cursor = self.conn.cursor()
-        
+
         # Сначала получаем из event_signups (новая архитектура)
         cursor.execute('''
-            SELECT 
+            SELECT
                 e.date as training_date,
                 e.start_time as training_time,
                 e.end_time,
                 e.chat_id,
                 e.topic_id,
+                e.uuid,
                 e.name as training_name,
                 e.location,
                 es.status,
                 es.created_at as registered_at,
+                u.telegram_id as user_telegram_id,
                 u.first_name,
                 u.last_name,
                 u.username,
@@ -1327,12 +1341,14 @@ class Database:
               AND u.is_active = 1
             ORDER BY e.date ASC, e.start_time ASC, es.created_at ASC
         ''', (start_date, end_date))
-        
+
         rows = [dict(row) for row in cursor.fetchall()]
         
         # Дополняем из training_registrations (старая архитектура)
         cursor.execute('''
             SELECT tr.*, u.first_name, u.last_name, u.username,
+                   tr.user_telegram_id as user_telegram_id,
+                   NULL as uuid,
                    ot.name as training_name,
                    ot.location as location,
                    ps.name as schedule_name,

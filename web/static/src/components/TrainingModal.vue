@@ -62,7 +62,7 @@
           <div class="space-y-2 mb-4">
             <div
               v-for="reg in registeredUsers"
-              :key="reg.user_telegram_id"
+              :key="reg.telegram_id"
               class="flex items-center gap-3 p-2 bg-gray-50 rounded"
             >
               <img v-if="reg.photo_url" :src="reg.photo_url" alt="" class="w-8 h-8 rounded-full" />
@@ -116,7 +116,7 @@
             <div class="space-y-2">
               <div
                 v-for="reg in waitlistUsers"
-                :key="reg.user_telegram_id"
+                :key="reg.telegram_id"
                 class="flex items-center gap-3 p-2 bg-yellow-50 rounded"
               >
                 <img

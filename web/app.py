@@ -2115,11 +2115,9 @@ async def unregister_from_training(request: Request, user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail=result.get('error', 'Unregistration failed'))
 
 
-@app.delete("/api/admin/calendar/remove-user/{training_date}/{training_time}/{chat_id}/{user_telegram_id}")
+@app.delete("/api/admin/calendar/remove-user/{event_uuid}/{user_telegram_id}")
 async def admin_remove_user_from_training(
-    training_date: str,
-    training_time: str,
-    chat_id: str,
+    event_uuid: str,
     user_telegram_id: int,
     user: dict = Depends(get_current_user_from_access_cookie)
 ):
@@ -2129,7 +2127,7 @@ async def admin_remove_user_from_training(
     require_admin(user)
 
     result = db.admin_remove_user_from_training(
-        training_date, training_time, chat_id, user_telegram_id
+        event_uuid, user_telegram_id
     )
 
     if result.get('success'):
@@ -2661,7 +2659,7 @@ async def get_training_by_uuid(
     # Добавляем статус записи текущего пользователя
     if user:
         telegram_id = user.get('telegram_id')
-        user_signup = next((p for p in participants if int(p.get('user_telegram_id')) == telegram_id), None)
+        user_signup = next((p for p in participants if int(p.get('telegram_id')) == telegram_id), None)
         training['user_status'] = user_signup['status'] if user_signup else None
     else:
         training['user_status'] = None
