@@ -279,7 +279,7 @@ const removeUser = async (item) => {
     } else {
       // Удаление из тренировки
       response = await fetch(
-        `/api/admin/calendar/remove-user/${item.training_date}/${encodeURIComponent(item.training_time)}/${item.chat_id}/${item.user_telegram_id}`,
+        `/api/admin/calendar/remove-user/${item.uuid}/${item.user_telegram_id}`,
         {
           method: 'DELETE',
           credentials: 'include',

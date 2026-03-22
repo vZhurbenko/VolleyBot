@@ -474,7 +474,7 @@ const removeUserFromTraining = async (reg) => {
 
   try {
     const response = await fetch(
-      `/api/admin/calendar/remove-user/${selectedTraining.value.date}/${encodeURIComponent(selectedTraining.value.time)}/${selectedTraining.value.chat_id}/${reg.user_telegram_id}`,
+      `/api/admin/calendar/remove-user/${selectedTraining.value.uuid}/${reg.telegram_id}`,
       {
         method: 'DELETE',
         credentials: 'include',
