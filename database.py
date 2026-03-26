@@ -215,6 +215,44 @@ class Database:
             )
         ''')
 
+        # Таблица событий (новая архитектура)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uuid TEXT UNIQUE NOT NULL,
+                event_type TEXT NOT NULL,
+                name TEXT NOT NULL,
+                date DATE NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                location TEXT,
+                chat_id TEXT,
+                topic_id INTEGER,
+                opponent TEXT,
+                result TEXT,
+                score TEXT,
+                source_id TEXT,
+                source_table TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Таблица записей на события
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS event_signups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'registered',
+                is_guest INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(event_id, user_id)
+            )
+        ''')
+
         self.conn.commit()
         logger.info("Таблицы базы данных созданы/проверены")
 
@@ -1251,7 +1289,8 @@ class Database:
         try:
             import uuid as uuid_module
             training_uuid = str(uuid_module.uuid4())
-            
+
+            # Создаём запись в scheduled_trainings
             cursor.execute('''
                 INSERT INTO scheduled_trainings
                 (id, uuid, schedule_id, training_date, training_time, start_time, end_time,
@@ -1259,6 +1298,12 @@ class Database:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ''', (training_id, training_uuid, schedule_id, training_date, training_time,
                   start_time, end_time, chat_id, topic_id, name, location))
+
+            # Создаём запись в events для поддержки новой архитектуры
+            cursor.execute('''
+                INSERT INTO events (uuid, event_type, name, date, start_time, end_time, location, chat_id, topic_id, source_id, source_table, created_at)
+                VALUES (?, 'scheduled_training', ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled_trainings', CURRENT_TIMESTAMP)
+            ''', (training_uuid, name, training_date, start_time, end_time, location, chat_id, topic_id, training_id))
 
             self.conn.commit()
             return {"success": True, "uuid": training_uuid}
@@ -1274,6 +1319,12 @@ class Database:
         cursor = self.conn.cursor()
 
         try:
+            # Сначала удаляем запись из events
+            cursor.execute('''
+                DELETE FROM events WHERE source_table = 'scheduled_trainings' AND source_id = ?
+            ''', (training_id,))
+
+            # Затем удаляем саму тренировку
             cursor.execute('DELETE FROM scheduled_trainings WHERE id = ?', (training_id,))
             self.conn.commit()
             return {"success": True}
