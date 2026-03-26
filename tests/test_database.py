@@ -573,3 +573,125 @@ class TestGetAllUsersWithFilters:
         assert len(users) == 1
         assert users[0]['telegram_id'] == 222
         assert users[0]['is_guest'] is True
+
+
+class TestScheduledTrainings:
+    """Тесты для работы с тренировками из расписания"""
+
+    def test_add_scheduled_training_creates_event(self, db, sample_schedule):
+        """Тест что add_scheduled_training создает запись в events"""
+        # Добавляем расписание
+        db.add_poll_schedule(sample_schedule)
+
+        # Добавляем тренировку из расписания
+        training_id = "test-scheduled-training-1"
+        schedule_id = sample_schedule["id"]
+        training_date = "2026-03-30"
+        training_time = "18:00 - 20:00"
+        chat_id = "-1001234567890"
+        topic_id = 123
+        name = "Тренировка"
+        start_time = "18:00"
+        end_time = "20:00"
+        location = "Место"
+
+        result = db.add_scheduled_training(
+            training_id=training_id,
+            schedule_id=schedule_id,
+            training_date=training_date,
+            training_time=training_time,
+            chat_id=chat_id,
+            topic_id=topic_id,
+            name=name,
+            start_time=start_time,
+            end_time=end_time,
+            location=location
+        )
+
+        # Проверяем что добавление успешно
+        assert result['success'] is True
+        assert 'uuid' in result
+
+        # Проверяем что запись создана в scheduled_trainings
+        training = db.get_scheduled_training(training_id)
+        assert training is not None
+        assert training['id'] == training_id
+        assert training['schedule_id'] == schedule_id
+        assert training['training_date'] == training_date
+        assert training['uuid'] == result['uuid']
+
+        # Проверяем что запись создана в events
+        event = db.get_event_by_uuid(result['uuid'])
+        assert event is not None
+        assert event['uuid'] == result['uuid']
+        assert event['event_type'] == 'scheduled_training'
+        assert event['source_table'] == 'scheduled_trainings'
+        assert event['source_id'] == training_id
+        assert event['name'] == name
+        assert event['date'] == training_date
+
+    def test_remove_scheduled_training_removes_event(self, db, sample_schedule):
+        """Тест что remove_scheduled_training удаляет запись из events"""
+        # Добавляем расписание
+        db.add_poll_schedule(sample_schedule)
+
+        # Добавляем тренировку
+        training_id = "test-scheduled-training-2"
+        result = db.add_scheduled_training(
+            training_id=training_id,
+            schedule_id=sample_schedule["id"],
+            training_date="2026-03-30",
+            training_time="18:00 - 20:00",
+            chat_id="-1001234567890",
+            topic_id=123,
+            name="Тренировка",
+            start_time="18:00",
+            end_time="20:00",
+            location="Место"
+        )
+
+        training_uuid = result['uuid']
+
+        # Проверяем что запись есть в events
+        event = db.get_event_by_uuid(training_uuid)
+        assert event is not None
+
+        # Удаляем тренировку
+        remove_result = db.remove_scheduled_training(training_id)
+        assert remove_result['success'] is True
+
+        # Проверяем что запись удалена из scheduled_trainings
+        training = db.get_scheduled_training(training_id)
+        assert training is None
+
+        # Проверяем что запись удалена из events
+        event = db.get_event_by_uuid(training_uuid)
+        assert event is None
+
+    def test_get_event_by_uuid_for_scheduled_training(self, db, sample_schedule):
+        """Тест что get_event_by_uuid находит тренировку из расписания"""
+        # Добавляем расписание
+        db.add_poll_schedule(sample_schedule)
+
+        # Добавляем тренировку
+        training_id = "test-scheduled-training-3"
+        result = db.add_scheduled_training(
+            training_id=training_id,
+            schedule_id=sample_schedule["id"],
+            training_date="2026-03-30",
+            training_time="18:00 - 20:00",
+            chat_id="-1001234567890",
+            topic_id=123,
+            name="Тренировка",
+            start_time="18:00",
+            end_time="20:00",
+            location="Место"
+        )
+
+        training_uuid = result['uuid']
+
+        # Проверяем что get_event_by_uuid находит тренировку
+        event = db.get_event_by_uuid(training_uuid)
+        assert event is not None
+        assert event['uuid'] == training_uuid
+        assert event['event_type'] == 'scheduled_training'
