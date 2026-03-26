@@ -86,6 +86,8 @@ const closeTrainingModal = () => {
 const registerForTraining = async () => {
   if (!selectedTraining.value) return
 
+  const trainingUuid = selectedTraining.value.uuid
+
   try {
     const response = await fetch('/api/user/calendar/register', {
       method: 'POST',
@@ -94,22 +96,26 @@ const registerForTraining = async () => {
       },
       credentials: 'include',
       body: JSON.stringify({
-        training_date: selectedTraining.value.date,
-        training_time: selectedTraining.value.time,
-        chat_id: selectedTraining.value.chat_id,
-        topic_id: selectedTraining.value.topic_id,
+        uuid: trainingUuid,
       }),
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
-      selectedTraining.value.user_status = result.status
-      selectedTraining.value.registered_count =
-        result.status === 'registered'
-          ? selectedTraining.value.registered_count + 1
-          : selectedTraining.value.registered_count
+      // Сначала загружаем актуальные данные тренировки через API
+      const apiResponse = await fetch(`/api/trainings/${trainingUuid}`, {
+        credentials: 'include',
+      })
+      if (apiResponse.ok) {
+        const data = await apiResponse.json()
+        selectedTraining.value = data.training
+      }
+
+      // Затем перезагружаем календарь
       loadCalendar()
+
+      notificationsStore.success('Вы записаны на тренировку')
     } else {
       notificationsStore.error(result.detail || 'Ошибка записи')
     }
@@ -122,6 +128,8 @@ const registerForTraining = async () => {
 const unregisterFromTraining = async () => {
   if (!selectedTraining.value) return
 
+  const trainingUuid = selectedTraining.value.uuid
+
   try {
     const response = await fetch('/api/user/calendar/unregister', {
       method: 'POST',
@@ -130,32 +138,25 @@ const unregisterFromTraining = async () => {
       },
       credentials: 'include',
       body: JSON.stringify({
-        training_date: selectedTraining.value.date,
-        training_time: selectedTraining.value.time,
-        chat_id: selectedTraining.value.chat_id,
+        uuid: trainingUuid,
       }),
     })
 
     const result = await response.json()
 
     if (response.ok && result.success) {
-      selectedTraining.value.user_status = null
-      selectedTraining.value.registered_count = Math.max(
-        0,
-        selectedTraining.value.registered_count - 1,
-      )
-      // Перезагружаем календарь для обновления списка записавшихся
-      await loadCalendar()
-      // Находим обновлённую тренировку и обновляем selectedTraining
-      const updatedTraining = trainings.value.find(
-        (t) =>
-          t.date === selectedTraining.value.date &&
-          t.time === selectedTraining.value.time &&
-          t.chat_id === selectedTraining.value.chat_id,
-      )
-      if (updatedTraining) {
-        selectedTraining.value = { ...updatedTraining }
+      // Сначала загружаем актуальные данные тренировки через API
+      const apiResponse = await fetch(`/api/trainings/${trainingUuid}`, {
+        credentials: 'include',
+      })
+      if (apiResponse.ok) {
+        const data = await apiResponse.json()
+        selectedTraining.value = data.training
       }
+
+      // Затем перезагружаем календарь
+      await loadCalendar()
+
       notificationsStore.success('Вы успешно выписались с тренировки')
     } else {
       notificationsStore.error(result.detail || 'Ошибка отписки')
